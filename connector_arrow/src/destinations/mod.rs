@@ -18,9 +18,7 @@ use crate::typesystem::{TypeAssoc, TypeSystem};
 pub trait Destination: Sized {
     const DATA_ORDERS: &'static [DataOrder];
     type TypeSystem: TypeSystem;
-    type Partition<'a>: DestinationPartition<'a, TypeSystem = Self::TypeSystem, Error = Self::Error>
-    where
-        Self: 'a;
+    type Partition: DestinationPartition<TypeSystem = Self::TypeSystem, Error = Self::Error>;
     type Error: From<ConnectorXError> + Send;
 
     /// Specify whether the destination needs total rows in advance
@@ -39,7 +37,7 @@ pub trait Destination: Sized {
     ) -> Result<(), Self::Error>;
 
     /// Create a bunch of partition destinations, with each write `count` number of rows.
-    fn partition(&mut self, counts: usize) -> Result<Vec<Self::Partition<'_>>, Self::Error>;
+    fn partition(&mut self, counts: usize) -> Result<Vec<Self::Partition>, Self::Error>;
     /// Return the schema of the destination.
     fn schema(&self) -> &[Self::TypeSystem];
 }
@@ -47,16 +45,16 @@ pub trait Destination: Sized {
 /// `PartitionDestination` writes values to its own region. `PartitionDestination` is parameterized
 /// on lifetime `'a`, which is the lifetime of the parent `Destination`. Usually,
 /// a `PartitionDestination` can never live longer than the parent.
-pub trait DestinationPartition<'a>: Send {
+pub trait DestinationPartition: Send {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send;
 
     /// Write a value of type T to the location (row, col). If T mismatch with the
     /// schema, `ConnectorXError::TypeCheckFailed` will return.
-    fn write<T>(&mut self, value: T) -> Result<(), <Self as DestinationPartition<'a>>::Error>
+    fn write<T>(&mut self, value: T) -> Result<(), <Self as DestinationPartition>::Error>
     where
         T: TypeAssoc<Self::TypeSystem>,
-        Self: Consume<T, Error = <Self as DestinationPartition<'a>>::Error>,
+        Self: Consume<T, Error = <Self as DestinationPartition>::Error>,
     {
         self.consume(value)
     }

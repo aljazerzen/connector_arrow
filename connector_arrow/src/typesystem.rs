@@ -96,7 +96,7 @@ pub trait Transport {
         ts1: Self::TSS,
         ts2: Self::TSD,
         src: &'r mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
-        dst: &'r mut <Self::D as Destination>::Partition<'d>,
+        dst: &'r mut <Self::D as Destination>::Partition,
     ) -> Result<(), Self::Error>
     where
         Self: 'd;
@@ -108,7 +108,7 @@ pub trait Transport {
     ) -> CXResult<
         fn(
             src: &mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
-            dst: &mut <Self::D as Destination>::Partition<'d>,
+            dst: &mut <Self::D as Destination>::Partition,
         ) -> Result<(), Self::Error>,
     >
     where
@@ -118,7 +118,7 @@ pub trait Transport {
 #[doc(hidden)]
 pub fn process<'s, 'd, 'r, T1, T2, TP, S, D, ES, ED, ET>(
     src: &'r mut <<S as Source>::Partition as SourcePartition>::Parser<'s>,
-    dst: &'r mut <D as Destination>::Partition<'d>,
+    dst: &'r mut <D as Destination>::Partition,
 ) -> Result<(), ET>
 where
     T1: TypeAssoc<<S as Source>::TypeSystem>,
@@ -130,7 +130,7 @@ where
 
     T2: TypeAssoc<<D as Destination>::TypeSystem>,
     D: Destination<Error = ED>,
-    <D as Destination>::Partition<'d>: Consume<T2, Error = ED>,
+    <D as Destination>::Partition: Consume<T2, Error = ED>,
     ED: From<ConnectorXError> + Send,
 
     TP: TypeConversion<T1, T2>,

@@ -54,7 +54,7 @@ impl Arrow2Destination {
 impl Destination for Arrow2Destination {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::ColumnMajor, DataOrder::RowMajor];
     type TypeSystem = Arrow2TypeSystem;
-    type Partition<'a> = ArrowPartitionWriter;
+    type Partition = ArrowPartitionWriter;
     type Error = Arrow2DestinationError;
 
     fn needs_count(&self) -> bool {
@@ -89,7 +89,7 @@ impl Destination for Arrow2Destination {
     }
 
     #[throws(Arrow2DestinationError)]
-    fn partition(&mut self, counts: usize) -> Vec<Self::Partition<'_>> {
+    fn partition(&mut self, counts: usize) -> Vec<Self::Partition> {
         let mut partitions = vec![];
         for _ in 0..counts {
             partitions.push(ArrowPartitionWriter::new(
@@ -227,7 +227,7 @@ impl ArrowPartitionWriter {
     }
 }
 
-impl<'a> DestinationPartition<'a> for ArrowPartitionWriter {
+impl DestinationPartition for ArrowPartitionWriter {
     type TypeSystem = Arrow2TypeSystem;
     type Error = Arrow2DestinationError;
 
@@ -248,9 +248,9 @@ impl<'a> DestinationPartition<'a> for ArrowPartitionWriter {
     }
 }
 
-impl<'a, T> Consume<T> for ArrowPartitionWriter
+impl<T> Consume<T> for ArrowPartitionWriter
 where
-    T: TypeAssoc<<Self as DestinationPartition<'a>>::TypeSystem> + ArrowAssoc + 'static,
+    T: TypeAssoc<<Self as DestinationPartition>::TypeSystem> + ArrowAssoc + 'static,
 {
     type Error = Arrow2DestinationError;
 

@@ -23,6 +23,14 @@ pub struct Dispatcher<'a, S, D, TP> {
     _phantom: PhantomData<TP>,
 }
 
+pub struct PreparedDispatch<S: Source, D: Destination> {
+    pub data_order: DataOrder,
+    pub src_partitions: Vec<S::Partition>,
+    pub dst_partitions: Vec<D::Partition>,
+    pub src_schema: Vec<S::TypeSystem>,
+    pub dst_schema: Vec<D::TypeSystem>,
+}
+
 impl<'w, S, D, TP> Dispatcher<'w, S, D, TP>
 where
     S: Source,
@@ -43,21 +51,10 @@ where
         }
     }
 
-    pub fn prepare(
-        mut self,
-    ) -> Result<
-        (
-            DataOrder,
-            Vec<S::Partition>,
-            Vec<D::Partition<'w>>,
-            Vec<S::TypeSystem>,
-            Vec<D::TypeSystem>,
-        ),
-        TP::Error,
-    > {
+    pub fn prepare(mut self) -> Result<PreparedDispatch<S, D>, TP::Error> {
         debug!("Prepare");
-        let dorder = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-        self.src.set_data_order(dorder)?;
+        let data_order = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
+        self.src.set_data_order(data_order)?;
         self.src.set_queries(self.queries.as_slice());
         self.src.set_origin_query(self.origin_query);
 
@@ -100,24 +97,31 @@ where
             total_rows,
             src_schema.len()
         );
-        self.dst.allocate(total_rows, &names, &dst_schema, dorder)?;
+        self.dst
+            .allocate(total_rows, &names, &dst_schema, data_order)?;
 
         debug!("Create destination partition");
         let dst_partitions = self.dst.partition(self.queries.len())?;
 
-        Ok((
-            dorder,
+        Ok(PreparedDispatch {
+            data_order,
             src_partitions,
             dst_partitions,
             src_schema,
             dst_schema,
-        ))
+        })
     }
 
     /// Start the data loading process.
     pub fn run(self) -> Result<(), TP::Error> {
         debug!("Run dispatcher");
-        let (dorder, src_partitions, dst_partitions, src_schema, dst_schema) = self.prepare()?;
+        let PreparedDispatch {
+            data_order,
+            src_partitions,
+            dst_partitions,
+            src_schema,
+            dst_schema,
+        } = self.prepare()?;
 
         #[cfg(all(not(feature = "branch"), not(feature = "fptr")))]
         compile_error!("branch or fptr, pick one");
@@ -145,7 +149,7 @@ where
 
                 let mut parser = src.parser()?;
 
-                match dorder {
+                match data_order {
                     DataOrder::RowMajor => loop {
                         let (n, is_last) = parser.fetch_next()?;
                         dst.aquire_row(n)?;

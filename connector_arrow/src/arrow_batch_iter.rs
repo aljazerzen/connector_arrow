@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{dispatcher::PreparedDispatch, prelude::*};
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use log::debug;
@@ -27,9 +27,9 @@ where
     <TP as Transport>::Error: 'static,
 {
     dst: ArrowStreamDestination,
-    dst_parts: Option<Vec<ArrowStreamPartitionWriter>>,
-    src_parts: Option<Vec<S::Partition>>,
-    dorder: DataOrder,
+    dst_partitions: Option<Vec<ArrowStreamPartitionWriter>>,
+    src_partitions: Option<Vec<S::Partition>>,
+    data_order: DataOrder,
     src_schema: Vec<S::TypeSystem>,
     dst_schema: Vec<ArrowStreamTypeSystem>,
     _phantom: PhantomData<TP>,
@@ -52,13 +52,19 @@ where
         queries: &[CXQuery<String>],
     ) -> Result<Self, TP::Error> {
         let dispatcher = Dispatcher::<_, _, TP>::new(src, &mut dst, queries, origin_query);
-        let (dorder, src_parts, dst_parts, src_schema, dst_schema) = dispatcher.prepare()?;
+        let PreparedDispatch {
+            data_order,
+            src_partitions,
+            dst_partitions,
+            src_schema,
+            dst_schema,
+        } = dispatcher.prepare()?;
 
         Ok(Self {
             dst,
-            dst_parts: Some(dst_parts),
-            src_parts: Some(src_parts),
-            dorder,
+            dst_partitions: Some(dst_partitions),
+            src_partitions: Some(src_partitions),
+            data_order,
             src_schema,
             dst_schema,
             _phantom: PhantomData,
@@ -68,9 +74,9 @@ where
     fn run(&mut self) {
         let src_schema = self.src_schema.clone();
         let dst_schema = self.dst_schema.clone();
-        let src_partitions = self.src_parts.take().unwrap();
-        let dst_partitions = self.dst_parts.take().unwrap();
-        let dorder = self.dorder;
+        let src_partitions = self.src_partitions.take().unwrap();
+        let dst_partitions = self.dst_partitions.take().unwrap();
+        let dorder = self.data_order;
 
         std::thread::spawn(move || -> Result<(), TP::Error> {
             let schemas: Vec<_> = src_schema

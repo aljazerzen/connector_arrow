@@ -1,6 +1,6 @@
-use connectorx::arrow_batch_iter::ArrowBatchIter;
-use connectorx::prelude::*;
-use connectorx::sources::postgres::{rewrite_tls_args, BinaryProtocol as PgBinaryProtocol};
+use connector_arrow::arrow_batch_iter::ArrowBatchIter;
+use connector_arrow::prelude::*;
+use connector_arrow::sources::postgres::{rewrite_tls_args, BinaryProtocol as PgBinaryProtocol};
 use postgres::NoTls;
 use std::convert::TryFrom;
 use std::time::Instant;

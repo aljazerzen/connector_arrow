@@ -89,7 +89,7 @@
 //! Given the source, destination and transport already implemented, you can use [`dispatcher::Dispatcher`] to load the data:
 //!
 //! ```no_run
-//! use connectorx::prelude::*;
+//! use connector_arrow::prelude::*;
 //!
 //! let mut destination = ArrowDestination::new();
 //! let source = SQLiteSource::new("/path/to/db", 10).expect("cannot create the source");
@@ -103,7 +103,7 @@
 //! Or simply you can directly use the [`get_arrow::get_arrow`] or [`get_arrow2::get_arrow2`] in which we wrapped the above procedures:
 //!
 //! ```no_run
-//! use connectorx::prelude::*;
+//! use connector_arrow::prelude::*;
 //! use std::convert::TryFrom;
 //!
 //! let mut source_conn = SourceConn::try_from("postgresql://username:password@host:port/db?cxprotocol=binary").expect("parse conn str failed");
