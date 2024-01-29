@@ -148,7 +148,7 @@ impl ArrowAssoc for DateTime<Utc> {
 
     #[throws(ArrowDestinationError)]
     fn append(builder: &mut Self::Builder, value: DateTime<Utc>) {
-        builder.append_value(value.timestamp_nanos())
+        builder.append_option(value.timestamp_nanos_opt())
     }
 
     fn field(header: &str) -> Field {
@@ -169,7 +169,7 @@ impl ArrowAssoc for Option<DateTime<Utc>> {
 
     #[throws(ArrowDestinationError)]
     fn append(builder: &mut Self::Builder, value: Option<DateTime<Utc>>) {
-        builder.append_option(value.map(|x| x.timestamp_nanos()))
+        builder.append_option(value.and_then(|x| x.timestamp_nanos_opt()))
     }
 
     fn field(header: &str) -> Field {

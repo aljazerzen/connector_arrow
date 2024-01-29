@@ -208,7 +208,7 @@ impl ArrowAssoc for DateTime<Utc> {
 
     #[inline]
     fn push(builder: &mut Self::Builder, value: DateTime<Utc>) {
-        builder.push(Some(value).map(|x| x.timestamp_nanos()));
+        builder.push(Some(value).and_then(|x| x.timestamp_nanos_opt()));
     }
 
     fn field(header: &str) -> Field {
@@ -232,7 +232,7 @@ impl ArrowAssoc for Option<DateTime<Utc>> {
 
     #[inline]
     fn push(builder: &mut Self::Builder, value: Option<DateTime<Utc>>) {
-        builder.push(value.map(|x| x.timestamp_nanos()));
+        builder.push(value.and_then(|x| x.timestamp_nanos_opt()));
     }
 
     fn field(header: &str) -> Field {
@@ -300,7 +300,7 @@ impl ArrowAssoc for Option<NaiveDateTime> {
 
     #[inline]
     fn push(builder: &mut Self::Builder, value: Option<NaiveDateTime>) {
-        builder.push(value.map(|x| x.timestamp_nanos()));
+        builder.push(value.and_then(|x| x.timestamp_nanos_opt()));
     }
 
     fn field(header: &str) -> Field {
@@ -323,7 +323,7 @@ impl ArrowAssoc for NaiveDateTime {
     }
 
     fn push(builder: &mut Self::Builder, value: NaiveDateTime) {
-        builder.push(Some(value).map(|x| x.timestamp_nanos()));
+        builder.push(Some(value).and_then(|x| x.timestamp_nanos_opt()));
     }
 
     fn field(header: &str) -> Field {
