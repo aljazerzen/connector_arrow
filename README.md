@@ -2,7 +2,7 @@
 
 Load data from many data sources into Apache Arrow, the fastest way.
 
-Fork of [ConnectorX](https://github.com/sfu-db/connector-x).
+Fork of [ConnectorX](https://github.com/sfu-db/connector-x), with focus on being a Rust library, instead of a Python library.
 
 [Documentation](https://docs.rs/connector_arrow)
 
@@ -26,14 +26,19 @@ is not specified, the count query will be `SELECT COUNT(*) FROM (SELECT * FROM l
 Finally, Connector Arrow will use the schema info as well as the count info to allocate memory and download data by executing the queries normally.
 
 Once the downloading begins, there will be one thread for each partition so that the data are downloaded in parallel at the partition level. The thread will issue the query of the corresponding
-partition to the database and then write the returned data to the destination row-wise or column-wise (depends on the database) in a streaming fashion. 
-
+partition to the database and then write the returned data to the destination row-wise or column-wise (depends on the database) in a streaming fashion.
 
 ## Sources
-- [x] Postgres
+
+Supported:
+
+- [x] PostgreSQL
+- [x] SQLite
+
+Partially-supported (not tested):
+
 - [x] Mysql
 - [x] Mariadb (through mysql protocol)
-- [x] Sqlite
 - [x] Redshift (through postgres protocol)
 - [x] Clickhouse (through mysql protocol)
 - [x] SQL Server
@@ -42,5 +47,6 @@ partition to the database and then write the returned data to the destination ro
 - [x] Big Query
 
 ## Destinations
+
 - [x] [arrow](https://crates.io/crates/arrow)
 - [x] [arrow2](https://crates.io/crates/arrow2)

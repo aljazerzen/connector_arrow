@@ -22,8 +22,11 @@ build-release:
 build-debug:
     cargo build --features all
 
+features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite,dst_arrow,dst_arrow2,dst_polars"
 test:
-    cargo nextest run --features=src_csv,src_postgres,src_dummy,src_sqlite,dst_arrow,dst_arrow2
+    cargo nextest run {{features_test}}
+    cargo fmt --check
+    cargo clippy {{features_test}} -- -D warnings
 
 test-feature-gate:
     cargo check --features src_postgres
