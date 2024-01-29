@@ -1,0 +1,20 @@
+start:
+    docker-compose up -d
+
+stop:
+    docker-compose down -d
+
+
+seed:
+    psql $POSTGRES_URL -f postgres.sql
+    sqlite3 ${SQLITE_URL#sqlite://} < sqlite.sql
+
+# dbs not included in ci
+seed-more:
+    mysql --protocol tcp -h$MYSQL_HOST -P$MYSQL_PORT -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DB < mysql.sql
+    mssql-cli -S$MSSQL_HOST -U$MSSQL_USER -P$MSSQL_PASSWORD -d$MSSQL_DB -i mssql.sql
+    mysql --protocol tcp -h$CLICKHOUSE_HOST -P$CLICKHOUSE_PORT -u$CLICKHOUSE_USER -p$CLICKHOUSE_PASSWORD $CLICKHOUSE_DB < clickhouse.sql
+    psql $REDSHIFT_URL -f redshift.sql
+    ORACLE_URL_SCRIPT=`echo ${ORACLE_URL#oracle://} | sed "s/:/\//"`
+    cat oracle.sql | sqlplus $ORACLE_URL_SCRIPT
+    mysql --protocol tcp -h$MARIADB_HOST -P$MARIADB_PORT -u$MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DB < mysql.sql

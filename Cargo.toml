@@ -1,12 +1,3 @@
 [workspace]
-default-members = ["connectorx"]
-members = ["connectorx", "connectorx-cpp"]
+members = ["connector_arrow"]
 resolver = "2"
-
-[profile.release]
-debug = true
-lto = true
-
-[workspace.dependencies]
-arrow = {version = "46", features = ["prettyprint", "ffi"]}
-arrow2 = {version = "0.17", default-features = false}
