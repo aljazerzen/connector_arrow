@@ -165,10 +165,7 @@ where
             .unzip();
 
         self.names = names;
-        self.schema = pg_types
-            .iter()
-            .map(PostgresTypeSystem::from)
-            .collect();
+        self.schema = pg_types.iter().map(PostgresTypeSystem::from).collect();
         self.pg_schema = self
             .schema
             .iter()
@@ -1105,7 +1102,7 @@ pub struct PostgresSimpleSourceParser {
     current_col: usize,
     current_row: usize,
 }
-impl<'a> PostgresSimpleSourceParser {
+impl PostgresSimpleSourceParser {
     pub fn new(rows: Vec<SimpleQueryMessage>, schema: &[PostgresTypeSystem]) -> Self {
         Self {
             rows,
@@ -1244,7 +1241,7 @@ impl<'r> Produce<'r, &'r str> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<&'r str>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<&'r str>> for PostgresSimpleSourceParser {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1296,7 +1293,7 @@ impl<'r> Produce<'r, Vec<u8>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<Vec<u8>>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<Vec<u8>>> for PostgresSimpleSourceParser {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]

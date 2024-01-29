@@ -123,7 +123,8 @@ impl Arrow2Destination {
         let fields: &[Field] = schema.fields.as_slice();
 
         // This should be in polars but their version needs updating.
-        // Whave placed this here contained in an inner function until the fix is merged upstream
+        // We have placed this here contained in an inner function until the fix is merged upstream
+        #[allow(clippy::type_complexity)]
         fn try_from(
             chunks: (Vec<Chunk<Box<dyn Array>>>, &[Field]),
         ) -> std::result::Result<DataFrame, PolarsError> {

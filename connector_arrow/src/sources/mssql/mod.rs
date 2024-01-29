@@ -80,8 +80,8 @@ pub fn mssql_config(url: &Url) -> Config {
     };
     #[cfg(all(not(windows), not(feature = "integrated-auth-gssapi")))]
     config.authentication(AuthMethod::sql_server(
-        decode(url.username())?.to_owned(),
-        decode(url.password().unwrap_or(""))?.to_owned(),
+        decode(url.username())?,
+        decode(url.password().unwrap_or(""))?,
     ));
 
     match params.get("encrypt") {
@@ -89,9 +89,8 @@ pub fn mssql_config(url: &Url) -> Config {
         _ => config.encryption(EncryptionLevel::NotSupported),
     };
 
-    match params.get("appname") {
-        Some(appname) => config.application_name(decode(appname)?.to_owned()),
-        _ => {}
+    if let Some(appname) = params.get("appname") {
+        config.application_name(decode(appname)?)
     };
 
     config

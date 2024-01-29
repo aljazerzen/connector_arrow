@@ -284,7 +284,7 @@ pub struct BigQuerySourceParser {
     nrows: Option<usize>,
 }
 
-impl<'a> BigQuerySourceParser {
+impl BigQuerySourceParser {
     fn new(
         rt: Arc<Runtime>,
         client: Arc<Client>,
@@ -409,7 +409,7 @@ macro_rules! impl_produce {
 
 impl_produce!(i64, f64, String,);
 
-impl<'r, 'a> Produce<'r, bool> for BigQuerySourceParser {
+impl<'r> Produce<'r, bool> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -483,7 +483,7 @@ impl<'r, 'a> Produce<'r, bool> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<bool>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<bool>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -559,7 +559,7 @@ impl<'r, 'a> Produce<'r, Option<bool>> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveDate> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveDate> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -628,7 +628,7 @@ impl<'r, 'a> Produce<'r, NaiveDate> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveDate>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveDate>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -703,7 +703,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveDate>> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveDateTime> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveDateTime> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -772,7 +772,7 @@ impl<'r, 'a> Produce<'r, NaiveDateTime> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveDateTime>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveDateTime>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -847,7 +847,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveDateTime>> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveTime> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveTime> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -916,7 +916,7 @@ impl<'r, 'a> Produce<'r, NaiveTime> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveTime>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveTime>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -991,7 +991,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveTime>> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, DateTime<Utc>> for BigQuerySourceParser {
+impl<'r> Produce<'r, DateTime<Utc>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -1067,7 +1067,7 @@ impl<'r, 'a> Produce<'r, DateTime<Utc>> for BigQuerySourceParser {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<DateTime<Utc>>> for BigQuerySourceParser {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -1136,7 +1136,8 @@ impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for BigQuerySourceParser {
                     * 1e9) as i64;
                 let secs = timestamp_ns / 1000000000;
                 let nsecs = (timestamp_ns % 1000000000) as u32;
-                NaiveDateTime::from_timestamp_opt(secs, nsecs).map(|ndt| DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc))
+                NaiveDateTime::from_timestamp_opt(secs, nsecs)
+                    .map(|ndt| DateTime::<Utc>::from_naive_utc_and_offset(ndt, Utc))
             }
         }
     }
