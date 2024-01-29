@@ -8,6 +8,7 @@ pub enum Arrow2DestinationError {
     ArrowError(#[from] arrow2::error::Error),
 
     #[error(transparent)]
+    #[cfg(feature = "dst_polars")]
     PolarsError(#[from] polars::error::PolarsError),
 
     #[error(transparent)]

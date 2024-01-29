@@ -12,14 +12,12 @@ use crate::typesystem::{Realize, TypeAssoc, TypeSystem};
 use anyhow::anyhow;
 use arrow2::array::{Array, MutableArray};
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::{Field, Schema};
+use arrow2::datatypes::Schema;
 use arrow_assoc::ArrowAssoc;
 pub use errors::{Arrow2DestinationError, Result};
 use fehler::throw;
 use fehler::throws;
 use funcs::{FFinishBuilder, FNewBuilder, FNewField};
-use polars::prelude::{DataFrame, PolarsError, Series};
-use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 pub use typesystem::Arrow2TypeSystem;
 
@@ -117,7 +115,13 @@ impl Arrow2Destination {
     }
 
     #[throws(Arrow2DestinationError)]
-    pub fn polars(self) -> DataFrame {
+    #[cfg(feature = "dst_polars")]
+    pub fn polars(self) -> polars::prelude::DataFrame {
+        use std::convert::TryFrom;
+
+        use arrow2::datatypes::Field;
+        use polars::prelude::{DataFrame, PolarsError, Series};
+
         let (rbs, schema): (Vec<Chunk<Box<dyn Array>>>, Arc<Schema>) = self.arrow()?;
         //let fields = schema.fields.as_slice();
         let fields: &[Field] = schema.fields.as_slice();

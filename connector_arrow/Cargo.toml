@@ -45,6 +45,8 @@ arrow = {version = "50", default-features = false, optional = true}
 
 # dst_arrow2
 arrow2 = {version = "0.17", default-features = false, optional = true}
+
+# dst_polars
 polars = {version = "0.32", optional = true, features=["dtype-u8", "dtype-u16"]}
 
 # src_bigquery
@@ -85,11 +87,12 @@ iai = "0.1"
 pprof = {version = "0.5", features = ["flamegraph"]}
 
 [features]
-all = ["src_sqlite", "src_postgres", "src_mysql", "src_mssql", "src_oracle", "src_bigquery", "src_csv", "src_dummy", "dst_arrow", "dst_arrow2"]
+all = ["src_sqlite", "src_postgres", "src_mysql", "src_mssql", "src_oracle", "src_bigquery", "src_csv", "src_dummy", "dst_arrow", "dst_arrow2", "dst_polars"]
 branch = []
 default = ["fptr"]
 dst_arrow = ["arrow"]
-dst_arrow2 = ["polars", "arrow2"]
+dst_arrow2 = ["arrow2"]
+dst_polars = ["polars", "dst_arrow2"]
 fptr = []
 src_bigquery = ["gcp-bigquery-client", "tokio"]
 src_csv = ["csv", "regex"]
