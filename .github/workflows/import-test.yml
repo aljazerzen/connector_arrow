@@ -1,0 +1,61 @@
+name: import-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      indexUrl:
+        description: "Index Url"
+        required: true
+        default: "https://test.pypi.org/simple/"
+      version:
+        description: "version"
+        required: false
+        default: ""
+
+jobs:
+  check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-10.15, windows-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
+      - name: Check which python we use
+        run: |
+          echo $(which python)
+
+      - name: Install ConnectorX - POSIX
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          pip install numpy importlib-metadata
+
+          version='${{ github.event.inputs.version }}'
+          if [ -z $version ]
+          then
+            pip install --index-url ${{ github.event.inputs.indexUrl }} connectorx
+          else
+            pip install --index-url ${{ github.event.inputs.indexUrl }} connectorx==$version
+          fi
+
+      - name: Install ConnectorX - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          pip install numpy importlib-metadata
+
+          $version = '${{ github.event.inputs.version }}'
+          if ($version) {
+            pip install --index-url ${{ github.event.inputs.indexUrl }} connectorx==$version
+          } else { 
+            pip install --index-url ${{ github.event.inputs.indexUrl }} connectorx
+          }
+
+      - name: Import
+        run: python -c "from connectorx import read_sql"
