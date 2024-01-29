@@ -12,28 +12,16 @@
         pkgs = nixpkgs.legacyPackages.${system};
 
         essentials = with pkgs; [
-          # compiler requirements
           rustup
           clang
 
           # tools
+          just
           cargo-nextest
-          bacon
           cargo-audit
-          cargo-insta
           cargo-release
           pkg-config
           openssl
-          #cargo-llvm-cov
-
-          # actions
-          just
-          #sd
-          #ripgrep
-          #nodePackages.prettier
-          #nodePackages.prettier-plugin-go-template
-          #nixpkgs-fmt
-          #rsync
         ];
 
         dbs = with pkgs; [
