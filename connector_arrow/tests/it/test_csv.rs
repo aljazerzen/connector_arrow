@@ -29,10 +29,7 @@ fn empty_file() {
             DataOrder::RowMajor,
         )
         .unwrap();
-    p.result_rows().expect("run query");
 
-    assert_eq!(0, p.nrows());
-    assert_eq!(0, p.ncols());
     let mut parser = p.parser().unwrap();
 
     parser.fetch_next().unwrap();
@@ -66,11 +63,6 @@ fn load_and_parse() {
             DataOrder::RowMajor,
         )
         .unwrap();
-
-    partition.result_rows().expect("run query");
-
-    assert_eq!(3, partition.nrows());
-    assert_eq!(5, partition.ncols());
 
     let mut results: Vec<Value> = Vec::new();
     let mut parser = partition.parser().unwrap();

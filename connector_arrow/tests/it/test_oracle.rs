@@ -20,9 +20,6 @@ fn test_types() {
             DataOrder::RowMajor,
         )
         .unwrap();
-    partition.result_rows().expect("run query");
-    assert_eq!(3, partition.nrows());
-    assert_eq!(8, partition.ncols());
 
     let mut parser = partition.parser().unwrap();
 

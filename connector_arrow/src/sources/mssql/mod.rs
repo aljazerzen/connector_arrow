@@ -11,7 +11,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, CXQuery},
+    sql::CXQuery,
     utils::DummyBox,
 };
 use anyhow::anyhow;
@@ -24,7 +24,6 @@ use futures::StreamExt;
 use log::debug;
 use owning_ref::OwningHandle;
 use rust_decimal::Decimal;
-use sqlparser::dialect::MsSqlDialect;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tiberius::{AuthMethod, Config, EncryptionLevel, QueryResult, Row};
@@ -181,8 +180,7 @@ pub struct MsSQLSourcePartition {
     rt: Arc<Runtime>,
     query: CXQuery<String>,
     schema: Vec<MsSQLTypeSystem>,
-    nrows: usize,
-    ncols: usize,
+    nrows: Option<usize>,
 }
 
 impl MsSQLSourcePartition {
@@ -197,8 +195,7 @@ impl MsSQLSourcePartition {
             pool,
             query: query.clone(),
             schema: schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
+            nrows: None,
         }
     }
 }
@@ -207,21 +204,6 @@ impl SourceReader for MsSQLSourcePartition {
     type TypeSystem = MsSQLTypeSystem;
     type Parser<'a> = MsSQLSourceParser<'a>;
     type Error = MsSQLSourceError;
-
-    #[throws(MsSQLSourceError)]
-    fn result_rows(&mut self) {
-        let cquery = count_query(&self.query, &MsSqlDialect {})?;
-        let mut conn = self.rt.block_on(self.pool.get())?;
-
-        let stream = self.rt.block_on(conn.query(cquery.as_str(), &[]))?;
-        let row = self
-            .rt
-            .block_on(stream.into_row())?
-            .ok_or_else(|| anyhow!("MsSQL failed to get the count of query: {}", self.query))?;
-
-        let row: i32 = row.get(0).ok_or(MsSQLSourceError::GetNRowsFailed)?; // the count in mssql is i32
-        self.nrows = row as usize;
-    }
 
     #[throws(MsSQLSourceError)]
     fn parser<'a>(&'a mut self) -> Self::Parser<'a> {
@@ -240,12 +222,8 @@ impl SourceReader for MsSQLSourcePartition {
         MsSQLSourceParser::new(self.rt.handle(), rows, &self.schema)
     }
 
-    fn nrows(&self) -> usize {
+    fn row_count(&self) -> Option<usize> {
         self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, CXQuery},
+    sql::CXQuery,
 };
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Utc};
@@ -31,9 +31,9 @@ use r2d2::{Pool, PooledConnection};
 use r2d2_postgres::PostgresConnectionManager;
 use rust_decimal::Decimal;
 use serde_json::{from_str, Value};
-use sqlparser::dialect::PostgreSqlDialect;
+
 use std::collections::HashMap;
-use std::convert::TryFrom;
+
 use std::marker::PhantomData;
 use uuid::Uuid;
 
@@ -51,34 +51,6 @@ pub enum SimpleProtocol {}
 
 type PgManager<C> = PostgresConnectionManager<C>;
 type PgConn<C> = PooledConnection<PgManager<C>>;
-
-// take a row and unwrap the interior field from column 0
-fn convert_row<'b, R: TryFrom<usize> + postgres::types::FromSql<'b> + Clone>(row: &'b Row) -> R {
-    let nrows: Option<R> = row.get(0);
-    nrows.expect("Could not parse int result from count_query")
-}
-
-#[throws(PostgresSourceError)]
-fn get_total_rows<C>(conn: &mut PgConn<C>, query: &CXQuery<String>) -> usize
-where
-    C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
-    C::TlsConnect: Send,
-    C::Stream: Send,
-    <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
-    let dialect = PostgreSqlDialect {};
-
-    let row = conn.query_one(count_query(query, &dialect)?.as_str(), &[])?;
-    let col_type = PostgresTypeSystem::from(row.columns()[0].type_());
-    match col_type {
-        PostgresTypeSystem::Int2(_) => convert_row::<i16>(&row) as usize,
-        PostgresTypeSystem::Int4(_) => convert_row::<i32>(&row) as usize,
-        PostgresTypeSystem::Int8(_) => convert_row::<i64>(&row) as usize,
-        _ => throw!(anyhow!(
-            "The result of the count query was not an int, aborting."
-        )),
-    }
-}
 
 pub struct PostgresSource<P, C>
 where
@@ -189,8 +161,6 @@ where
     query: CXQuery<String>,
     schema: Vec<PostgresTypeSystem>,
     pg_schema: Vec<postgres::types::Type>,
-    nrows: usize,
-    ncols: usize,
     _protocol: PhantomData<P>,
 }
 
@@ -212,8 +182,6 @@ where
             query: query.clone(),
             schema: schema.to_vec(),
             pg_schema: pg_schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
             _protocol: PhantomData,
         }
     }
@@ -231,25 +199,12 @@ where
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn result_rows(&mut self) -> () {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(PostgresSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let query = format!("COPY ({}) TO STDOUT WITH BINARY", self.query);
         let reader = self.conn.copy_out(&*query)?; // unless reading the data, it seems like issue the query is fast
         let iter = BinaryCopyOutIter::new(reader, &self.pg_schema);
 
         PostgresBinarySourcePartitionParser::new(iter, &self.schema)
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 
@@ -265,11 +220,6 @@ where
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(PostgresSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let query = format!("COPY ({}) TO STDOUT WITH CSV", self.query);
         let reader = self.conn.copy_out(&*query)?; // unless reading the data, it seems like issue the query is fast
@@ -279,14 +229,6 @@ where
             .into_records();
 
         PostgresCSVSourceParser::new(iter, &self.schema)
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 
@@ -302,24 +244,11 @@ where
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(PostgresSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let iter = self
             .conn
             .query_raw::<_, bool, _>(self.query.as_str(), vec![])?; // unless reading the data, it seems like issue the query is fast
         PostgresRawSourceParser::new(iter, &self.schema)
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 pub struct PostgresBinarySourcePartitionParser<'a> {
@@ -1043,22 +972,9 @@ where
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(PostgresSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let rows = self.conn.simple_query(self.query.as_str())?; // unless reading the data, it seems like issue the query is fast
         PostgresSimpleSourceParser::new(rows, &self.schema)
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 

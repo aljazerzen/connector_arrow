@@ -178,7 +178,7 @@ impl Source for CSVSource {
 pub struct CSVSourcePartition {
     records: Vec<csv::StringRecord>,
     counter: usize,
-    nrows: usize,
+    nrows: Option<usize>,
     ncols: usize,
 }
 
@@ -202,7 +202,7 @@ impl CSVSourcePartition {
         Self {
             records,
             counter: 0,
-            nrows,
+            nrows: Some(nrows),
             ncols,
         }
     }
@@ -213,16 +213,8 @@ impl SourceReader for CSVSourcePartition {
     type Parser<'a> = CSVSourcePartitionParser<'a>;
     type Error = CSVSourceError;
 
-    /// The parameter `query` is the path of the csv file
-    #[throws(CSVSourceError)]
-    fn result_rows(&mut self) {}
-
-    fn nrows(&self) -> usize {
+    fn row_count(&self) -> Option<usize> {
         self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 
     #[throws(CSVSourceError)]

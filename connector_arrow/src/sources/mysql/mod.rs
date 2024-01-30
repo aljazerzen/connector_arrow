@@ -10,7 +10,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, limit1_query, CXQuery},
+    sql::{limit1_query, CXQuery},
 };
 use anyhow::anyhow;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -31,12 +31,6 @@ type MysqlConn = PooledConnection<MySqlConnectionManager>;
 
 pub enum BinaryProtocol {}
 pub enum TextProtocol {}
-
-#[throws(MySQLSourceError)]
-fn get_total_rows(conn: &mut MysqlConn, query: &CXQuery<String>) -> usize {
-    conn.query_first(&count_query(query, &MySqlDialect {})?)?
-        .ok_or_else(|| anyhow!("mysql failed to get the count of query: {}", query))?
-}
 
 pub struct MySQLSource<P> {
     pool: Pool<MySqlConnectionManager>,
@@ -176,8 +170,7 @@ pub struct MySQLSourcePartition<P> {
     conn: MysqlConn,
     query: CXQuery<String>,
     schema: Vec<MySQLTypeSystem>,
-    nrows: usize,
-    ncols: usize,
+    nrows: Option<usize>,
     _protocol: PhantomData<P>,
 }
 
@@ -187,8 +180,7 @@ impl<P> MySQLSourcePartition<P> {
             conn,
             query: query.clone(),
             schema: schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
+            nrows: None,
             _protocol: PhantomData,
         }
     }
@@ -200,23 +192,14 @@ impl SourceReader for MySQLSourcePartition<BinaryProtocol> {
     type Error = MySQLSourceError;
 
     #[throws(MySQLSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(MySQLSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let stmt = self.conn.prep(self.query.as_str())?;
         let iter = self.conn.exec_iter(stmt, ())?;
         MySQLBinarySourceParser::new(iter, &self.schema)
     }
 
-    fn nrows(&self) -> usize {
+    fn row_count(&self) -> Option<usize> {
         self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 
@@ -226,23 +209,14 @@ impl SourceReader for MySQLSourcePartition<TextProtocol> {
     type Error = MySQLSourceError;
 
     #[throws(MySQLSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = get_total_rows(&mut self.conn, &self.query)?;
-    }
-
-    #[throws(MySQLSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let query = self.query.clone();
         let iter = self.conn.query_iter(query)?;
         MySQLTextSourceParser::new(iter, &self.schema)
     }
 
-    fn nrows(&self) -> usize {
+    fn row_count(&self) -> Option<usize> {
         self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 

@@ -82,10 +82,6 @@ impl SourceReader for DummySourcePartition {
     type Parser<'a> = DummySourcePartitionParser<'a>;
     type Error = ConnectorXError;
 
-    fn result_rows(&mut self) -> Result<()> {
-        Ok(())
-    }
-
     fn parser(&mut self) -> Result<Self::Parser<'_>> {
         Ok(DummySourcePartitionParser::new(
             &mut self.counter,
@@ -94,12 +90,8 @@ impl SourceReader for DummySourcePartition {
         ))
     }
 
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
+    fn row_count(&self) -> Option<usize> {
+        Some(self.nrows)
     }
 }
 

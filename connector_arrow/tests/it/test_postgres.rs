@@ -34,7 +34,6 @@ fn load_and_parse() {
             DataOrder::RowMajor,
         )
         .unwrap();
-    partition.result_rows().expect("run query");
 
     let mut parser = partition.parser().unwrap();
 
@@ -90,10 +89,6 @@ fn load_and_parse_csv() {
             DataOrder::RowMajor,
         )
         .unwrap();
-    partition.result_rows().expect("run query");
-
-    assert_eq!(6, partition.nrows());
-    assert_eq!(5, partition.ncols());
 
     let mut parser = partition.parser().unwrap();
 

@@ -9,7 +9,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, limit1_query_oracle, CXQuery},
+    sql::{limit1_query_oracle, CXQuery},
     utils::DummyBox,
 };
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
@@ -166,8 +166,6 @@ pub struct OracleSourcePartition {
     conn: OracleConn,
     query: CXQuery<String>,
     schema: Vec<OracleTypeSystem>,
-    nrows: usize,
-    ncols: usize,
 }
 
 impl OracleSourcePartition {
@@ -176,8 +174,6 @@ impl OracleSourcePartition {
             conn,
             query: query.clone(),
             schema: schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
         }
     }
 }
@@ -188,26 +184,11 @@ impl SourceReader for OracleSourcePartition {
     type Error = OracleSourceError;
 
     #[throws(OracleSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = self
-            .conn
-            .query_row_as::<usize>(count_query(&self.query, &OracleDialect {})?.as_str(), &[])?;
-    }
-
-    #[throws(OracleSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         let query = self.query.clone();
 
         // let iter = self.conn.query(query.as_str(), &[])?;
         OracleTextSourceParser::new(&self.conn, query.as_str(), &self.schema)?
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 

@@ -8,7 +8,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, limit1_query, CXQuery},
+    sql::{limit1_query, CXQuery},
     typesystem::Schema,
 };
 use anyhow::anyhow;
@@ -152,8 +152,6 @@ pub struct BigQueryPartitionReader {
     project_id: String,
     query: CXQuery<String>,
     schema: Vec<BigQueryTypeSystem>,
-    nrows: usize,
-    ncols: usize,
 }
 
 impl BigQueryPartitionReader {
@@ -170,8 +168,6 @@ impl BigQueryPartitionReader {
             project_id: project_id.clone(),
             query: query.clone(),
             schema: schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
         }
     }
 }
@@ -180,20 +176,6 @@ impl SourceReader for BigQueryPartitionReader {
     type TypeSystem = BigQueryTypeSystem;
     type Parser<'a> = BigQuerySourceParser;
     type Error = BigQuerySourceError;
-
-    #[throws(BigQuerySourceError)]
-    fn result_rows(&mut self) {
-        let cquery = count_query(&self.query, &BigQueryDialect {})?;
-        let job = self.client.job();
-        let mut rs = self
-            .rt
-            .block_on(job.query(self.project_id.as_str(), QueryRequest::new(cquery.as_str())))?;
-        rs.next_row();
-        let nrows = rs
-            .get_i64(0)?
-            .ok_or_else(|| anyhow!("cannot get row number"))?;
-        self.nrows = nrows as usize;
-    }
 
     #[throws(BigQuerySourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
@@ -227,14 +209,6 @@ impl SourceReader for BigQueryPartitionReader {
             ),
         )?;
         BigQuerySourceParser::new(self.rt.clone(), self.client.clone(), rs, &self.schema)
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 

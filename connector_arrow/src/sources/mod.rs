@@ -53,17 +53,13 @@ pub trait SourceReader {
         Self: 'a;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    /// Count total number of rows in each partition.
-    fn result_rows(&mut self) -> Result<(), Self::Error>;
-
     fn parser(&mut self) -> Result<Self::Parser<'_>, Self::Error>;
 
     /// Number of rows this partition has.
     /// Sometimes it is not possible for the source to know how many rows it gets before reading the whole data.
-    fn nrows(&self) -> usize;
-
-    /// Number of cols this partition has.
-    fn ncols(&self) -> usize;
+    fn row_count(&self) -> Option<usize> {
+        None
+    }
 }
 
 pub trait PartitionParser<'a>: Send {

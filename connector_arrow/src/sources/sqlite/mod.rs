@@ -8,7 +8,7 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{count_query, limit1_query, CXQuery},
+    sql::{limit1_query, CXQuery},
     typesystem::Schema,
     utils::DummyBox,
 };
@@ -163,8 +163,6 @@ pub struct SQLiteSourcePartition {
     conn: PooledConnection<SqliteConnectionManager>,
     query: CXQuery<String>,
     schema: Vec<SQLiteTypeSystem>,
-    nrows: usize,
-    ncols: usize,
 }
 
 impl SQLiteSourcePartition {
@@ -177,8 +175,6 @@ impl SQLiteSourcePartition {
             conn,
             query: query.clone(),
             schema: schema.to_vec(),
-            nrows: 0,
-            ncols: schema.len(),
         }
     }
 }
@@ -189,25 +185,8 @@ impl SourceReader for SQLiteSourcePartition {
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
-    fn result_rows(&mut self) {
-        self.nrows = self.conn.query_row(
-            count_query(&self.query, &SQLiteDialect {})?.as_str(),
-            [],
-            |row| Ok(row.get::<_, i64>(0)? as usize),
-        )?;
-    }
-
-    #[throws(SQLiteSourceError)]
     fn parser(&mut self) -> Self::Parser<'_> {
         SQLiteSourcePartitionParser::new(&self.conn, self.query.as_str(), &self.schema)?
-    }
-
-    fn nrows(&self) -> usize {
-        self.nrows
-    }
-
-    fn ncols(&self) -> usize {
-        self.ncols
     }
 }
 
