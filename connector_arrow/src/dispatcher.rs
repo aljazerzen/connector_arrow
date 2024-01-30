@@ -18,7 +18,6 @@ pub struct Dispatcher<'a, S, D, TP> {
     src: S,
     dst: &'a mut D,
     queries: Vec<CXQuery<String>>,
-    origin_query: Option<String>,
     _phantom: PhantomData<TP>,
 }
 
@@ -37,7 +36,7 @@ where
     TP: Transport<TSS = S::TypeSystem, TSD = D::TypeSystem, S = S, D = D>,
 {
     /// Create a new dispatcher by providing a source, a destination and the queries.
-    pub fn new<Q>(src: S, dst: &'w mut D, queries: &[Q], origin_query: Option<String>) -> Self
+    pub fn new<Q>(src: S, dst: &'w mut D, queries: &[Q]) -> Self
     where
         for<'a> &'a Q: Into<CXQuery>,
     {
@@ -45,7 +44,6 @@ where
             src,
             dst,
             queries: queries.iter().map(Into::into).collect(),
-            origin_query,
             _phantom: PhantomData,
         }
     }
@@ -54,11 +52,9 @@ where
         debug!("Prepare");
         let data_order = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
         self.src.set_queries(self.queries.as_slice());
-        self.src.set_origin_query(self.origin_query);
 
         debug!("Fetching metadata");
-        self.src.fetch_metadata()?;
-        let src_schema = self.src.schema();
+        let src_schema = self.src.fetch_metadata()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
         let src_partitions: Vec<S::Reader> = self.src.reader(data_order)?;
@@ -168,9 +164,7 @@ where
     pub fn get_meta(&mut self) -> Result<(), TP::Error> {
         let dorder = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
         self.src.set_queries(self.queries.as_slice());
-        self.src.set_origin_query(self.origin_query.clone());
-        self.src.fetch_metadata()?;
-        let src_schema = self.src.schema();
+        let src_schema = self.src.fetch_metadata()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
         self.dst.set_metadata(dst_schema, dorder)?;
         Ok(())

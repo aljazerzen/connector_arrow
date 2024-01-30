@@ -28,7 +28,6 @@ use urlencoding::decode;
 
 pub struct SQLiteSource {
     pool: Pool<SqliteConnectionManager>,
-    origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
     types: Vec<SQLiteTypeSystem>,
@@ -46,7 +45,6 @@ impl SQLiteSource {
 
         Self {
             pool,
-            origin_query: None,
             queries: vec![],
             names: vec![],
             types: vec![],
@@ -67,12 +65,8 @@ where
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, query: Option<String>) {
-        self.origin_query = query;
-    }
-
     #[throws(SQLiteSourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         assert!(!self.queries.is_empty());
         let conn = self.pool.get()?;
         let mut names = vec![];
@@ -113,7 +107,10 @@ where
                     if !types.contains(&None) {
                         self.names = names;
                         self.types = types.into_iter().map(|t| t.unwrap()).collect();
-                        return;
+                        return Schema {
+                            names: self.names.clone(),
+                            types: self.types.clone(),
+                        };
                     } else if i == self.queries.len() - 1 {
                         debug!(
                             "cannot get metadata for '{}' due to null value: {:?}",
@@ -145,9 +142,6 @@ where
             .collect();
         // set all columns as string (align with pandas)
         self.types = vec![SQLiteTypeSystem::Text(false); self.names.len()];
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),

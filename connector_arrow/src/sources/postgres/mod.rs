@@ -88,7 +88,6 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     pool: Pool<PgManager<C>>,
-    origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
     types: Vec<PostgresTypeSystem>,
@@ -110,7 +109,6 @@ where
 
         Self {
             pool,
-            origin_query: None,
             queries: vec![],
             names: vec![],
             types: vec![],
@@ -139,12 +137,8 @@ where
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, query: Option<String>) {
-        self.origin_query = query;
-    }
-
     #[throws(PostgresSourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         assert!(!self.queries.is_empty());
 
         let mut conn = self.pool.get()?;
@@ -166,9 +160,6 @@ where
             .zip(pg_types.iter())
             .map(|(t1, t2)| PostgresTypePairs(t2, t1).into())
             .collect();
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),

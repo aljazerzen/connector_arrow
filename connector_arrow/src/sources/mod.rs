@@ -35,11 +35,7 @@ pub trait Source {
 
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]);
 
-    fn set_origin_query(&mut self, query: Option<String>);
-
-    fn fetch_metadata(&mut self) -> Result<(), Self::Error>;
-
-    fn schema(&self) -> Schema<Self::TypeSystem>;
+    fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
 
     fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>, Self::Error>;
 }

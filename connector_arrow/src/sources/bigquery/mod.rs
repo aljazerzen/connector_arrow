@@ -49,7 +49,6 @@ pub struct BigQuerySource {
     rt: Arc<Runtime>,
     client: Arc<Client>,
     project_id: String,
-    origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
     types: Vec<BigQueryTypeSystem>,
@@ -75,7 +74,6 @@ impl BigQuerySource {
             rt,
             client,
             project_id,
-            origin_query: None,
             queries: vec![],
             names: vec![],
             types: vec![],
@@ -97,12 +95,8 @@ where
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, query: Option<String>) {
-        self.origin_query = query;
-    }
-
     #[throws(BigQuerySourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         assert!(!self.queries.is_empty());
         let job = self.client.job();
         for (_, query) in self.queries.iter().enumerate() {
@@ -130,9 +124,6 @@ where
             self.names = names;
             self.types = types;
         }
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),

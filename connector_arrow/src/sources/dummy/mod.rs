@@ -41,17 +41,11 @@ impl Source for DummySource {
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, _query: Option<String>) {}
-
-    fn fetch_metadata(&mut self) -> Result<()> {
-        Ok(())
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
-        Schema {
+    fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>> {
+        Ok(Schema {
             names: self.names.clone(),
             types: self.types.clone(),
-        }
+        })
     }
 
     fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>> {

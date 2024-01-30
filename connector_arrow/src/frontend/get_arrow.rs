@@ -17,11 +17,7 @@ use std::sync::Arc;
 
 #[allow(unreachable_code, unreachable_patterns, unused_variables, unused_mut)]
 #[throws(ConnectorXOutError)]
-pub fn get_arrow(
-    source_conn: &SourceConn,
-    origin_query: Option<String>,
-    queries: &[CXQuery<String>],
-) -> ArrowDestination {
+pub fn get_arrow(source_conn: &SourceConn, queries: &[CXQuery<String>]) -> ArrowDestination {
     let mut destination = ArrowDestination::new();
     let protocol = source_conn.proto.as_str();
     debug!("Protocol: {}", protocol);
@@ -41,9 +37,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<CSVProtocol, MakeTlsConnector>,
-                    >::new(
-                        source, &mut destination, queries, origin_query
-                    );
+                    >::new(source, &mut destination, queries);
                     dispatcher.run()?;
                 }
                 ("csv", None) => {
@@ -54,7 +48,6 @@ pub fn get_arrow(
                             source,
                             &mut destination,
                             queries,
-                            origin_query,
                         );
                     dispatcher.run()?;
                 }
@@ -68,9 +61,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<PgBinaryProtocol, MakeTlsConnector>,
-                    >::new(
-                        source, &mut destination, queries, origin_query
-                    );
+                    >::new(source, &mut destination, queries);
                     dispatcher.run()?;
                 }
                 ("binary", None) => {
@@ -83,9 +74,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<PgBinaryProtocol, NoTls>,
-                    >::new(
-                        source, &mut destination, queries, origin_query
-                    );
+                    >::new(source, &mut destination, queries);
                     dispatcher.run()?;
                 }
                 ("cursor", Some(tls_conn)) => {
@@ -98,9 +87,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<CursorProtocol, MakeTlsConnector>,
-                    >::new(
-                        source, &mut destination, queries, origin_query
-                    );
+                    >::new(source, &mut destination, queries);
                     dispatcher.run()?;
                 }
                 ("cursor", None) => {
@@ -110,9 +97,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<CursorProtocol, NoTls>,
-                    >::new(
-                        source, &mut destination, queries, origin_query
-                    );
+                    >::new(source, &mut destination, queries);
                     dispatcher.run()?;
                 }
                 ("simple", Some(tls_conn)) => {
@@ -125,9 +110,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<SimpleProtocol, MakeTlsConnector>,
-                    >::new(
-                        sb, &mut destination, queries, origin_query
-                    );
+                    >::new(sb, &mut destination, queries);
                     debug!("Running dispatcher");
                     dispatcher.run()?;
                 }
@@ -138,9 +121,7 @@ pub fn get_arrow(
                         _,
                         _,
                         PostgresArrowTransport<SimpleProtocol, NoTls>,
-                    >::new(
-                        sb, &mut destination, queries, origin_query
-                    );
+                    >::new(sb, &mut destination, queries);
                     debug!("Running dispatcher");
                     dispatcher.run()?;
                 }
@@ -156,7 +137,6 @@ pub fn get_arrow(
                     source,
                     &mut destination,
                     queries,
-                    origin_query,
                 );
                 dispatcher.run()?;
             }
@@ -167,7 +147,6 @@ pub fn get_arrow(
                     source,
                     &mut destination,
                     queries,
-                    origin_query,
                 );
                 dispatcher.run()?;
             }
@@ -178,47 +157,31 @@ pub fn get_arrow(
             // remove the first "sqlite://" manually since url.path is not correct for windows
             let path = &source_conn.conn.as_str()[9..];
             let source = SQLiteSource::new(path, queries.len())?;
-            let dispatcher = Dispatcher::<_, _, SQLiteArrowTransport>::new(
-                source,
-                &mut destination,
-                queries,
-                origin_query,
-            );
+            let dispatcher =
+                Dispatcher::<_, _, SQLiteArrowTransport>::new(source, &mut destination, queries);
             dispatcher.run()?;
         }
         #[cfg(feature = "src_mssql")]
         SourceType::MsSQL => {
             let rt = Arc::new(tokio::runtime::Runtime::new().expect("Failed to create runtime"));
             let source = MsSQLSource::new(rt, &source_conn.conn[..], queries.len())?;
-            let dispatcher = Dispatcher::<_, _, MsSQLArrowTransport>::new(
-                source,
-                &mut destination,
-                queries,
-                origin_query,
-            );
+            let dispatcher =
+                Dispatcher::<_, _, MsSQLArrowTransport>::new(source, &mut destination, queries);
             dispatcher.run()?;
         }
         #[cfg(feature = "src_oracle")]
         SourceType::Oracle => {
             let source = OracleSource::new(&source_conn.conn[..], queries.len())?;
-            let dispatcher = Dispatcher::<_, _, OracleArrowTransport>::new(
-                source,
-                &mut destination,
-                queries,
-                origin_query,
-            );
+            let dispatcher =
+                Dispatcher::<_, _, OracleArrowTransport>::new(source, &mut destination, queries);
             dispatcher.run()?;
         }
         #[cfg(feature = "src_bigquery")]
         SourceType::BigQuery => {
             let rt = Arc::new(tokio::runtime::Runtime::new().expect("Failed to create runtime"));
             let source = BigQuerySource::new(rt, &source_conn.conn[..])?;
-            let dispatcher = Dispatcher::<_, _, BigQueryArrowTransport>::new(
-                source,
-                &mut destination,
-                queries,
-                origin_query,
-            );
+            let dispatcher =
+                Dispatcher::<_, _, BigQueryArrowTransport>::new(source, &mut destination, queries);
             dispatcher.run()?;
         }
         _ => throw!(ConnectorXOutError::SourceNotSupport(format!(

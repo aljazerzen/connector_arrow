@@ -145,10 +145,8 @@ impl Source for CSVSource {
         self.files = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, _query: Option<String>) {}
-
     #[throws(CSVSourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(true)
             .from_reader(File::open(self.files[0].as_str())?);
@@ -161,9 +159,6 @@ impl Source for CSVSource {
         }
 
         assert_eq!(header.len(), self.types.len());
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),

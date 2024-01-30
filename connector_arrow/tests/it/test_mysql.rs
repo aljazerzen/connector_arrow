@@ -28,7 +28,6 @@ fn test_mysql() {
         builder,
         &mut destination,
         &queries,
-        Some(String::from("select * from test_table")),
     );
     dispatcher.run().unwrap();
 
@@ -53,7 +52,6 @@ fn test_mysql_text() {
         builder,
         &mut destination,
         &queries,
-        None,
     );
     dispatcher.run().unwrap();
 

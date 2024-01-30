@@ -53,7 +53,6 @@ fn test_arrow() {
         DummySource::new(&["a", "b", "c", "d", "e"], &schema),
         &mut destination,
         &queries,
-        None,
     );
     dispatcher.run().expect("run dispatcher");
 
@@ -159,7 +158,6 @@ fn test_arrow_large() {
         DummySource::new(&["a", "b", "c", "d", "e"], &schema),
         &mut destination,
         &queries,
-        None,
     );
     dispatcher.run().expect("run dispatcher");
 
@@ -200,7 +198,6 @@ fn test_postgres_arrow() {
         builder,
         &mut destination,
         &queries,
-        Some(format!("select * from test_table")),
     );
 
     dispatcher.run().expect("run dispatcher");

@@ -140,7 +140,6 @@ fn test_postgres() {
         builder,
         &mut destination,
         &queries,
-        Some(String::from("select * from test_table")),
     );
 
     dispatcher.run().expect("run dispatcher");
@@ -164,7 +163,7 @@ fn test_postgres_csv() {
     let builder = PostgresSource::<CSVProtocol, NoTls>::new(config, NoTls, 2).unwrap();
     let mut dst = ArrowDestination::new();
     let dispatcher = Dispatcher::<_, _, PostgresArrowTransport<CSVProtocol, NoTls>>::new(
-        builder, &mut dst, &queries, None,
+        builder, &mut dst, &queries,
     );
 
     dispatcher.run().expect("run dispatcher");
@@ -190,7 +189,6 @@ fn test_postgres_agg() {
         builder,
         &mut destination,
         &queries,
-        Some("SELECT test_bool, SUM(test_float) FROM test_table GROUP BY test_bool".to_string()),
     );
 
     dispatcher.run().expect("run dispatcher");

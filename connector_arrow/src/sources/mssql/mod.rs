@@ -37,7 +37,6 @@ type Conn<'a> = PooledConnection<'a, ConnectionManager>;
 pub struct MsSQLSource {
     rt: Arc<Runtime>,
     pool: Pool<ConnectionManager>,
-    origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
     types: Vec<MsSQLTypeSystem>,
@@ -108,7 +107,6 @@ impl MsSQLSource {
         Self {
             rt,
             pool,
-            origin_query: None,
             queries: vec![],
             names: vec![],
             types: vec![],
@@ -129,12 +127,8 @@ where
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, query: Option<String>) {
-        self.origin_query = query;
-    }
-
     #[throws(MsSQLSourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         assert!(!self.queries.is_empty());
 
         let mut conn = self.rt.block_on(self.pool.get())?;
@@ -166,9 +160,6 @@ where
 
         self.names = names;
         self.types = types;
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),

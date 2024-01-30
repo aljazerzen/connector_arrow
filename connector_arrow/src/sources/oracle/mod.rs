@@ -45,7 +45,6 @@ impl Dialect for OracleDialect {
 
 pub struct OracleSource {
     pool: Pool<OracleManager>,
-    origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
     types: Vec<OracleTypeSystem>,
@@ -80,7 +79,6 @@ impl OracleSource {
 
         Self {
             pool,
-            origin_query: None,
             queries: vec![],
             names: vec![],
             types: vec![],
@@ -101,12 +99,8 @@ where
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
-    fn set_origin_query(&mut self, query: Option<String>) {
-        self.origin_query = query;
-    }
-
     #[throws(OracleSourceError)]
-    fn fetch_metadata(&mut self) {
+    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
         assert!(!self.queries.is_empty());
 
         let conn = self.pool.get()?;
@@ -129,7 +123,10 @@ where
                         .unzip();
                     self.names = names;
                     self.types = types;
-                    return;
+                    return Schema {
+                        names: self.names.clone(),
+                        types: self.types.clone(),
+                    };
                 }
                 Err(e) if i == self.queries.len() - 1 => {
                     // tried the last query but still get an error
@@ -148,9 +145,6 @@ where
             .unzip();
         self.names = names;
         self.types = types;
-    }
-
-    fn schema(&self) -> Schema<Self::TypeSystem> {
         Schema {
             names: self.names.clone(),
             types: self.types.clone(),
