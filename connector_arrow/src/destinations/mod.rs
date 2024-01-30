@@ -1,13 +1,8 @@
 //! This module defines three traits [`Destination`], [`DestinationPartition`], and [`Consume`] to define a destination.
 //! This module also contains destination implementations for various dataframes.
 
-#[cfg(feature = "dst_arrow")]
 pub mod arrow;
-#[cfg(feature = "dst_arrow")]
 pub mod arrowstream;
-
-#[cfg(feature = "dst_arrow2")]
-pub mod arrow2;
 
 use crate::data_order::DataOrder;
 use crate::errors::ConnectorXError;

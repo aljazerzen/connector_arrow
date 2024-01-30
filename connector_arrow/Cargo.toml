@@ -25,6 +25,7 @@ url = "2"
 owning_ref = "0.4"
 serde_json = "1"
 chrono = "0.4"
+arrow = {version = "50", default-features = false}
 
 # common optional
 futures = {version = "0.3", optional = true}
@@ -39,15 +40,6 @@ tokio = {version = "1", features = ["rt", "rt-multi-thread", "net"], optional = 
 tokio-util = {version = "0.6", optional = true}
 urlencoding = {version = "2.1", optional = true}
 uuid = {version = "0.8", optional = true}
-
-# dst_arrow
-arrow = {version = "50", default-features = false, optional = true}
-
-# dst_arrow2
-arrow2 = {version = "0.17", default-features = false, optional = true}
-
-# dst_polars
-polars = {version = "0.32", optional = true, features=["dtype-u8", "dtype-u16"]}
 
 # src_bigquery
 gcp-bigquery-client = {version = "0.13.0", default-features = false, optional = true}
@@ -87,12 +79,9 @@ iai = "0.1"
 pprof = {version = "0.5", features = ["flamegraph"]}
 
 [features]
-all = ["src_sqlite", "src_postgres", "src_mysql", "src_mssql", "src_oracle", "src_bigquery", "src_csv", "src_dummy", "dst_arrow", "dst_arrow2", "dst_polars"]
+all = ["src_sqlite", "src_postgres", "src_mysql", "src_mssql", "src_oracle", "src_bigquery", "src_csv", "src_dummy"]
 branch = []
 default = ["fptr"]
-dst_arrow = ["arrow"]
-dst_arrow2 = ["arrow2"]
-dst_polars = ["polars", "dst_arrow2"]
 fptr = []
 src_bigquery = ["gcp-bigquery-client", "tokio"]
 src_csv = ["csv", "regex"]

@@ -136,25 +136,22 @@
 //! - [x] Arrow2
 //!
 //! # Feature gates
-//! By default, ConnectorX does not enable any sources / destinations to keep the dependencies minimal.
-//! Instead, we provide following features for you to opt-in: `src_sqlite`, `src_postgres`, `src_mysql`, `src_mssql`, `src_oracle`, `dst_arrow`, `dst_arrow2`.
-//! For example, if you'd like to load data from Postgres to Arrow, you can enable `src_postgres` and `dst_arrow` in `Cargo.toml`.
-//! This will enable [`sources::postgres`], [`destinations::arrow`] and [`transports::PostgresArrowTransport`].
+//! By default, ConnectorX does not enable any sources to keep the dependencies minimal.
+//! Instead, we provide following features for you to opt-in: `src_sqlite`, `src_postgres`, `src_mysql`, `src_mssql`, `src_oracle`.
+//! For example, if you'd like to load data from Postgres to Arrow, you can enable `src_postgres` in `Cargo.toml`.
+//! This will enable [`sources::postgres`] and [`transports::PostgresArrowTransport`].
 
 pub mod typesystem;
 #[macro_use]
 mod macros;
-#[cfg(feature = "dst_arrow")]
+
 pub mod arrow_batch_iter;
 pub mod constants;
 pub mod data_order;
 pub mod destinations;
 mod dispatcher;
 pub mod errors;
-#[cfg(feature = "dst_arrow")]
 pub mod get_arrow;
-#[cfg(feature = "dst_arrow2")]
-pub mod get_arrow2;
 pub mod partition;
 pub mod source_router;
 pub mod sources;
@@ -165,14 +162,9 @@ pub mod transports;
 pub mod utils;
 
 pub mod prelude {
-    #[cfg(feature = "dst_arrow")]
     pub use crate::arrow_batch_iter::{set_global_num_thread, RecordBatchIterator};
     pub use crate::data_order::{coordinate, DataOrder};
-    #[cfg(feature = "dst_arrow")]
     pub use crate::destinations::arrow::{ArrowDestination, ArrowPartitionWriter, ArrowTypeSystem};
-    #[cfg(feature = "dst_arrow2")]
-    pub use crate::destinations::arrow2::Arrow2Destination;
-    #[cfg(feature = "dst_arrow")]
     pub use crate::destinations::arrowstream::{
         ArrowDestination as ArrowStreamDestination,
         ArrowPartitionWriter as ArrowStreamPartitionWriter,
@@ -181,10 +173,7 @@ pub mod prelude {
     pub use crate::destinations::{Consume, Destination, DestinationPartition};
     pub use crate::dispatcher::Dispatcher;
     pub use crate::errors::{ConnectorXError, ConnectorXOutError};
-    #[cfg(feature = "dst_arrow")]
     pub use crate::get_arrow::{get_arrow, new_record_batch_iter};
-    #[cfg(feature = "dst_arrow2")]
-    pub use crate::get_arrow2::get_arrow2;
     pub use crate::source_router::*;
     #[cfg(feature = "src_bigquery")]
     pub use crate::sources::bigquery::BigQuerySource;

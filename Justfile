@@ -22,7 +22,7 @@ build-release:
 build-debug:
     cargo build --features all
 
-features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite,dst_arrow,dst_arrow2,dst_polars"
+features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite"
 test:
     cargo nextest run {{features_test}}
     cargo fmt --check
@@ -36,5 +36,3 @@ test-feature-gate:
     cargo check --features src_oracle
     cargo check --features src_csv
     cargo check --features src_dummy
-    cargo check --features dst_arrow
-    cargo check --features dst_arrow2
