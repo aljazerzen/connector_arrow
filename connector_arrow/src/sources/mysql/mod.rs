@@ -9,7 +9,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, limit1_query, CXQuery},
 };
 use anyhow::anyhow;
@@ -69,11 +69,11 @@ impl<P> MySQLSource<P> {
 impl<P> Source for MySQLSource<P>
 where
     MySQLSourcePartition<P>:
-        SourcePartition<TypeSystem = MySQLTypeSystem, Error = MySQLSourceError>,
+        SourceReader<TypeSystem = MySQLTypeSystem, Error = MySQLSourceError>,
     P: Send,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = MySQLSourcePartition<P>;
+    type Reader = MySQLSourcePartition<P>;
     type TypeSystem = MySQLTypeSystem;
     type Error = MySQLSourceError;
 
@@ -176,7 +176,7 @@ where
     }
 
     #[throws(MySQLSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
@@ -208,7 +208,7 @@ impl<P> MySQLSourcePartition<P> {
     }
 }
 
-impl SourcePartition for MySQLSourcePartition<BinaryProtocol> {
+impl SourceReader for MySQLSourcePartition<BinaryProtocol> {
     type TypeSystem = MySQLTypeSystem;
     type Parser<'a> = MySQLBinarySourceParser<'a>;
     type Error = MySQLSourceError;
@@ -234,7 +234,7 @@ impl SourcePartition for MySQLSourcePartition<BinaryProtocol> {
     }
 }
 
-impl SourcePartition for MySQLSourcePartition<TextProtocol> {
+impl SourceReader for MySQLSourcePartition<TextProtocol> {
     type TypeSystem = MySQLTypeSystem;
     type Parser<'a> = MySQLTextSourceParser<'a>;
     type Error = MySQLSourceError;

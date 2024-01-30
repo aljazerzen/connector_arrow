@@ -7,7 +7,7 @@ pub use self::errors::SQLiteSourceError;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, limit1_query, CXQuery},
     typesystem::Schema,
     utils::DummyBox,
@@ -56,10 +56,10 @@ impl SQLiteSource {
 
 impl Source for SQLiteSource
 where
-    SQLiteSourcePartition: SourcePartition<TypeSystem = SQLiteTypeSystem>,
+    SQLiteSourcePartition: SourceReader<TypeSystem = SQLiteTypeSystem>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = SQLiteSourcePartition;
+    type Reader = SQLiteSourcePartition;
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
@@ -162,7 +162,7 @@ where
     }
 
     #[throws(SQLiteSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
@@ -197,7 +197,7 @@ impl SQLiteSourcePartition {
     }
 }
 
-impl SourcePartition for SQLiteSourcePartition {
+impl SourceReader for SQLiteSourcePartition {
     type TypeSystem = SQLiteTypeSystem;
     type Parser<'a> = SQLiteSourcePartitionParser<'a>;
     type Error = SQLiteSourceError;

@@ -7,7 +7,7 @@ pub use self::errors::BigQuerySourceError;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, limit1_query, CXQuery},
     typesystem::Schema,
 };
@@ -85,11 +85,11 @@ impl BigQuerySource {
 
 impl Source for BigQuerySource
 where
-    BigQuerySourcePartition:
-        SourcePartition<TypeSystem = BigQueryTypeSystem, Error = BigQuerySourceError>,
+    BigQueryPartitionReader:
+        SourceReader<TypeSystem = BigQueryTypeSystem, Error = BigQuerySourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = BigQuerySourcePartition;
+    type Reader = BigQueryPartitionReader;
     type TypeSystem = BigQueryTypeSystem;
     type Error = BigQuerySourceError;
 
@@ -147,10 +147,10 @@ where
     }
 
     #[throws(BigQuerySourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
-            ret.push(BigQuerySourcePartition::new(
+            ret.push(BigQueryPartitionReader::new(
                 self.rt.clone(),
                 self.client.clone(),
                 self.project_id.clone(),
@@ -162,7 +162,7 @@ where
     }
 }
 
-pub struct BigQuerySourcePartition {
+pub struct BigQueryPartitionReader {
     rt: Arc<Runtime>,
     client: Arc<Client>,
     project_id: String,
@@ -172,7 +172,7 @@ pub struct BigQuerySourcePartition {
     ncols: usize,
 }
 
-impl BigQuerySourcePartition {
+impl BigQueryPartitionReader {
     pub fn new(
         handle: Arc<Runtime>,
         client: Arc<Client>,
@@ -192,7 +192,7 @@ impl BigQuerySourcePartition {
     }
 }
 
-impl SourcePartition for BigQuerySourcePartition {
+impl SourceReader for BigQueryPartitionReader {
     type TypeSystem = BigQueryTypeSystem;
     type Parser<'a> = BigQuerySourceParser;
     type Error = BigQuerySourceError;

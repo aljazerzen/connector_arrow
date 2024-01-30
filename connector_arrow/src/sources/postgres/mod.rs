@@ -13,7 +13,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, CXQuery},
 };
 use anyhow::anyhow;
@@ -123,7 +123,7 @@ where
 impl<P, C> Source for PostgresSource<P, C>
 where
     PostgresSourcePartition<P, C>:
-        SourcePartition<TypeSystem = PostgresTypeSystem, Error = PostgresSourceError>,
+        SourceReader<TypeSystem = PostgresTypeSystem, Error = PostgresSourceError>,
     P: Send,
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -131,7 +131,7 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = PostgresSourcePartition<P, C>;
+    type Reader = PostgresSourcePartition<P, C>;
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
@@ -183,7 +183,7 @@ where
     }
 
     #[throws(PostgresSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
@@ -240,7 +240,7 @@ where
     }
 }
 
-impl<C> SourcePartition for PostgresSourcePartition<BinaryProtocol, C>
+impl<C> SourceReader for PostgresSourcePartition<BinaryProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<C> SourcePartition for PostgresSourcePartition<CSVProtocol, C>
+impl<C> SourceReader for PostgresSourcePartition<CSVProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -311,7 +311,7 @@ where
     }
 }
 
-impl<C> SourcePartition for PostgresSourcePartition<CursorProtocol, C>
+impl<C> SourceReader for PostgresSourcePartition<CursorProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -1052,7 +1052,7 @@ impl_produce!(
     Vec<String>,
 );
 
-impl<C> SourcePartition for PostgresSourcePartition<SimpleProtocol, C>
+impl<C> SourceReader for PostgresSourcePartition<SimpleProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,

@@ -4,7 +4,7 @@
 mod typesystem;
 
 pub use self::typesystem::DummyTypeSystem;
-use super::{PartitionParser, Produce, Source, SourcePartition};
+use super::{PartitionParser, Produce, Source, SourceReader};
 use crate::data_order::DataOrder;
 use crate::errors::{ConnectorXError, Result};
 use crate::sql::CXQuery;
@@ -33,7 +33,7 @@ impl DummySource {
 impl Source for DummySource {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
     type TypeSystem = DummyTypeSystem;
-    type Partition = DummySourcePartition;
+    type Reader = DummySourcePartition;
     type Error = ConnectorXError;
 
     #[throws(ConnectorXError)]
@@ -61,7 +61,7 @@ impl Source for DummySource {
         }
     }
 
-    fn partition(self) -> Result<Vec<Self::Partition>> {
+    fn reader(self) -> Result<Vec<Self::Reader>> {
         assert!(!self.queries.is_empty());
         let queries = self.queries;
         let schema = self.types;
@@ -91,7 +91,7 @@ impl DummySourcePartition {
     }
 }
 
-impl SourcePartition for DummySourcePartition {
+impl SourceReader for DummySourcePartition {
     type TypeSystem = DummyTypeSystem;
     type Parser<'a> = DummySourcePartitionParser<'a>;
     type Error = ConnectorXError;

@@ -3,7 +3,7 @@
 use crate::{
     data_order::{coordinate, DataOrder},
     destinations::{Destination, PartitionWriter},
-    sources::{PartitionParser, Source, SourcePartition},
+    sources::{PartitionParser, Source, SourceReader},
     sql::CXQuery,
     typesystem::{Schema, Transport},
 };
@@ -24,7 +24,7 @@ pub struct Dispatcher<'a, S, D, TP> {
 
 pub struct PreparedDispatch<S: Source, D: Destination> {
     pub data_order: DataOrder,
-    pub src_partitions: Vec<S::Partition>,
+    pub src_partitions: Vec<S::Reader>,
     pub dst_partitions: Vec<D::PartitionWriter>,
     pub src_schema: Schema<S::TypeSystem>,
     pub dst_schema: Schema<D::TypeSystem>,
@@ -62,7 +62,7 @@ where
         let src_schema = self.src.schema();
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
-        let src_partitions: Vec<S::Partition> = self.src.partition()?;
+        let src_partitions: Vec<S::Reader> = self.src.reader()?;
 
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
 

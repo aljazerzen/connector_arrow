@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 use crate::destinations::{Consume, Destination, PartitionWriter};
 use crate::errors::{ConnectorXError, Result as CXResult};
-use crate::sources::{PartitionParser, Produce, Source, SourcePartition};
+use crate::sources::{PartitionParser, Produce, Source, SourceReader};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Schema<T: TypeSystem> {
@@ -138,7 +138,7 @@ pub trait Transport {
     fn process<'s, 'd, 'r>(
         ts1: Self::TSS,
         ts2: Self::TSD,
-        src: &'r mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
+        src: &'r mut <<Self::S as Source>::Reader as SourceReader>::Parser<'s>,
         dst: &'r mut <Self::D as Destination>::PartitionWriter,
     ) -> Result<(), Self::Error>
     where
@@ -150,7 +150,7 @@ pub trait Transport {
         ts2: Self::TSD,
     ) -> CXResult<
         fn(
-            src: &mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
+            src: &mut <<Self::S as Source>::Reader as SourceReader>::Parser<'s>,
             dst: &mut <Self::D as Destination>::PartitionWriter,
         ) -> Result<(), Self::Error>,
     >
@@ -160,15 +160,15 @@ pub trait Transport {
 
 #[doc(hidden)]
 pub fn process<'s, 'd, 'r, T1, T2, TP, S, D, ES, ED, ET>(
-    src: &'r mut <<S as Source>::Partition as SourcePartition>::Parser<'s>,
+    src: &'r mut <<S as Source>::Reader as SourceReader>::Parser<'s>,
     dst: &'r mut <D as Destination>::PartitionWriter,
 ) -> Result<(), ET>
 where
     T1: TypeAssoc<<S as Source>::TypeSystem>,
     S: Source<Error = ES>,
-    <S as Source>::Partition: SourcePartition<Error = ES>,
+    <S as Source>::Reader: SourceReader<Error = ES>,
 
-    <<S as Source>::Partition as SourcePartition>::Parser<'s>: Produce<'r, T1, Error = ES>,
+    <<S as Source>::Reader as SourceReader>::Parser<'s>: Produce<'r, T1, Error = ES>,
     ES: From<ConnectorXError> + Send,
 
     T2: TypeAssoc<<D as Destination>::TypeSystem>,

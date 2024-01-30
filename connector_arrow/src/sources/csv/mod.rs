@@ -5,7 +5,7 @@ mod typesystem;
 
 pub use self::errors::CSVSourceError;
 pub use self::typesystem::CSVTypeSystem;
-use super::{PartitionParser, Produce, Source, SourcePartition};
+use super::{PartitionParser, Produce, Source, SourceReader};
 use crate::typesystem::Schema;
 use crate::{data_order::DataOrder, errors::ConnectorXError, sql::CXQuery};
 use anyhow::anyhow;
@@ -137,7 +137,7 @@ impl CSVSource {
 
 impl Source for CSVSource {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = CSVSourcePartition;
+    type Reader = CSVSourcePartition;
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
@@ -178,7 +178,7 @@ impl Source for CSVSource {
     }
 
     #[throws(CSVSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut partitions = vec![];
         for file in self.files {
             partitions.push(CSVSourcePartition::new(file)?);
@@ -220,7 +220,7 @@ impl CSVSourcePartition {
     }
 }
 
-impl SourcePartition for CSVSourcePartition {
+impl SourceReader for CSVSourcePartition {
     type TypeSystem = CSVTypeSystem;
     type Parser<'a> = CSVSourcePartitionParser<'a>;
     type Error = CSVSourceError;

@@ -15,7 +15,7 @@ use connector_arrow::{
 fn no_file() {
     let mut source = CSVSource::new(&[]);
     source.set_queries(&[CXQuery::naked("./a_fake_file.csv")]);
-    source.partition().err().unwrap();
+    source.reader().err().unwrap();
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn no_file() {
 fn empty_file() {
     let mut source = CSVSource::new(&[]);
     source.set_queries(&[CXQuery::naked("./tests/data/empty.csv")]);
-    let mut partitions = source.partition().unwrap();
+    let mut partitions = source.reader().unwrap();
     for p in &mut partitions {
         p.result_rows().expect("run query");
     }
@@ -56,7 +56,7 @@ fn load_and_parse() {
     ]);
     source.set_queries(&[CXQuery::naked("./tests/data/uspop_0.csv")]);
 
-    let mut partitions = source.partition().unwrap();
+    let mut partitions = source.reader().unwrap();
 
     let mut partition = partitions.remove(0);
     partition.result_rows().expect("run query");

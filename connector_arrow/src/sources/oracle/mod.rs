@@ -8,7 +8,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, limit1_query_oracle, CXQuery},
     utils::DummyBox,
 };
@@ -91,10 +91,10 @@ impl OracleSource {
 impl Source for OracleSource
 where
     OracleSourcePartition:
-        SourcePartition<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
+        SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = OracleSourcePartition;
+    type Reader = OracleSourcePartition;
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
 
@@ -166,7 +166,7 @@ where
     }
 
     #[throws(OracleSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
@@ -196,7 +196,7 @@ impl OracleSourcePartition {
     }
 }
 
-impl SourcePartition for OracleSourcePartition {
+impl SourceReader for OracleSourcePartition {
     type TypeSystem = OracleTypeSystem;
     type Parser<'a> = OracleTextSourceParser<'a>;
     type Error = OracleSourceError;

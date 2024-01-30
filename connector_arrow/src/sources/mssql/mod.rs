@@ -10,7 +10,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourcePartition},
+    sources::{PartitionParser, Produce, Source, SourceReader},
     sql::{count_query, CXQuery},
     utils::DummyBox,
 };
@@ -118,10 +118,10 @@ impl MsSQLSource {
 
 impl Source for MsSQLSource
 where
-    MsSQLSourcePartition: SourcePartition<TypeSystem = MsSQLTypeSystem, Error = MsSQLSourceError>,
+    MsSQLSourcePartition: SourceReader<TypeSystem = MsSQLTypeSystem, Error = MsSQLSourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Partition = MsSQLSourcePartition;
+    type Reader = MsSQLSourcePartition;
     type TypeSystem = MsSQLTypeSystem;
     type Error = MsSQLSourceError;
 
@@ -183,7 +183,7 @@ where
     }
 
     #[throws(MsSQLSourceError)]
-    fn partition(self) -> Vec<Self::Partition> {
+    fn reader(self) -> Vec<Self::Reader> {
         let mut ret = vec![];
         for query in self.queries {
             ret.push(MsSQLSourcePartition::new(
@@ -224,7 +224,7 @@ impl MsSQLSourcePartition {
     }
 }
 
-impl SourcePartition for MsSQLSourcePartition {
+impl SourceReader for MsSQLSourcePartition {
     type TypeSystem = MsSQLTypeSystem;
     type Parser<'a> = MsSQLSourceParser<'a>;
     type Error = MsSQLSourceError;

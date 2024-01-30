@@ -28,7 +28,7 @@ fn load_and_parse() {
     source.set_queries(&[CXQuery::naked("select * from test_table")]);
     source.fetch_metadata().unwrap();
 
-    let mut partitions = source.partition().unwrap();
+    let mut partitions = source.reader().unwrap();
     assert!(partitions.len() == 1);
     let mut partition = partitions.remove(0);
     partition.result_rows().expect("run query");
@@ -81,7 +81,7 @@ fn load_and_parse_csv() {
     source.set_queries(&[CXQuery::naked("select * from test_table")]);
     source.fetch_metadata().unwrap();
 
-    let mut partitions = source.partition().unwrap();
+    let mut partitions = source.reader().unwrap();
     assert!(partitions.len() == 1);
     let mut partition = partitions.remove(0);
     partition.result_rows().expect("run query");

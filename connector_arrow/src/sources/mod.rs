@@ -30,7 +30,7 @@ pub trait Source {
     /// The type system this `Source` associated with.
     type TypeSystem: TypeSystem;
     // Partition needs to be send to different threads for parallel execution
-    type Partition: SourcePartition<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
+    type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
     fn set_data_order(&mut self, data_order: DataOrder) -> Result<(), Self::Error>;
@@ -43,12 +43,12 @@ pub trait Source {
 
     fn schema(&self) -> Schema<Self::TypeSystem>;
 
-    fn partition(self) -> Result<Vec<Self::Partition>, Self::Error>;
+    fn reader(self) -> Result<Vec<Self::Reader>, Self::Error>;
 }
 
-/// In general, a `DataSource` abstracts the data source as a stream, which can produce
+/// In general, a [PartitionReader] abstracts the data source as a stream, which can produce
 /// a sequence of values of variate types by repetitively calling the function `produce`.
-pub trait SourcePartition {
+pub trait SourceReader {
     type TypeSystem: TypeSystem;
     type Parser<'a>: PartitionParser<'a, TypeSystem = Self::TypeSystem, Error = Self::Error>
     where
@@ -60,11 +60,11 @@ pub trait SourcePartition {
 
     fn parser(&mut self) -> Result<Self::Parser<'_>, Self::Error>;
 
-    /// Number of rows this `DataSource` got.
+    /// Number of rows this partition has.
     /// Sometimes it is not possible for the source to know how many rows it gets before reading the whole data.
     fn nrows(&self) -> usize;
 
-    /// Number of cols this `DataSource` got.
+    /// Number of cols this partition has.
     fn ncols(&self) -> usize;
 }
 
