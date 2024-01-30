@@ -33,7 +33,7 @@ pub trait Source {
     type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]);
+    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]);
 
     fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
 

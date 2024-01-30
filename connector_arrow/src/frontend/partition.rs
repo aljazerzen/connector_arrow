@@ -137,7 +137,7 @@ pub fn get_part_query(
         )?,
         _ => unimplemented!("{:?} not implemented!", source_conn.ty),
     };
-    CXQuery::Wrapped(query)
+    CXQuery::wrapped(query)
 }
 
 #[cfg(feature = "src_postgres")]

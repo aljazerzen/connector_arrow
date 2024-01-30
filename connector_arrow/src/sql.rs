@@ -14,44 +14,62 @@ use sqlparser::parser::Parser;
 use std::any::Any;
 
 #[derive(Debug, Clone)]
-pub enum CXQuery<Q = String> {
-    Naked(Q),   // The query directly comes from the user
-    Wrapped(Q), // The user query is already wrapped in a subquery
+pub struct CXQuery<Q: AsRef<str> = String> {
+    kind: CXQueryKind,
+    sql: Q,
 }
 
-impl<Q: std::fmt::Display> std::fmt::Display for CXQuery<Q> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CXQuery::Naked(q) => write!(f, "{}", q),
-            CXQuery::Wrapped(q) => write!(f, "{}", q),
+#[derive(Debug, Clone, Copy)]
+pub enum CXQueryKind {
+    /// The query directly comes from the user
+    Naked,
+    /// The user query is already wrapped in a subquery
+    Wrapped,
+}
+
+impl<Q: AsRef<str>> CXQuery<Q> {
+    pub fn naked(sql: Q) -> CXQuery<String> {
+        CXQuery {
+            kind: CXQueryKind::Naked,
+            sql: sql.as_ref().to_string(),
         }
+    }
+
+    pub fn wrapped(sql: Q) -> Self {
+        Self {
+            kind: CXQueryKind::Wrapped,
+            sql,
+        }
+    }
+}
+
+impl std::fmt::Display for CXQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.sql)
     }
 }
 
 impl<Q: AsRef<str>> CXQuery<Q> {
     pub fn as_str(&self) -> &str {
-        match self {
-            CXQuery::Naked(q) => q.as_ref(),
-            CXQuery::Wrapped(q) => q.as_ref(),
-        }
+        self.sql.as_ref()
     }
 }
 
 impl From<&str> for CXQuery {
     fn from(s: &str) -> CXQuery<String> {
-        CXQuery::Naked(s.to_string())
+        CXQuery::naked(s.to_string())
     }
 }
 
 impl From<&&str> for CXQuery {
     fn from(s: &&str) -> CXQuery<String> {
-        CXQuery::Naked(s.to_string())
+        CXQuery::naked(s.to_string())
     }
 }
 
 impl From<&String> for CXQuery {
     fn from(s: &String) -> CXQuery {
-        CXQuery::Naked(s.clone())
+        CXQuery::naked(s.clone())
     }
 }
 
@@ -61,38 +79,21 @@ impl From<&CXQuery> for CXQuery {
     }
 }
 
-impl CXQuery<String> {
-    pub fn naked<Q: AsRef<str>>(q: Q) -> Self {
-        CXQuery::Naked(q.as_ref().to_string())
-    }
-}
-
 impl<Q: AsRef<str>> AsRef<str> for CXQuery<Q> {
     fn as_ref(&self) -> &str {
-        match self {
-            CXQuery::Naked(q) => q.as_ref(),
-            CXQuery::Wrapped(q) => q.as_ref(),
-        }
+        self.sql.as_ref()
     }
 }
 
-impl<Q> CXQuery<Q> {
-    pub fn map<F, U>(&self, f: F) -> CXQuery<U>
+impl<Q: AsRef<str>> CXQuery<Q> {
+    pub fn map<F, U: AsRef<str>>(&self, f: F) -> CXQuery<U>
     where
         F: Fn(&Q) -> U,
     {
-        match self {
-            CXQuery::Naked(q) => CXQuery::Naked(f(q)),
-            CXQuery::Wrapped(q) => CXQuery::Wrapped(f(q)),
-        }
-    }
-}
-
-impl<Q, E> CXQuery<Result<Q, E>> {
-    pub fn result(self) -> Result<CXQuery<Q>, E> {
-        match self {
-            CXQuery::Naked(q) => q.map(CXQuery::Naked),
-            CXQuery::Wrapped(q) => q.map(CXQuery::Wrapped),
+        let sql = f(&self.sql);
+        CXQuery {
+            kind: self.kind,
+            sql,
         }
     }
 }
@@ -177,8 +178,8 @@ impl QueryExt for Query {
 }
 
 #[throws(ConnectorXError)]
-pub fn count_query<T: Dialect>(sql: &CXQuery<String>, dialect: &T) -> CXQuery<String> {
-    trace!("Incoming query: {}", sql);
+pub fn count_query<T: Dialect>(query: &CXQuery<String>, dialect: &T) -> CXQuery<String> {
+    trace!("Incoming query: {}", query);
 
     const COUNT_TMP_TAB_NAME: &str = "CXTMPTAB_COUNT";
 
@@ -189,73 +190,69 @@ pub fn count_query<T: Dialect>(sql: &CXQuery<String>, dialect: &T) -> CXQuery<St
     #[cfg(feature = "src_oracle")]
     if dialect.type_id() == (OracleDialect {}.type_id()) {
         // table_alias = "";
-        return CXQuery::Wrapped(format!(
+        return CXQuery::wrapped(format!(
             "SELECT COUNT(*) FROM ({}) {}",
-            sql.as_str(),
-            COUNT_TMP_TAB_NAME
+            query.sql, COUNT_TMP_TAB_NAME
         ));
     }
 
-    let tsql = match sql.map(|sql| Parser::parse_sql(dialect, sql)).result() {
+    let tsql = match Parser::parse_sql(dialect, &query.sql) {
         Ok(ast) => {
-            let projection = vec![SelectItem::UnnamedExpr(Expr::Function(Function {
-                name: ObjectName(vec![Ident {
-                    value: "count".to_string(),
-                    quote_style: None,
-                }]),
-                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                over: None,
-                distinct: false,
-                order_by: vec![],
-                special: false,
-            }))];
-            let ast_count: Statement = match ast {
-                CXQuery::Naked(ast) => {
-                    if ast.len() != 1 {
-                        throw!(ConnectorXError::SqlQueryNotSupported(sql.to_string()));
-                    }
-                    let mut query = ast[0]
-                        .as_query()
-                        .ok_or_else(|| ConnectorXError::SqlQueryNotSupported(sql.to_string()))?
-                        .clone();
-                    if query.offset.is_none() {
-                        query.order_by = vec![]; // mssql offset must appear with order by
-                    }
-                    let select = query
-                        .as_select_mut()
-                        .ok_or_else(|| ConnectorXError::SqlQueryNotSupported(sql.to_string()))?;
-                    select.sort_by = vec![];
-                    wrap_query(&mut query, projection, None, table_alias)
-                }
-                CXQuery::Wrapped(ast) => {
-                    if ast.len() != 1 {
-                        throw!(ConnectorXError::SqlQueryNotSupported(sql.to_string()));
-                    }
-                    let mut query = ast[0]
-                        .as_query()
-                        .ok_or_else(|| ConnectorXError::SqlQueryNotSupported(sql.to_string()))?
-                        .clone();
-                    let select = query
-                        .as_select_mut()
-                        .ok_or_else(|| ConnectorXError::SqlQueryNotSupported(sql.to_string()))?;
-                    select.projection = projection;
-                    Statement::Query(Box::new(query))
-                }
-            };
+            let ast_count: Statement = match query.kind {
+                CXQueryKind::Naked => wrap_naked(ast, table_alias),
+                CXQueryKind::Wrapped => wrap_wrapped(ast),
+            }
+            .ok_or_else(|| ConnectorXError::SqlQueryNotSupported(query.sql.clone()))?;
             format!("{}", ast_count)
         }
         Err(e) => {
             warn!("parser error: {:?}, manually compose query string", e);
             format!(
                 "SELECT COUNT(*) FROM ({}) as {}",
-                sql.as_str(),
-                COUNT_TMP_TAB_NAME
+                query.sql, COUNT_TMP_TAB_NAME
             )
         }
     };
 
     debug!("Transformed count query: {}", tsql);
-    CXQuery::Wrapped(tsql)
+    CXQuery::wrapped(tsql)
+}
+
+fn wrap_naked(ast: Vec<Statement>, table_alias: &str) -> Option<Statement> {
+    if ast.len() != 1 {
+        return None;
+    }
+    let mut q = ast[0].as_query()?.clone();
+    if q.offset.is_none() {
+        q.order_by = vec![]; // mssql offset must appear with order by
+    }
+    let select = q.as_select_mut()?;
+    select.sort_by = vec![];
+    Some(wrap_query(&mut q, make_projection(), None, table_alias))
+}
+
+fn wrap_wrapped(ast: Vec<Statement>) -> Option<Statement> {
+    if ast.len() != 1 {
+        return None;
+    }
+    let mut q = ast[0].as_query()?.clone();
+    let select = q.as_select_mut()?;
+    select.projection = make_projection();
+    Some(Statement::Query(Box::new(q)))
+}
+
+fn make_projection() -> Vec<SelectItem> {
+    vec![SelectItem::UnnamedExpr(Expr::Function(Function {
+        name: ObjectName(vec![Ident {
+            value: "count".to_string(),
+            quote_style: None,
+        }]),
+        args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+        over: None,
+        distinct: false,
+        order_by: vec![],
+        special: false,
+    }))]
 }
 
 #[throws(ConnectorXError)]
@@ -284,7 +281,7 @@ pub fn limit1_query<T: Dialect>(sql: &CXQuery<String>, dialect: &T) -> CXQuery<S
     };
 
     debug!("Transformed limit 1 query: {}", sql);
-    CXQuery::Wrapped(sql)
+    CXQuery::wrapped(sql)
 }
 
 #[throws(ConnectorXError)]
@@ -292,7 +289,7 @@ pub fn limit1_query<T: Dialect>(sql: &CXQuery<String>, dialect: &T) -> CXQuery<S
 pub fn limit1_query_oracle(sql: &CXQuery<String>) -> CXQuery<String> {
     trace!("Incoming oracle query: {}", sql);
 
-    CXQuery::Wrapped(format!("SELECT * FROM ({}) WHERE rownum = 1", sql))
+    CXQuery::wrapped(format!("SELECT * FROM ({}) WHERE rownum = 1", sql))
 
     // let ast = Parser::parse_sql(&OracleDialect {}, sql.as_str())?;
     // if ast.len() != 1 {

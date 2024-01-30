@@ -141,7 +141,7 @@ impl Source for CSVSource {
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
-    fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
+    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
         self.files = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 

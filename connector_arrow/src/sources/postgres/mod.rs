@@ -133,7 +133,7 @@ where
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
-    fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
+    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
 
