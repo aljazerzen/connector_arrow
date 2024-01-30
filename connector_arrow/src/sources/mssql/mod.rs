@@ -174,27 +174,6 @@ where
         self.schema = types;
     }
 
-    #[throws(MsSQLSourceError)]
-    fn result_rows(&mut self) -> Option<usize> {
-        match &self.origin_query {
-            Some(q) => {
-                let cxq = CXQuery::Naked(q.clone());
-                let cquery = count_query(&cxq, &MsSqlDialect {})?;
-                let mut conn = self.rt.block_on(self.pool.get())?;
-
-                let stream = self.rt.block_on(conn.query(cquery.as_str(), &[]))?;
-                let row = self
-                    .rt
-                    .block_on(stream.into_row())?
-                    .ok_or_else(|| anyhow!("MsSQL failed to get the count of query: {}", q))?;
-
-                let row: i32 = row.get(0).ok_or(MsSQLSourceError::GetNRowsFailed)?; // the count in mssql is i32
-                Some(row as usize)
-            }
-            None => None,
-        }
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }

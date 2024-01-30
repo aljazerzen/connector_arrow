@@ -3,7 +3,7 @@
 use crate::{
     data_order::{coordinate, DataOrder},
     destinations::{Destination, DestinationPartition},
-    errors::{ConnectorXError, Result as CXResult},
+    errors::Result as CXResult,
     sources::{PartitionParser, Source, SourcePartition},
     sql::CXQuery,
     typesystem::Transport,
@@ -67,31 +67,9 @@ where
             .collect::<CXResult<Vec<_>>>()?;
         let names = self.src.names();
 
-        let mut total_rows = if self.dst.needs_count() {
-            // return None if cannot derive total count
-            debug!("Try get row rounts for entire result");
-            self.src.result_rows()?
-        } else {
-            debug!("Do not need counts in advance");
-            Some(0)
-        };
-        let mut src_partitions: Vec<S::Partition> = self.src.partition()?;
-        if self.dst.needs_count() && total_rows.is_none() {
-            debug!("Manually count rows of each partitioned query and sum up");
-            // run queries
-            src_partitions
-                .par_iter_mut()
-                .try_for_each(|partition| -> Result<(), S::Error> { partition.result_rows() })?;
+        let src_partitions: Vec<S::Partition> = self.src.partition()?;
 
-            // get number of row of each partition from the source
-            let part_rows: Vec<usize> = src_partitions
-                .iter()
-                .map(|partition| partition.nrows())
-                .collect();
-            total_rows = Some(part_rows.iter().sum());
-        }
-        let total_rows = total_rows.ok_or_else(ConnectorXError::CountError)?;
-
+        let total_rows = 0;
         debug!(
             "Allocate destination memory: {}x{}",
             total_rows,

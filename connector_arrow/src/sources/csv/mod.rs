@@ -169,11 +169,6 @@ impl Source for CSVSource {
         assert_eq!(header.len(), self.schema.len());
     }
 
-    #[throws(CSVSourceError)]
-    fn result_rows(&mut self) -> Option<usize> {
-        None
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }

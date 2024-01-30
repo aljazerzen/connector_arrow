@@ -15,10 +15,6 @@ pub trait Destination: Sized {
     type Partition: DestinationPartition<TypeSystem = Self::TypeSystem, Error = Self::Error>;
     type Error: From<ConnectorXError> + Send;
 
-    /// Specify whether the destination needs total rows in advance
-    /// in order to pre-allocate the buffer.
-    fn needs_count(&self) -> bool;
-
     /// Construct the `Destination`.
     /// This allocates the memory based on the types of each columns
     /// and the number of rows.
@@ -32,6 +28,7 @@ pub trait Destination: Sized {
 
     /// Create a bunch of partition destinations, with each write `count` number of rows.
     fn partition(&mut self, counts: usize) -> Result<Vec<Self::Partition>, Self::Error>;
+
     /// Return the schema of the destination.
     fn schema(&self) -> &[Self::TypeSystem];
 }

@@ -67,10 +67,6 @@ impl Destination for ArrowDestination {
     type Partition = ArrowPartitionWriter;
     type Error = ArrowDestinationError;
 
-    fn needs_count(&self) -> bool {
-        false
-    }
-
     #[throws(ArrowDestinationError)]
     fn allocate<S: AsRef<str>>(
         &mut self,
@@ -79,7 +75,7 @@ impl Destination for ArrowDestination {
         schema: &[ArrowTypeSystem],
         data_order: DataOrder,
     ) {
-        // todo: support colmajor
+        // TODO: support ColMajor
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(crate::errors::ConnectorXError::UnsupportedDataOrder(
                 data_order

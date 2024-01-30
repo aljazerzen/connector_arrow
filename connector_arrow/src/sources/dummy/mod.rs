@@ -53,10 +53,6 @@ impl Source for DummySource {
         Ok(())
     }
 
-    fn result_rows(&mut self) -> Result<Option<usize>> {
-        Ok(None)
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }

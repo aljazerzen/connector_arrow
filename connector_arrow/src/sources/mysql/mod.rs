@@ -167,19 +167,6 @@ where
         }
     }
 
-    #[throws(MySQLSourceError)]
-    fn result_rows(&mut self) -> Option<usize> {
-        match &self.origin_query {
-            Some(q) => {
-                let cxq = CXQuery::Naked(q.clone());
-                let mut conn = self.pool.get()?;
-                let nrows = get_total_rows(&mut conn, &cxq)?;
-                Some(nrows)
-            }
-            None => None,
-        }
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }

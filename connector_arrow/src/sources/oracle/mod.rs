@@ -157,21 +157,6 @@ where
         self.schema = types;
     }
 
-    #[throws(OracleSourceError)]
-    fn result_rows(&mut self) -> Option<usize> {
-        match &self.origin_query {
-            Some(q) => {
-                let cxq = CXQuery::Naked(q.clone());
-                let conn = self.pool.get()?;
-
-                let nrows = conn
-                    .query_row_as::<usize>(count_query(&cxq, &OracleDialect {})?.as_str(), &[])?;
-                Some(nrows)
-            }
-            None => None,
-        }
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }

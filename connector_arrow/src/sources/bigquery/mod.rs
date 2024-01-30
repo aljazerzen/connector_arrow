@@ -138,26 +138,6 @@ where
         }
     }
 
-    #[throws(BigQuerySourceError)]
-    fn result_rows(&mut self) -> Option<usize> {
-        match &self.origin_query {
-            Some(q) => {
-                let cxq = CXQuery::Naked(q.clone());
-                let cquery = count_query(&cxq, &BigQueryDialect {})?;
-                let job = self.client.job();
-                let mut rs = self.rt.block_on(
-                    job.query(self.project_id.as_str(), QueryRequest::new(cquery.as_str())),
-                )?;
-                rs.next_row();
-                let nrows = rs
-                    .get_i64(0)?
-                    .ok_or_else(|| anyhow!("cannot get row number"))?;
-                Some(nrows as usize)
-            }
-            None => None,
-        }
-    }
-
     fn names(&self) -> Vec<String> {
         self.names.clone()
     }
