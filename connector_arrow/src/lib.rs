@@ -150,9 +150,7 @@ pub mod data_order;
 pub mod destinations;
 mod dispatcher;
 pub mod errors;
-pub mod get_arrow;
-pub mod partition;
-pub mod source_router;
+pub mod frontend;
 pub mod sources;
 #[doc(hidden)]
 pub mod sql;
@@ -162,13 +160,13 @@ pub mod utils;
 
 pub mod prelude {
     pub use crate::destinations::arrow::{ArrowDestination, ArrowPartitionWriter, ArrowTypeSystem};
-    pub use crate::get_arrow::get_arrow;
+    pub use crate::frontend::get_arrow::get_arrow;
 
     pub use crate::data_order::{coordinate, DataOrder};
     pub use crate::destinations::{Consume, Destination, DestinationPartition};
     pub use crate::dispatcher::Dispatcher;
     pub use crate::errors::{ConnectorXError, ConnectorXOutError};
-    pub use crate::source_router::*;
+    pub use crate::frontend::source_router::*;
     pub use crate::sources::{PartitionParser, Produce, Source, SourcePartition};
     pub use crate::sql::CXQuery;
     pub use crate::transports::*;

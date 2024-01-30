@@ -3,6 +3,7 @@
 
 use crate::errors::ConnectorXError;
 use fehler::{throw, throws};
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum DataOrder {
     RowMajor,

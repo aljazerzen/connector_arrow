@@ -36,3 +36,6 @@ test-feature-gate:
     cargo check --features src_oracle
     cargo check --features src_csv
     cargo check --features src_dummy
+    cargo clippy -- -D warnings
+    cargo clippy --features all -- -D warnings
+
