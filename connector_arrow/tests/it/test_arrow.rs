@@ -41,7 +41,7 @@ fn test_arrow() {
         DummyTypeSystem::String(true),
         DummyTypeSystem::F64(false),
     ];
-    let nrows = vec![4, 7];
+    let nrows = [4, 7];
     let ncols = schema.len();
     let queries: Vec<CXQuery> = nrows
         .iter()
@@ -146,7 +146,7 @@ fn test_arrow_large() {
         DummyTypeSystem::String(true),
         DummyTypeSystem::F64(false),
     ];
-    let nrows = vec![RECORD_BATCH_SIZE * 2 + 1, RECORD_BATCH_SIZE * 2 - 1];
+    let nrows = [RECORD_BATCH_SIZE * 2 + 1, RECORD_BATCH_SIZE * 2 - 1];
     let ncols = schema.len();
     let queries: Vec<CXQuery> = nrows
         .iter()

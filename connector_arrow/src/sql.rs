@@ -57,19 +57,19 @@ impl<Q: AsRef<str>> CXQuery<Q> {
 
 impl From<&str> for CXQuery {
     fn from(s: &str) -> CXQuery<String> {
-        CXQuery::naked(s.to_string())
+        CXQuery::naked(s)
     }
 }
 
 impl From<&&str> for CXQuery {
     fn from(s: &&str) -> CXQuery<String> {
-        CXQuery::naked(s.to_string())
+        CXQuery::naked(s)
     }
 }
 
 impl From<&String> for CXQuery {
     fn from(s: &String) -> CXQuery {
-        CXQuery::naked(s.clone())
+        CXQuery::naked(s)
     }
 }
 

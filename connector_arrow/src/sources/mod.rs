@@ -37,7 +37,11 @@ pub trait Source {
 
     fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
 
-    fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>, Self::Error>;
+    fn reader(
+        &mut self,
+        query: &CXQuery,
+        data_order: DataOrder,
+    ) -> Result<Self::Reader, Self::Error>;
 }
 
 /// In general, a [PartitionReader] abstracts the data source as a stream, which can produce

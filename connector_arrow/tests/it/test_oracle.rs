@@ -14,9 +14,12 @@ fn test_types() {
 
     source.set_queries(&[CXQuery::naked("select * from admin.test_table")]);
     source.fetch_metadata().unwrap();
-    let mut partitions = source.reader(DataOrder::RowMajor).unwrap();
-    assert!(partitions.len() == 1);
-    let mut partition = partitions.remove(0);
+    let mut partition = source
+        .reader(
+            &CXQuery::naked("select * from admin.test_table"),
+            DataOrder::RowMajor,
+        )
+        .unwrap();
     partition.result_rows().expect("run query");
     assert_eq!(3, partition.nrows());
     assert_eq!(8, partition.ncols());

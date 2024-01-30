@@ -166,16 +166,12 @@ impl Source for CSVSource {
     }
 
     #[throws(CSVSourceError)]
-    fn reader(self, data_order: DataOrder) -> Vec<Self::Reader> {
+    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        let mut partitions = vec![];
-        for file in self.files {
-            partitions.push(CSVSourcePartition::new(file)?);
-        }
-        partitions
+        CSVSourcePartition::new(query)?
     }
 }
 
@@ -188,7 +184,7 @@ pub struct CSVSourcePartition {
 
 impl CSVSourcePartition {
     #[throws(CSVSourceError)]
-    pub fn new(fname: CXQuery<String>) -> Self {
+    pub fn new(fname: &CXQuery<String>) -> Self {
         let reader = csv::ReaderBuilder::new()
             .has_headers(true)
             .from_reader(File::open(fname.as_str())?);

@@ -3,10 +3,7 @@ use connector_arrow::prelude::*;
 use connector_arrow::typesystem::Schema;
 use connector_arrow::{
     destinations::arrow::{ArrowDestination, ArrowTypeSystem},
-    sources::{
-        csv::{CSVSource, CSVTypeSystem},
-        PartitionParser,
-    },
+    sources::csv::{CSVSource, CSVTypeSystem},
     sql::CXQuery,
     transports::CSVArrowTransport,
 };
@@ -15,7 +12,10 @@ use connector_arrow::{
 fn no_file() {
     let mut source = CSVSource::new(&[]);
     source.set_queries(&[CXQuery::naked("./a_fake_file.csv")]);
-    source.reader(DataOrder::RowMajor).err().unwrap();
+    source
+        .reader(&CXQuery::naked("./a_fake_file.csv"), DataOrder::RowMajor)
+        .err()
+        .unwrap();
 }
 
 #[test]
@@ -23,13 +23,17 @@ fn no_file() {
 fn empty_file() {
     let mut source = CSVSource::new(&[]);
     source.set_queries(&[CXQuery::naked("./tests/data/empty.csv")]);
-    let mut partitions = source.reader(DataOrder::RowMajor).unwrap();
-    for p in &mut partitions {
-        p.result_rows().expect("run query");
-    }
-    assert_eq!(0, partitions[0].nrows());
-    assert_eq!(0, partitions[0].ncols());
-    let mut parser = partitions[0].parser().unwrap();
+    let mut p = source
+        .reader(
+            &CXQuery::naked("./tests/data/empty.csv"),
+            DataOrder::RowMajor,
+        )
+        .unwrap();
+    p.result_rows().expect("run query");
+
+    assert_eq!(0, p.nrows());
+    assert_eq!(0, p.ncols());
+    let mut parser = p.parser().unwrap();
 
     parser.fetch_next().unwrap();
 
@@ -56,9 +60,13 @@ fn load_and_parse() {
     ]);
     source.set_queries(&[CXQuery::naked("./tests/data/uspop_0.csv")]);
 
-    let mut partitions = source.reader(DataOrder::RowMajor).unwrap();
+    let mut partition = source
+        .reader(
+            &CXQuery::naked("./tests/data/uspop_0.csv"),
+            DataOrder::RowMajor,
+        )
+        .unwrap();
 
-    let mut partition = partitions.remove(0);
     partition.result_rows().expect("run query");
 
     assert_eq!(3, partition.nrows());

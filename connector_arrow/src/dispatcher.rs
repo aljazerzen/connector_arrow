@@ -23,7 +23,7 @@ pub struct Dispatcher<'a, S, D, TP> {
 
 pub struct PreparedDispatch<S: Source, D: Destination> {
     pub data_order: DataOrder,
-    pub src_partitions: Vec<S::Reader>,
+    pub src_readers: Vec<S::Reader>,
     pub dst_partitions: Vec<D::PartitionWriter>,
     pub src_schema: Schema<S::TypeSystem>,
     pub dst_schema: Schema<D::TypeSystem>,
@@ -57,7 +57,10 @@ where
         let src_schema = self.src.fetch_metadata()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
-        let src_partitions: Vec<S::Reader> = self.src.reader(data_order)?;
+        let mut src_readers = Vec::with_capacity(self.queries.len());
+        for query in &self.queries {
+            src_readers.push(self.src.reader(query, data_order)?);
+        }
 
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
 
@@ -69,7 +72,7 @@ where
 
         Ok(PreparedDispatch {
             data_order,
-            src_partitions,
+            src_readers,
             dst_partitions,
             src_schema,
             dst_schema,
@@ -81,7 +84,7 @@ where
         debug!("Run dispatcher");
         let PreparedDispatch {
             data_order,
-            src_partitions,
+            src_readers,
             dst_partitions,
             src_schema,
             dst_schema,
@@ -97,7 +100,7 @@ where
         // parse and write
         dst_partitions
             .into_par_iter()
-            .zip_eq(src_partitions)
+            .zip_eq(src_readers)
             .enumerate()
             .try_for_each(|(i, (mut dst, mut src))| -> Result<(), TP::Error> {
                 #[cfg(feature = "fptr")]

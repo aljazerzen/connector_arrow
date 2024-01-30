@@ -48,19 +48,14 @@ impl Source for DummySource {
         })
     }
 
-    fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>> {
+    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Result<Self::Reader> {
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        assert!(!self.queries.is_empty());
-        let queries = self.queries;
-        let schema = self.types;
+        let schema = &self.types;
 
-        Ok(queries
-            .into_iter()
-            .map(|q| DummySourcePartition::new(&schema, &q))
-            .collect())
+        Ok(DummySourcePartition::new(schema, query))
     }
 }
 

@@ -149,18 +149,13 @@ where
     }
 
     #[throws(SQLiteSourceError)]
-    fn reader(self, data_order: DataOrder) -> Vec<Self::Reader> {
+    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order));
         }
 
-        let mut ret = vec![];
-        for query in self.queries {
-            let conn = self.pool.get()?;
-
-            ret.push(SQLiteSourcePartition::new(conn, &query, &self.types));
-        }
-        ret
+        let conn = self.pool.get()?;
+        SQLiteSourcePartition::new(conn, query, &self.types)
     }
 }
 
