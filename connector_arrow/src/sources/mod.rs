@@ -33,8 +33,6 @@ pub trait Source {
     type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn set_data_order(&mut self, data_order: DataOrder) -> Result<(), Self::Error>;
-
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]);
 
     fn set_origin_query(&mut self, query: Option<String>);
@@ -43,7 +41,7 @@ pub trait Source {
 
     fn schema(&self) -> Schema<Self::TypeSystem>;
 
-    fn reader(self) -> Result<Vec<Self::Reader>, Self::Error>;
+    fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>, Self::Error>;
 }
 
 /// In general, a [PartitionReader] abstracts the data source as a stream, which can produce

@@ -141,13 +141,6 @@ impl Source for CSVSource {
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
-    #[throws(CSVSourceError)]
-    fn set_data_order(&mut self, data_order: DataOrder) {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
-        }
-    }
-
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
         self.files = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
@@ -178,7 +171,11 @@ impl Source for CSVSource {
     }
 
     #[throws(CSVSourceError)]
-    fn reader(self) -> Vec<Self::Reader> {
+    fn reader(self, data_order: DataOrder) -> Vec<Self::Reader> {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
+        }
+
         let mut partitions = vec![];
         for file in self.files {
             partitions.push(CSVSourcePartition::new(file)?);

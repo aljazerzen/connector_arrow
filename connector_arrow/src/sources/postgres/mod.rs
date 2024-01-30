@@ -135,13 +135,6 @@ where
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
-    #[throws(PostgresSourceError)]
-    fn set_data_order(&mut self, data_order: DataOrder) {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-    }
-
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
     }
@@ -183,7 +176,11 @@ where
     }
 
     #[throws(PostgresSourceError)]
-    fn reader(self) -> Vec<Self::Reader> {
+    fn reader(self, data_order: DataOrder) -> Vec<Self::Reader> {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
+        }
+
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;

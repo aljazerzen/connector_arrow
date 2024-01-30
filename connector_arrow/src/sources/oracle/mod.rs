@@ -90,20 +90,12 @@ impl OracleSource {
 
 impl Source for OracleSource
 where
-    OracleSourcePartition:
-        SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
+    OracleSourcePartition: SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
     type Reader = OracleSourcePartition;
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
-
-    #[throws(OracleSourceError)]
-    fn set_data_order(&mut self, data_order: DataOrder) {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-    }
 
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
@@ -166,7 +158,11 @@ where
     }
 
     #[throws(OracleSourceError)]
-    fn reader(self) -> Vec<Self::Reader> {
+    fn reader(self, data_order: DataOrder) -> Vec<Self::Reader> {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
+        }
+
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;

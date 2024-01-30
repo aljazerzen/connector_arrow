@@ -53,7 +53,6 @@ where
     pub fn prepare(mut self) -> Result<PreparedDispatch<S, D>, TP::Error> {
         debug!("Prepare");
         let data_order = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-        self.src.set_data_order(data_order)?;
         self.src.set_queries(self.queries.as_slice());
         self.src.set_origin_query(self.origin_query);
 
@@ -62,7 +61,7 @@ where
         let src_schema = self.src.schema();
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
-        let src_partitions: Vec<S::Reader> = self.src.reader()?;
+        let src_partitions: Vec<S::Reader> = self.src.reader(data_order)?;
 
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
 
@@ -168,7 +167,6 @@ where
     /// Only fetch the metadata (header) of the destination.
     pub fn get_meta(&mut self) -> Result<(), TP::Error> {
         let dorder = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-        self.src.set_data_order(dorder)?;
         self.src.set_queries(self.queries.as_slice());
         self.src.set_origin_query(self.origin_query.clone());
         self.src.fetch_metadata()?;

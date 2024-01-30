@@ -10,7 +10,7 @@ use crate::errors::{ConnectorXError, Result};
 use crate::sql::CXQuery;
 use crate::typesystem::Schema;
 use chrono::{offset, DateTime, Utc};
-use fehler::{throw, throws};
+use fehler::throw;
 use num_traits::cast::FromPrimitive;
 
 pub struct DummySource {
@@ -36,13 +36,6 @@ impl Source for DummySource {
     type Reader = DummySourcePartition;
     type Error = ConnectorXError;
 
-    #[throws(ConnectorXError)]
-    fn set_data_order(&mut self, data_order: DataOrder) {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
-        }
-    }
-
     // query: nrows,ncols
     fn set_queries<Q: ToString>(&mut self, queries: &[CXQuery<Q>]) {
         self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
@@ -61,7 +54,11 @@ impl Source for DummySource {
         }
     }
 
-    fn reader(self) -> Result<Vec<Self::Reader>> {
+    fn reader(self, data_order: DataOrder) -> Result<Vec<Self::Reader>> {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
+        }
+
         assert!(!self.queries.is_empty());
         let queries = self.queries;
         let schema = self.types;
