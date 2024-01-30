@@ -12,6 +12,7 @@ use connector_arrow::{
     },
     sql::CXQuery,
     transports::{DummyArrowTransport, PostgresArrowTransport},
+    typesystem::Schema,
 };
 use postgres::NoTls;
 use std::env;
@@ -20,18 +21,15 @@ use url::Url;
 #[test]
 fn arrow_destination_col_major() {
     let mut dw = ArrowDestination::new();
-    let _ = dw
-        .allocate(
-            11,
-            &["a", "b", "c"],
-            &[
-                ArrowTypeSystem::Int64(false),
-                ArrowTypeSystem::Float64(true),
-                ArrowTypeSystem::LargeUtf8(true),
-            ],
-            DataOrder::ColumnMajor,
-        )
-        .unwrap_err();
+    let schema = Schema {
+        names: vec!["a".into(), "b".into(), "c".into()],
+        types: vec![
+            ArrowTypeSystem::Int64(false),
+            ArrowTypeSystem::Float64(true),
+            ArrowTypeSystem::LargeUtf8(true),
+        ],
+    };
+    let _ = dw.set_metadata(schema, DataOrder::ColumnMajor).unwrap_err();
 }
 
 #[test]
@@ -59,7 +57,7 @@ fn test_arrow() {
     );
     dispatcher.run().expect("run dispatcher");
 
-    let records: Vec<RecordBatch> = destination.arrow().unwrap();
+    let records: Vec<RecordBatch> = destination.finish().unwrap();
     assert_eq!(2, records.len());
 
     for r in records {
@@ -165,7 +163,7 @@ fn test_arrow_large() {
     );
     dispatcher.run().expect("run dispatcher");
 
-    let records: Vec<RecordBatch> = destination.arrow().unwrap();
+    let records: Vec<RecordBatch> = destination.finish().unwrap();
     assert_eq!(5, records.len());
     let mut rsizes = vec![];
     for r in records {
@@ -207,7 +205,7 @@ fn test_postgres_arrow() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let records: Vec<RecordBatch> = destination.arrow().unwrap();
+    let records: Vec<RecordBatch> = destination.finish().unwrap();
     assert_eq!(2, records.len());
 
     for r in records {

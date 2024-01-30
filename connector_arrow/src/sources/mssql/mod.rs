@@ -6,6 +6,7 @@ mod typesystem;
 pub use self::errors::MsSQLSourceError;
 pub use self::typesystem::{FloatN, IntN, MsSQLTypeSystem};
 use crate::constants::DB_BUFFER_SIZE;
+use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
@@ -39,7 +40,7 @@ pub struct MsSQLSource {
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<MsSQLTypeSystem>,
+    types: Vec<MsSQLTypeSystem>,
 }
 
 #[throws(MsSQLSourceError)]
@@ -110,7 +111,7 @@ impl MsSQLSource {
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
         }
     }
 }
@@ -171,15 +172,14 @@ where
         };
 
         self.names = names;
-        self.schema = types;
+        self.types = types;
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(MsSQLSourceError)]
@@ -190,7 +190,7 @@ where
                 self.pool.clone(),
                 self.rt.clone(),
                 &query,
-                &self.schema,
+                &self.types,
             ));
         }
         ret

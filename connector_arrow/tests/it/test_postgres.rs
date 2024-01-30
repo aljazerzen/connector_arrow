@@ -145,7 +145,7 @@ fn test_postgres() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let result = destination.arrow().unwrap();
+    let result = destination.finish().unwrap();
     verify_arrow_results(result);
 }
 
@@ -168,7 +168,7 @@ fn test_postgres_csv() {
     );
 
     dispatcher.run().expect("run dispatcher");
-    let result = dst.arrow().unwrap();
+    let result = dst.finish().unwrap();
     verify_arrow_results(result);
 }
 
@@ -195,7 +195,7 @@ fn test_postgres_agg() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let mut result = destination.arrow().unwrap();
+    let mut result = destination.finish().unwrap();
     assert!(result.len() == 1);
     let rb = result.pop().unwrap();
     assert!(rb.columns().len() == 2);

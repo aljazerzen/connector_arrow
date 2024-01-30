@@ -8,22 +8,23 @@ use super::{PartitionParser, Produce, Source, SourcePartition};
 use crate::data_order::DataOrder;
 use crate::errors::{ConnectorXError, Result};
 use crate::sql::CXQuery;
+use crate::typesystem::Schema;
 use chrono::{offset, DateTime, Utc};
 use fehler::{throw, throws};
 use num_traits::cast::FromPrimitive;
 
 pub struct DummySource {
     names: Vec<String>,
-    schema: Vec<DummyTypeSystem>,
+    types: Vec<DummyTypeSystem>,
     queries: Vec<CXQuery<String>>,
 }
 
 impl DummySource {
-    pub fn new<S: AsRef<str>>(names: &[S], schema: &[DummyTypeSystem]) -> Self {
-        assert_eq!(names.len(), schema.len());
+    pub fn new<S: AsRef<str>>(names: &[S], types: &[DummyTypeSystem]) -> Self {
+        assert_eq!(names.len(), types.len());
         DummySource {
             names: names.iter().map(|s| s.as_ref().to_string()).collect(),
-            schema: schema.to_vec(),
+            types: types.to_vec(),
             queries: vec![],
         }
     }
@@ -53,18 +54,17 @@ impl Source for DummySource {
         Ok(())
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     fn partition(self) -> Result<Vec<Self::Partition>> {
         assert!(!self.queries.is_empty());
         let queries = self.queries;
-        let schema = self.schema;
+        let schema = self.types;
 
         Ok(queries
             .into_iter()

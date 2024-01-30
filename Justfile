@@ -29,6 +29,7 @@ test:
     cargo clippy {{features_test}} -- -D warnings
 
 test-feature-gate:
+    cargo check --features branch --no-default-features
     cargo check --features src_postgres
     cargo check --features src_mysql
     cargo check --features src_mssql

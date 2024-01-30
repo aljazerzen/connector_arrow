@@ -28,7 +28,7 @@ fn test_mssql() {
         Dispatcher::<_, _, MsSQLArrowTransport>::new(builder, &mut destination, &queries, None);
     dispatcher.run().unwrap();
 
-    let result = destination.arrow().unwrap();
+    let result = destination.finish().unwrap();
     verify_arrow_results(result);
 }
 
@@ -55,7 +55,7 @@ fn test_mssql_agg() {
     );
     dispatcher.run().unwrap();
 
-    let mut result = destination.arrow().unwrap();
+    let mut result = destination.finish().unwrap();
     assert!(result.len() == 1);
     let rb = result.pop().unwrap();
     assert!(rb.columns().len() == 2);

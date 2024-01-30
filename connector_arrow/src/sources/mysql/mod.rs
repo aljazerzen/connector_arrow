@@ -5,6 +5,7 @@ mod typesystem;
 
 pub use self::errors::MySQLSourceError;
 use crate::constants::DB_BUFFER_SIZE;
+use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
@@ -42,7 +43,7 @@ pub struct MySQLSource<P> {
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<MySQLTypeSystem>,
+    types: Vec<MySQLTypeSystem>,
     _protocol: PhantomData<P>,
 }
 
@@ -59,7 +60,7 @@ impl<P> MySQLSource<P> {
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
             _protocol: PhantomData,
         }
     }
@@ -111,7 +112,7 @@ where
                     })
                     .unzip();
                 self.names = names;
-                self.schema = types;
+                self.types = types;
             }
             Err(e) => {
                 warn!(
@@ -135,7 +136,7 @@ where
                                 })
                                 .unzip();
                             self.names = names;
-                            self.schema = types;
+                            self.types = types;
                             return;
                         }
                         Ok(None) => {}
@@ -162,17 +163,16 @@ where
                     })
                     .unzip();
                 self.names = names;
-                self.schema = types;
+                self.types = types;
             }
         }
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(MySQLSourceError)]
@@ -180,7 +180,7 @@ where
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
-            ret.push(MySQLSourcePartition::new(conn, &query, &self.schema));
+            ret.push(MySQLSourcePartition::new(conn, &query, &self.types));
         }
         ret
     }

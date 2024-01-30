@@ -33,5 +33,5 @@ fn test_bigquery_partition() {
     let dispatcher =
         Dispatcher::<_, _, BigQueryArrowTransport>::new(source, &mut destination, &queries, None);
     dispatcher.run().unwrap();
-    let _result = destination.arrow().unwrap();
+    let _result = destination.finish().unwrap();
 }

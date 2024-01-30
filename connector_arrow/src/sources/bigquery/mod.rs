@@ -9,6 +9,7 @@ use crate::{
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourcePartition},
     sql::{count_query, limit1_query, CXQuery},
+    typesystem::Schema,
 };
 use anyhow::anyhow;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
@@ -51,7 +52,7 @@ pub struct BigQuerySource {
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<BigQueryTypeSystem>,
+    types: Vec<BigQueryTypeSystem>,
 }
 
 impl BigQuerySource {
@@ -77,7 +78,7 @@ impl BigQuerySource {
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
         }
     }
 }
@@ -134,16 +135,15 @@ where
                 })
                 .unzip();
             self.names = names;
-            self.schema = types;
+            self.types = types;
         }
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(BigQuerySourceError)]
@@ -155,7 +155,7 @@ where
                 self.client.clone(),
                 self.project_id.clone(),
                 &query,
-                &self.schema,
+                &self.types,
             ));
         }
         ret

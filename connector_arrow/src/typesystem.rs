@@ -4,9 +4,52 @@
 //! A typesystem also needs to implement [`TypeAssoc`] to associate the enum variants to the physical representation
 //! of the types in the typesystem.
 
-use crate::destinations::{Consume, Destination, DestinationPartition};
+use fehler::throws;
+use itertools::Itertools;
+
+use crate::destinations::{Consume, Destination, PartitionWriter};
 use crate::errors::{ConnectorXError, Result as CXResult};
 use crate::sources::{PartitionParser, Produce, Source, SourcePartition};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Schema<T: TypeSystem> {
+    pub names: Vec<String>,
+    pub types: Vec<T>,
+}
+
+impl<T: TypeSystem> Schema<T> {
+    pub fn empty() -> Self {
+        Schema {
+            names: vec![],
+            types: vec![],
+        }
+    }
+
+    #[throws(ConnectorXError)]
+    pub fn convert<D: TypeSystem, TP: Transport<TSS = T, TSD = D>>(&self) -> Schema<D> {
+        let names = self.names.clone();
+        let types = self
+            .types
+            .iter()
+            .map(|&s| TP::convert_typesystem(s))
+            .collect::<CXResult<Vec<_>>>()?;
+        Schema { names, types }
+    }
+
+    pub fn len(&self) -> usize {
+        let names_len = self.names.len();
+        assert_eq!(names_len, self.types.len());
+        names_len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {
+        self.names.iter().zip_eq(self.types.iter())
+    }
+}
 
 #[doc(hidden)]
 /// `TypeSystem` describes all the types a source or destination support
@@ -96,7 +139,7 @@ pub trait Transport {
         ts1: Self::TSS,
         ts2: Self::TSD,
         src: &'r mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
-        dst: &'r mut <Self::D as Destination>::Partition,
+        dst: &'r mut <Self::D as Destination>::PartitionWriter,
     ) -> Result<(), Self::Error>
     where
         Self: 'd;
@@ -108,7 +151,7 @@ pub trait Transport {
     ) -> CXResult<
         fn(
             src: &mut <<Self::S as Source>::Partition as SourcePartition>::Parser<'s>,
-            dst: &mut <Self::D as Destination>::Partition,
+            dst: &mut <Self::D as Destination>::PartitionWriter,
         ) -> Result<(), Self::Error>,
     >
     where
@@ -118,7 +161,7 @@ pub trait Transport {
 #[doc(hidden)]
 pub fn process<'s, 'd, 'r, T1, T2, TP, S, D, ES, ED, ET>(
     src: &'r mut <<S as Source>::Partition as SourcePartition>::Parser<'s>,
-    dst: &'r mut <D as Destination>::Partition,
+    dst: &'r mut <D as Destination>::PartitionWriter,
 ) -> Result<(), ET>
 where
     T1: TypeAssoc<<S as Source>::TypeSystem>,
@@ -130,7 +173,7 @@ where
 
     T2: TypeAssoc<<D as Destination>::TypeSystem>,
     D: Destination<Error = ED>,
-    <D as Destination>::Partition: Consume<T2, Error = ED>,
+    <D as Destination>::PartitionWriter: Consume<T2, Error = ED>,
     ED: From<ConnectorXError> + Send,
 
     TP: TypeConversion<T1, T2>,
@@ -138,6 +181,6 @@ where
 {
     let val: T1 = PartitionParser::parse(src)?;
     let val: T2 = <TP as TypeConversion<T1, _>>::convert(val);
-    DestinationPartition::write(dst, val)?;
+    PartitionWriter::write(dst, val)?;
     Ok(())
 }

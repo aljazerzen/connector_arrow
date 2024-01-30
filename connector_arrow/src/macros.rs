@@ -200,21 +200,21 @@ macro_rules! impl_transport {
             ts1: Self::TSS,
             ts2: Self::TSD,
             src: &'r mut <<Self::S as $crate::sources::Source>::Partition as $crate::sources::SourcePartition>::Parser<'s>,
-            dst: &'r mut <Self::D as $crate::destinations::Destination>::Partition,
+            dst: &'r mut <Self::D as $crate::destinations::Destination>::PartitionWriter,
         ) -> Result<(), Self::Error> where Self: 'd {
             match (ts1, ts2) {
                 $(
                     ($TSS::$V1(true), $TSD::$V2(true)) => {
                         let val: Option<$T1> = $crate::sources::PartitionParser::parse(src)?;
                         let val: Option<$T2> = <Self as TypeConversion<Option<$T1>, _>>::convert(val);
-                        $crate::destinations::DestinationPartition::write(dst, val)?;
+                        $crate::destinations::PartitionWriter::write(dst, val)?;
                         Ok(())
                     }
 
                     ($TSS::$V1(false), $TSD::$V2(false)) => {
                         let val: $T1 = $crate::sources::PartitionParser::parse(src)?;
                         let val: $T2 = <Self as TypeConversion<$T1, _>>::convert(val);
-                        $crate::destinations::DestinationPartition::write(dst, val)?;
+                        $crate::destinations::PartitionWriter::write(dst, val)?;
                         Ok(())
                     }
                 )*
@@ -234,7 +234,7 @@ macro_rules! impl_transport {
         ) -> $crate::errors::Result<
             fn(
                 src: &mut <<Self::S as $crate::sources::Source>::Partition as $crate::sources::SourcePartition>::Parser<'s>,
-                dst: &mut <Self::D as $crate::destinations::Destination>::Partition,
+                dst: &mut <Self::D as $crate::destinations::Destination>::PartitionWriter,
             ) -> Result<(), Self::Error>
         > where Self: 'd {
             match (ts1, ts2) {

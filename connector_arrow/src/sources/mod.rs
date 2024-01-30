@@ -21,7 +21,7 @@ pub mod sqlite;
 use crate::data_order::DataOrder;
 use crate::errors::ConnectorXError;
 use crate::sql::CXQuery;
-use crate::typesystem::{TypeAssoc, TypeSystem};
+use crate::typesystem::{Schema, TypeAssoc, TypeSystem};
 use std::fmt::Debug;
 
 pub trait Source {
@@ -41,9 +41,7 @@ pub trait Source {
 
     fn fetch_metadata(&mut self) -> Result<(), Self::Error>;
 
-    fn names(&self) -> Vec<String>;
-
-    fn schema(&self) -> Vec<Self::TypeSystem>;
+    fn schema(&self) -> Schema<Self::TypeSystem>;
 
     fn partition(self) -> Result<Vec<Self::Partition>, Self::Error>;
 }

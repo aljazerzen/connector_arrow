@@ -9,6 +9,7 @@ pub use connection::rewrite_tls_args;
 pub use typesystem::{PostgresTypePairs, PostgresTypeSystem};
 
 use crate::constants::DB_BUFFER_SIZE;
+use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
@@ -90,7 +91,7 @@ where
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<PostgresTypeSystem>,
+    types: Vec<PostgresTypeSystem>,
     pg_schema: Vec<postgres::types::Type>,
     _protocol: PhantomData<P>,
 }
@@ -112,7 +113,7 @@ where
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
             pg_schema: vec![],
             _protocol: PhantomData,
         }
@@ -165,21 +166,20 @@ where
             .unzip();
 
         self.names = names;
-        self.schema = pg_types.iter().map(PostgresTypeSystem::from).collect();
+        self.types = pg_types.iter().map(PostgresTypeSystem::from).collect();
         self.pg_schema = self
-            .schema
+            .types
             .iter()
             .zip(pg_types.iter())
             .map(|(t1, t2)| PostgresTypePairs(t2, t1).into())
             .collect();
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(PostgresSourceError)]
@@ -191,7 +191,7 @@ where
             ret.push(PostgresSourcePartition::<P, C>::new(
                 conn,
                 &query,
-                &self.schema,
+                &self.types,
                 &self.pg_schema,
             ));
         }

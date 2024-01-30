@@ -32,7 +32,7 @@ fn test_mysql() {
     );
     dispatcher.run().unwrap();
 
-    let result = destination.arrow().unwrap();
+    let result = destination.finish().unwrap();
     verify_arrow_results(result);
 }
 
@@ -57,7 +57,7 @@ fn test_mysql_text() {
     );
     dispatcher.run().unwrap();
 
-    let result = destination.arrow().unwrap();
+    let result = destination.finish().unwrap();
     verify_arrow_results(result);
 }
 

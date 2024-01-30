@@ -5,47 +5,43 @@ pub mod arrow;
 
 use crate::data_order::DataOrder;
 use crate::errors::ConnectorXError;
-use crate::typesystem::{TypeAssoc, TypeSystem};
+use crate::typesystem::{Schema, TypeAssoc, TypeSystem};
 
 /// A `Destination` is associated with a `TypeSystem` and a `PartitionDestination`.
 /// `PartitionDestination` allows multiple threads write data into the buffer owned by `Destination`.
 pub trait Destination: Sized {
     const DATA_ORDERS: &'static [DataOrder];
     type TypeSystem: TypeSystem;
-    type Partition: DestinationPartition<TypeSystem = Self::TypeSystem, Error = Self::Error>;
+    type PartitionWriter: PartitionWriter<TypeSystem = Self::TypeSystem, Error = Self::Error>;
     type Error: From<ConnectorXError> + Send;
 
-    /// Construct the `Destination`.
-    /// This allocates the memory based on the types of each columns
-    /// and the number of rows.
-    fn allocate<S: AsRef<str>>(
+    /// Set metadata of the destination writer.
+    fn set_metadata(
         &mut self,
-        nrow: usize,
-        names: &[S],
-        schema: &[Self::TypeSystem],
+        schema: Schema<Self::TypeSystem>,
         data_order: DataOrder,
     ) -> Result<(), Self::Error>;
 
-    /// Create a bunch of partition destinations, with each write `count` number of rows.
-    fn partition(&mut self, counts: usize) -> Result<Vec<Self::Partition>, Self::Error>;
+    /// Allocates memory for a destination partition and returns a writer for that partition.
+    fn allocate_partition(&mut self) -> Result<Self::PartitionWriter, Self::Error>;
 
     /// Return the schema of the destination.
-    fn schema(&self) -> &[Self::TypeSystem];
+    fn schema(&self) -> &Schema<Self::TypeSystem>;
 }
 
 /// `PartitionDestination` writes values to its own region. `PartitionDestination` is parameterized
 /// on lifetime `'a`, which is the lifetime of the parent `Destination`. Usually,
 /// a `PartitionDestination` can never live longer than the parent.
-pub trait DestinationPartition: Send {
+pub trait PartitionWriter: Send {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send;
 
     /// Write a value of type T to the location (row, col). If T mismatch with the
     /// schema, `ConnectorXError::TypeCheckFailed` will return.
-    fn write<T>(&mut self, value: T) -> Result<(), <Self as DestinationPartition>::Error>
+    fn write<T>(&mut self, value: T) -> Result<(), <Self as PartitionWriter>::Error>
     where
         T: TypeAssoc<Self::TypeSystem>,
-        Self: Consume<T, Error = <Self as DestinationPartition>::Error>,
+        Self: Consume<T, Error = <Self as PartitionWriter>::Error>,
     {
         self.consume(value)
     }

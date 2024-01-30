@@ -6,6 +6,7 @@ mod typesystem;
 pub use self::errors::CSVSourceError;
 pub use self::typesystem::CSVTypeSystem;
 use super::{PartitionParser, Produce, Source, SourcePartition};
+use crate::typesystem::Schema;
 use crate::{data_order::DataOrder, errors::ConnectorXError, sql::CXQuery};
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
@@ -16,15 +17,15 @@ use std::collections::HashSet;
 use std::fs::File;
 
 pub struct CSVSource {
-    schema: Vec<CSVTypeSystem>,
-    files: Vec<CXQuery<String>>,
+    types: Vec<CSVTypeSystem>,
     names: Vec<String>,
+    files: Vec<CXQuery<String>>,
 }
 
 impl CSVSource {
     pub fn new(schema: &[CSVTypeSystem]) -> Self {
         CSVSource {
-            schema: schema.to_vec(),
+            types: schema.to_vec(),
             files: vec![],
             names: vec![],
         }
@@ -162,19 +163,18 @@ impl Source for CSVSource {
 
         self.names = header.iter().map(|s| s.to_string()).collect();
 
-        if self.schema.is_empty() {
-            self.schema = self.infer_schema()?;
+        if self.types.is_empty() {
+            self.types = self.infer_schema()?;
         }
 
-        assert_eq!(header.len(), self.schema.len());
+        assert_eq!(header.len(), self.types.len());
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(CSVSourceError)]

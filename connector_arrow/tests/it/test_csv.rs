@@ -1,5 +1,6 @@
 use arrow::array::Int64Array;
 use connector_arrow::prelude::*;
+use connector_arrow::typesystem::Schema;
 use connector_arrow::{
     destinations::arrow::{ArrowDestination, ArrowTypeSystem},
     sources::{
@@ -117,7 +118,7 @@ fn test_csv() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let result = destination.arrow().unwrap();
+    let result = destination.finish().unwrap();
 
     println!("result len: {}", result.len());
     assert!(result.len() == 2);
@@ -146,16 +147,28 @@ fn test_csv_infer_schema() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let expected_schema = vec![
-        ArrowTypeSystem::Int64(false),
-        ArrowTypeSystem::Float64(false),
-        ArrowTypeSystem::Boolean(true),
-        ArrowTypeSystem::LargeUtf8(true),
-        ArrowTypeSystem::Float64(false),
-        ArrowTypeSystem::LargeUtf8(true),
-        ArrowTypeSystem::LargeUtf8(false),
-        ArrowTypeSystem::LargeUtf8(true),
-    ];
+    let expected_schema = Schema {
+        names: vec![
+            "c0".into(),
+            "c1".into(),
+            "c2".into(),
+            "c3".into(),
+            "c4".into(),
+            "c5".into(),
+            "c6".into(),
+            "c7".into(),
+        ],
+        types: vec![
+            ArrowTypeSystem::Int64(false),
+            ArrowTypeSystem::Float64(false),
+            ArrowTypeSystem::Boolean(true),
+            ArrowTypeSystem::LargeUtf8(true),
+            ArrowTypeSystem::Float64(false),
+            ArrowTypeSystem::LargeUtf8(true),
+            ArrowTypeSystem::LargeUtf8(false),
+            ArrowTypeSystem::LargeUtf8(true),
+        ],
+    };
 
-    assert_eq!(expected_schema, writer.schema());
+    assert_eq!(&expected_schema, writer.schema());
 }

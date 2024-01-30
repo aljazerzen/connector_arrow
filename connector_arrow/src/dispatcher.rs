@@ -2,13 +2,12 @@
 //! that drives the data loading from a source to a destination.
 use crate::{
     data_order::{coordinate, DataOrder},
-    destinations::{Destination, DestinationPartition},
-    errors::Result as CXResult,
+    destinations::{Destination, PartitionWriter},
     sources::{PartitionParser, Source, SourcePartition},
     sql::CXQuery,
-    typesystem::Transport,
+    typesystem::{Schema, Transport},
 };
-use itertools::Itertools;
+use itertools::zip_eq;
 use log::debug;
 use rayon::prelude::*;
 use std::marker::PhantomData;
@@ -26,9 +25,9 @@ pub struct Dispatcher<'a, S, D, TP> {
 pub struct PreparedDispatch<S: Source, D: Destination> {
     pub data_order: DataOrder,
     pub src_partitions: Vec<S::Partition>,
-    pub dst_partitions: Vec<D::Partition>,
-    pub src_schema: Vec<S::TypeSystem>,
-    pub dst_schema: Vec<D::TypeSystem>,
+    pub dst_partitions: Vec<D::PartitionWriter>,
+    pub src_schema: Schema<S::TypeSystem>,
+    pub dst_schema: Schema<D::TypeSystem>,
 }
 
 impl<'w, S, D, TP> Dispatcher<'w, S, D, TP>
@@ -61,25 +60,17 @@ where
         debug!("Fetching metadata");
         self.src.fetch_metadata()?;
         let src_schema = self.src.schema();
-        let dst_schema = src_schema
-            .iter()
-            .map(|&s| TP::convert_typesystem(s))
-            .collect::<CXResult<Vec<_>>>()?;
-        let names = self.src.names();
+        let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
         let src_partitions: Vec<S::Partition> = self.src.partition()?;
 
-        let total_rows = 0;
-        debug!(
-            "Allocate destination memory: {}x{}",
-            total_rows,
-            src_schema.len()
-        );
-        self.dst
-            .allocate(total_rows, &names, &dst_schema, data_order)?;
+        self.dst.set_metadata(dst_schema.clone(), data_order)?;
 
         debug!("Create destination partition");
-        let dst_partitions = self.dst.partition(self.queries.len())?;
+        let mut dst_partitions = Vec::with_capacity(self.queries.len());
+        for _ in 0..self.queries.len() {
+            dst_partitions.push(self.dst.allocate_partition()?);
+        }
 
         Ok(PreparedDispatch {
             data_order,
@@ -105,11 +96,7 @@ where
         compile_error!("branch or fptr, pick one");
 
         #[cfg(feature = "branch")]
-        let schemas: Vec<_> = src_schema
-            .iter()
-            .zip_eq(&dst_schema)
-            .map(|(&src_ty, &dst_ty)| (src_ty, dst_ty))
-            .collect();
+        let types: Vec<_> = zip_eq(src_schema.types, dst_schema.types).collect();
 
         debug!("Start writing");
         // parse and write
@@ -119,11 +106,9 @@ where
             .enumerate()
             .try_for_each(|(i, (mut dst, mut src))| -> Result<(), TP::Error> {
                 #[cfg(feature = "fptr")]
-                let f: Vec<_> = src_schema
-                    .iter()
-                    .zip_eq(&dst_schema)
-                    .map(|(&src_ty, &dst_ty)| TP::processor(src_ty, dst_ty))
-                    .collect::<CXResult<Vec<_>>>()?;
+                let f: Vec<_> = zip_eq(&src_schema.types, &dst_schema.types)
+                    .map(|(src_ty, dst_ty)| TP::processor(*src_ty, *dst_ty))
+                    .collect::<crate::errors::Result<Vec<_>>>()?;
 
                 let mut parser = src.parser()?;
 
@@ -139,7 +124,7 @@ where
 
                                 #[cfg(feature = "branch")]
                                 {
-                                    let (s1, s2) = schemas[col];
+                                    let (s1, s2) = types[col];
                                     TP::process(s1, s2, &mut parser, &mut dst)?;
                                 }
                             }
@@ -158,7 +143,7 @@ where
                                 f[col](&mut parser, &mut dst)?;
                                 #[cfg(feature = "branch")]
                                 {
-                                    let (s1, s2) = schemas[col];
+                                    let (s1, s2) = types[col];
                                     TP::process(s1, s2, &mut parser, &mut dst)?;
                                 }
                             }
@@ -188,12 +173,8 @@ where
         self.src.set_origin_query(self.origin_query.clone());
         self.src.fetch_metadata()?;
         let src_schema = self.src.schema();
-        let dst_schema = src_schema
-            .iter()
-            .map(|&s| TP::convert_typesystem(s))
-            .collect::<CXResult<Vec<_>>>()?;
-        let names = self.src.names();
-        self.dst.allocate(0, &names, &dst_schema, dorder)?;
+        let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
+        self.dst.set_metadata(dst_schema, dorder)?;
         Ok(())
     }
 }

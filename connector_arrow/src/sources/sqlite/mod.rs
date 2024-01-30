@@ -9,6 +9,7 @@ use crate::{
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourcePartition},
     sql::{count_query, limit1_query, CXQuery},
+    typesystem::Schema,
     utils::DummyBox,
 };
 use anyhow::anyhow;
@@ -30,7 +31,7 @@ pub struct SQLiteSource {
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<SQLiteTypeSystem>,
+    types: Vec<SQLiteTypeSystem>,
 }
 
 impl SQLiteSource {
@@ -48,7 +49,7 @@ impl SQLiteSource {
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
         }
     }
 }
@@ -118,7 +119,7 @@ where
                 Ok(()) => {
                     if !types.contains(&None) {
                         self.names = names;
-                        self.schema = types.into_iter().map(|t| t.unwrap()).collect();
+                        self.types = types.into_iter().map(|t| t.unwrap()).collect();
                         return;
                     } else if i == self.queries.len() - 1 {
                         debug!(
@@ -150,15 +151,14 @@ where
             .map(|s| s.to_string())
             .collect();
         // set all columns as string (align with pandas)
-        self.schema = vec![SQLiteTypeSystem::Text(false); self.names.len()];
+        self.types = vec![SQLiteTypeSystem::Text(false); self.names.len()];
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(SQLiteSourceError)]
@@ -167,7 +167,7 @@ where
         for query in self.queries {
             let conn = self.pool.get()?;
 
-            ret.push(SQLiteSourcePartition::new(conn, &query, &self.schema));
+            ret.push(SQLiteSourcePartition::new(conn, &query, &self.types));
         }
         ret
     }

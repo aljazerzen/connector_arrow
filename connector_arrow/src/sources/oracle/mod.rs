@@ -4,6 +4,7 @@ mod typesystem;
 pub use self::errors::OracleSourceError;
 pub use self::typesystem::OracleTypeSystem;
 use crate::constants::{DB_BUFFER_SIZE, ORACLE_ARRAY_SIZE};
+use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
@@ -47,7 +48,7 @@ pub struct OracleSource {
     origin_query: Option<String>,
     queries: Vec<CXQuery<String>>,
     names: Vec<String>,
-    schema: Vec<OracleTypeSystem>,
+    types: Vec<OracleTypeSystem>,
 }
 
 #[throws(OracleSourceError)]
@@ -82,7 +83,7 @@ impl OracleSource {
             origin_query: None,
             queries: vec![],
             names: vec![],
-            schema: vec![],
+            types: vec![],
         }
     }
 }
@@ -135,7 +136,7 @@ where
                         })
                         .unzip();
                     self.names = names;
-                    self.schema = types;
+                    self.types = types;
                     return;
                 }
                 Err(e) if i == self.queries.len() - 1 => {
@@ -154,15 +155,14 @@ where
             .map(|col| (col.name().to_string(), OracleTypeSystem::VarChar(false)))
             .unzip();
         self.names = names;
-        self.schema = types;
+        self.types = types;
     }
 
-    fn names(&self) -> Vec<String> {
-        self.names.clone()
-    }
-
-    fn schema(&self) -> Vec<Self::TypeSystem> {
-        self.schema.clone()
+    fn schema(&self) -> Schema<Self::TypeSystem> {
+        Schema {
+            names: self.names.clone(),
+            types: self.types.clone(),
+        }
     }
 
     #[throws(OracleSourceError)]
@@ -170,7 +170,7 @@ where
         let mut ret = vec![];
         for query in self.queries {
             let conn = self.pool.get()?;
-            ret.push(OracleSourcePartition::new(conn, &query, &self.schema));
+            ret.push(OracleSourcePartition::new(conn, &query, &self.types));
         }
         ret
     }
