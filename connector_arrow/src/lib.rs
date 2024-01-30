@@ -145,7 +145,6 @@ pub mod typesystem;
 #[macro_use]
 mod macros;
 
-pub mod arrow_batch_iter;
 pub mod constants;
 pub mod data_order;
 pub mod destinations;
@@ -162,19 +161,22 @@ pub mod transports;
 pub mod utils;
 
 pub mod prelude {
-    pub use crate::arrow_batch_iter::{set_global_num_thread, RecordBatchIterator};
-    pub use crate::data_order::{coordinate, DataOrder};
     pub use crate::destinations::arrow::{ArrowDestination, ArrowPartitionWriter, ArrowTypeSystem};
-    pub use crate::destinations::arrowstream::{
-        ArrowDestination as ArrowStreamDestination,
-        ArrowPartitionWriter as ArrowStreamPartitionWriter,
-        ArrowTypeSystem as ArrowStreamTypeSystem,
-    };
+    pub use crate::get_arrow::get_arrow;
+
+    pub use crate::data_order::{coordinate, DataOrder};
     pub use crate::destinations::{Consume, Destination, DestinationPartition};
     pub use crate::dispatcher::Dispatcher;
     pub use crate::errors::{ConnectorXError, ConnectorXOutError};
-    pub use crate::get_arrow::{get_arrow, new_record_batch_iter};
     pub use crate::source_router::*;
+    pub use crate::sources::{PartitionParser, Produce, Source, SourcePartition};
+    pub use crate::sql::CXQuery;
+    pub use crate::transports::*;
+    pub use crate::typesystem::{
+        ParameterizedFunc, ParameterizedOn, Realize, Transport, TypeAssoc, TypeConversion,
+        TypeSystem,
+    };
+
     #[cfg(feature = "src_bigquery")]
     pub use crate::sources::bigquery::BigQuerySource;
     #[cfg(feature = "src_csv")]
@@ -191,11 +193,4 @@ pub mod prelude {
     pub use crate::sources::postgres::PostgresSource;
     #[cfg(feature = "src_sqlite")]
     pub use crate::sources::sqlite::SQLiteSource;
-    pub use crate::sources::{PartitionParser, Produce, Source, SourcePartition};
-    pub use crate::sql::CXQuery;
-    pub use crate::transports::*;
-    pub use crate::typesystem::{
-        ParameterizedFunc, ParameterizedOn, Realize, Transport, TypeAssoc, TypeConversion,
-        TypeSystem,
-    };
 }

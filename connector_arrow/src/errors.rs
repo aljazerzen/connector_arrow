@@ -77,9 +77,6 @@ pub enum ConnectorXOutError {
     #[error(transparent)]
     ArrowError(#[from] crate::destinations::arrow::ArrowDestinationError),
 
-    #[error(transparent)]
-    ArrowStreamError(#[from] crate::destinations::arrowstream::ArrowDestinationError),
-
     #[cfg(feature = "src_postgres")]
     #[error(transparent)]
     PostgresArrowTransportError(#[from] crate::transports::PostgresArrowTransportError),

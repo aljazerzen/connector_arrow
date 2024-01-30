@@ -2,7 +2,6 @@
 //! This module also contains destination implementations for various dataframes.
 
 pub mod arrow;
-pub mod arrowstream;
 
 use crate::data_order::DataOrder;
 use crate::errors::ConnectorXError;
