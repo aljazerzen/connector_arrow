@@ -10,12 +10,12 @@ use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
     sources::{PartitionParser, Produce, Source, SourceReader},
-    sql::{limit1_query, CXQuery},
+    sql::CXQuery,
 };
 use anyhow::anyhow;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use fehler::{throw, throws};
-use log::{debug, warn};
+use log::debug;
 use r2d2::{Pool, PooledConnection};
 use r2d2_mysql::{
     mysql::{prelude::Queryable, Binary, Opts, OptsBuilder, QueryResult, Row, Text},
@@ -23,7 +23,6 @@ use r2d2_mysql::{
 };
 use rust_decimal::Decimal;
 use serde_json::Value;
-use sqlparser::dialect::MySqlDialect;
 use std::marker::PhantomData;
 pub use typesystem::MySQLTypeSystem;
 
@@ -34,9 +33,6 @@ pub enum TextProtocol {}
 
 pub struct MySQLSource<P> {
     pool: Pool<MySqlConnectionManager>,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<MySQLTypeSystem>,
     _protocol: PhantomData<P>,
 }
 
@@ -50,9 +46,6 @@ impl<P> MySQLSource<P> {
 
         Self {
             pool,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
             _protocol: PhantomData,
         }
     }
@@ -68,18 +61,37 @@ where
     type TypeSystem = MySQLTypeSystem;
     type Error = MySQLSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
+    #[throws(MySQLSourceError)]
+    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
+        }
+
+        let conn = self.pool.get()?;
+        MySQLSourcePartition::new(conn, query)
+    }
+}
+
+pub struct MySQLSourcePartition<P> {
+    conn: MysqlConn,
+    query: CXQuery<String>,
+    _protocol: PhantomData<P>,
+}
+
+impl<P> MySQLSourcePartition<P> {
+    pub fn new(conn: MysqlConn, query: &CXQuery<String>) -> Self {
+        Self {
+            conn,
+            query: query.clone(),
+            _protocol: PhantomData,
+        }
     }
 
     #[throws(MySQLSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
+    fn fetch_metadata_generic(&mut self) -> Schema<MySQLTypeSystem> {
+        let first_query = &self.query;
 
-        let mut conn = self.pool.get()?;
-        let first_query = &self.queries[0];
-
-        match conn.prep(first_query) {
+        match self.conn.prep(first_query) {
             Ok(stmt) => {
                 let (names, types) = stmt
                     .columns()
@@ -91,97 +103,16 @@ where
                         )
                     })
                     .unzip();
-                self.names = names;
-                self.types = types;
+
+                Schema { names, types }
             }
             Err(e) => {
-                warn!(
-                    "mysql text prepared statement error: {:?}, switch to limit1 method",
-                    e
+                debug!(
+                    "cannot get metadata for '{}', try next query: {}",
+                    self.query, e
                 );
-                for (i, query) in self.queries.iter().enumerate() {
-                    // assuming all the partition queries yield same schema
-                    match conn
-                        .query_first::<Row, _>(limit1_query(query, &MySqlDialect {})?.as_str())
-                    {
-                        Ok(Some(row)) => {
-                            let (names, types) = row
-                                .columns_ref()
-                                .iter()
-                                .map(|col| {
-                                    (
-                                        col.name_str().to_string(),
-                                        MySQLTypeSystem::from((&col.column_type(), &col.flags())),
-                                    )
-                                })
-                                .unzip();
-                            self.names = names;
-                            self.types = types;
-                            return Schema {
-                                names: self.names.clone(),
-                                types: self.types.clone(),
-                            };
-                        }
-                        Ok(None) => {}
-                        Err(e) if i == self.queries.len() - 1 => {
-                            // tried the last query but still get an error
-                            debug!("cannot get metadata for '{}', try next query: {}", query, e);
-                            throw!(e)
-                        }
-                        Err(_) => {}
-                    }
-                }
-
-                // tried all queries but all get empty result set
-                let iter = conn.query_iter(self.queries[0].as_str())?;
-                let (names, types) = iter
-                    .columns()
-                    .as_ref()
-                    .iter()
-                    .map(|col| {
-                        (
-                            col.name_str().to_string(),
-                            MySQLTypeSystem::VarChar(false), // set all columns as string (align with pandas)
-                        )
-                    })
-                    .unzip();
-                self.names = names;
-                self.types = types;
+                throw!(e)
             }
-        }
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
-    #[throws(MySQLSourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-
-        let conn = self.pool.get()?;
-        MySQLSourcePartition::new(conn, query, &self.types)
-    }
-}
-
-pub struct MySQLSourcePartition<P> {
-    conn: MysqlConn,
-    query: CXQuery<String>,
-    schema: Vec<MySQLTypeSystem>,
-    nrows: Option<usize>,
-    _protocol: PhantomData<P>,
-}
-
-impl<P> MySQLSourcePartition<P> {
-    pub fn new(conn: MysqlConn, query: &CXQuery<String>, schema: &[MySQLTypeSystem]) -> Self {
-        Self {
-            conn,
-            query: query.clone(),
-            schema: schema.to_vec(),
-            nrows: None,
-            _protocol: PhantomData,
         }
     }
 }
@@ -191,15 +122,15 @@ impl SourceReader for MySQLSourcePartition<BinaryProtocol> {
     type Parser<'a> = MySQLBinarySourceParser<'a>;
     type Error = MySQLSourceError;
 
-    #[throws(MySQLSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
-        let stmt = self.conn.prep(self.query.as_str())?;
-        let iter = self.conn.exec_iter(stmt, ())?;
-        MySQLBinarySourceParser::new(iter, &self.schema)
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
     }
 
-    fn row_count(&self) -> Option<usize> {
-        self.nrows
+    #[throws(MySQLSourceError)]
+    fn parser(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Parser<'_> {
+        let stmt = self.conn.prep(self.query.as_str())?;
+        let iter = self.conn.exec_iter(stmt, ())?;
+        MySQLBinarySourceParser::new(iter, schema)
     }
 }
 
@@ -208,15 +139,15 @@ impl SourceReader for MySQLSourcePartition<TextProtocol> {
     type Parser<'a> = MySQLTextSourceParser<'a>;
     type Error = MySQLSourceError;
 
-    #[throws(MySQLSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
-        let query = self.query.clone();
-        let iter = self.conn.query_iter(query)?;
-        MySQLTextSourceParser::new(iter, &self.schema)
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
     }
 
-    fn row_count(&self) -> Option<usize> {
-        self.nrows
+    #[throws(MySQLSourceError)]
+    fn parser(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Parser<'_> {
+        let query = self.query.clone();
+        let iter = self.conn.query_iter(query)?;
+        MySQLTextSourceParser::new(iter, schema)
     }
 }
 
@@ -230,7 +161,7 @@ pub struct MySQLBinarySourceParser<'a> {
 }
 
 impl<'a> MySQLBinarySourceParser<'a> {
-    pub fn new(iter: QueryResult<'a, 'a, 'a, Binary>, schema: &[MySQLTypeSystem]) -> Self {
+    pub fn new(iter: QueryResult<'a, 'a, 'a, Binary>, schema: &Schema<MySQLTypeSystem>) -> Self {
         Self {
             iter,
             rowbuf: Vec::with_capacity(DB_BUFFER_SIZE),
@@ -341,7 +272,7 @@ pub struct MySQLTextSourceParser<'a> {
 }
 
 impl<'a> MySQLTextSourceParser<'a> {
-    pub fn new(iter: QueryResult<'a, 'a, 'a, Text>, schema: &[MySQLTypeSystem]) -> Self {
+    pub fn new(iter: QueryResult<'a, 'a, 'a, Text>, schema: &Schema<MySQLTypeSystem>) -> Self {
         Self {
             iter,
             rowbuf: Vec::with_capacity(DB_BUFFER_SIZE),

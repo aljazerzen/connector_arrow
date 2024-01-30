@@ -49,9 +49,6 @@ pub struct BigQuerySource {
     rt: Arc<Runtime>,
     client: Arc<Client>,
     project_id: String,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<BigQueryTypeSystem>,
 }
 
 impl BigQuerySource {
@@ -74,9 +71,6 @@ impl BigQuerySource {
             rt,
             client,
             project_id,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
         }
     }
 }
@@ -91,45 +85,6 @@ where
     type TypeSystem = BigQueryTypeSystem;
     type Error = BigQuerySourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    #[throws(BigQuerySourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
-        let job = self.client.job();
-        for (_, query) in self.queries.iter().enumerate() {
-            let l1query = limit1_query(query, &BigQueryDialect {})?;
-            let rs = self.rt.block_on(job.query(
-                self.project_id.as_str(),
-                QueryRequest::new(l1query.as_str()),
-            ))?;
-            let (names, types) = rs
-                .query_response()
-                .schema
-                .as_ref()
-                .ok_or_else(|| anyhow!("TableSchema is none"))?
-                .fields
-                .as_ref()
-                .ok_or_else(|| anyhow!("TableFieldSchema is none"))?
-                .iter()
-                .map(|col| {
-                    (
-                        col.clone().name,
-                        BigQueryTypeSystem::from(&col.clone().r#type),
-                    )
-                })
-                .unzip();
-            self.names = names;
-            self.types = types;
-        }
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
     #[throws(BigQuerySourceError)]
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
@@ -141,7 +96,6 @@ where
             self.client.clone(),
             self.project_id.clone(),
             query,
-            &self.types,
         )
     }
 }
@@ -151,7 +105,6 @@ pub struct BigQueryPartitionReader {
     client: Arc<Client>,
     project_id: String,
     query: CXQuery<String>,
-    schema: Vec<BigQueryTypeSystem>,
 }
 
 impl BigQueryPartitionReader {
@@ -160,14 +113,12 @@ impl BigQueryPartitionReader {
         client: Arc<Client>,
         project_id: String,
         query: &CXQuery<String>,
-        schema: &[BigQueryTypeSystem],
     ) -> Self {
         Self {
             rt: handle,
             client,
             project_id: project_id.clone(),
             query: query.clone(),
-            schema: schema.to_vec(),
         }
     }
 }
@@ -178,7 +129,37 @@ impl SourceReader for BigQueryPartitionReader {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+        let job = self.client.job();
+        let query = &self.query;
+
+        let l1query = limit1_query(query, &BigQueryDialect {})?;
+        let rs = self.rt.block_on(job.query(
+            self.project_id.as_str(),
+            QueryRequest::new(l1query.as_str()),
+        ))?;
+        let (names, types) = rs
+            .query_response()
+            .schema
+            .as_ref()
+            .ok_or_else(|| anyhow!("TableSchema is none"))?
+            .fields
+            .as_ref()
+            .ok_or_else(|| anyhow!("TableFieldSchema is none"))?
+            .iter()
+            .map(|col| {
+                (
+                    col.clone().name,
+                    BigQueryTypeSystem::from(&col.clone().r#type),
+                )
+            })
+            .unzip();
+
+        Schema { names, types }
+    }
+
+    #[throws(BigQuerySourceError)]
+    fn parser(&mut self, schema: &Schema<BigQueryTypeSystem>) -> Self::Parser<'_> {
         let job = self.client.job();
         let qry = self.rt.block_on(job.query(
             self.project_id.as_str(),
@@ -208,7 +189,7 @@ impl SourceReader for BigQueryPartitionReader {
                 params,
             ),
         )?;
-        BigQuerySourceParser::new(self.rt.clone(), self.client.clone(), rs, &self.schema)
+        BigQuerySourceParser::new(self.rt.clone(), self.client.clone(), rs, schema)
     }
 }
 
@@ -227,7 +208,7 @@ impl BigQuerySourceParser {
         rt: Arc<Runtime>,
         client: Arc<Client>,
         response: GetQueryResultsResponse,
-        schema: &[BigQueryTypeSystem],
+        schema: &Schema<BigQueryTypeSystem>,
     ) -> Self {
         Self {
             rt,

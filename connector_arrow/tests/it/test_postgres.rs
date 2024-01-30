@@ -25,17 +25,12 @@ fn load_and_parse() {
     let url = Url::parse(dburl.as_str()).unwrap();
     let (config, _tls) = rewrite_tls_args(&url).unwrap();
     let mut source = PostgresSource::<BinaryProtocol, NoTls>::new(config, NoTls, 1).unwrap();
-    source.set_queries(&[CXQuery::naked("select * from test_table")]);
-    source.fetch_metadata().unwrap();
 
-    let mut partition = source
-        .reader(
-            &CXQuery::naked("select * from test_table"),
-            DataOrder::RowMajor,
-        )
-        .unwrap();
+    let query = CXQuery::naked("select * from test_table");
+    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
+    let schema = partition.fetch_schema().unwrap();
 
-    let mut parser = partition.parser().unwrap();
+    let mut parser = partition.parser(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
     loop {
@@ -80,17 +75,13 @@ fn load_and_parse_csv() {
     let url = Url::parse(dburl.as_str()).unwrap();
     let (config, _tls) = rewrite_tls_args(&url).unwrap();
     let mut source = PostgresSource::<CSVProtocol, NoTls>::new(config, NoTls, 1).unwrap();
-    source.set_queries(&[CXQuery::naked("select * from test_table")]);
-    source.fetch_metadata().unwrap();
 
-    let mut partition = source
-        .reader(
-            &CXQuery::naked("select * from test_table"),
-            DataOrder::RowMajor,
-        )
-        .unwrap();
+    let query = CXQuery::naked("select * from test_table");
+    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
 
-    let mut parser = partition.parser().unwrap();
+    let schema = partition.fetch_schema().unwrap();
+
+    let mut parser = partition.parser(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
     loop {

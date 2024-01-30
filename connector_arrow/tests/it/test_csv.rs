@@ -10,19 +10,16 @@ use connector_arrow::{
 
 #[test]
 fn no_file() {
-    let mut source = CSVSource::new(&[]);
-    source.set_queries(&[CXQuery::naked("./a_fake_file.csv")]);
-    source
-        .reader(&CXQuery::naked("./a_fake_file.csv"), DataOrder::RowMajor)
-        .err()
-        .unwrap();
+    let mut source = CSVSource::new(None);
+    let query = CXQuery::naked("./a_fake_file.csv");
+    let mut reader = source.reader(&query, DataOrder::RowMajor).unwrap();
+    reader.fetch_schema().unwrap_err();
 }
 
 #[test]
 #[ignore] // TODO: panic with division by zero
 fn empty_file() {
-    let mut source = CSVSource::new(&[]);
-    source.set_queries(&[CXQuery::naked("./tests/data/empty.csv")]);
+    let mut source = CSVSource::new(None);
     let mut p = source
         .reader(
             &CXQuery::naked("./tests/data/empty.csv"),
@@ -30,7 +27,9 @@ fn empty_file() {
         )
         .unwrap();
 
-    let mut parser = p.parser().unwrap();
+    let schema = p.fetch_schema().unwrap();
+
+    let mut parser = p.parser(&schema).unwrap();
 
     parser.fetch_next().unwrap();
 
@@ -48,24 +47,25 @@ fn load_and_parse() {
         Latitude(f64),
     }
 
-    let mut source = CSVSource::new(&[
+    let mut source = CSVSource::new(Some(&[
         CSVTypeSystem::String(false),
         CSVTypeSystem::String(false),
         CSVTypeSystem::I64(false),
         CSVTypeSystem::F64(false),
         CSVTypeSystem::F64(false),
-    ]);
-    source.set_queries(&[CXQuery::naked("./tests/data/uspop_0.csv")]);
+    ]));
 
-    let mut partition = source
+    let mut reader = source
         .reader(
             &CXQuery::naked("./tests/data/uspop_0.csv"),
             DataOrder::RowMajor,
         )
         .unwrap();
 
+    let schema = reader.fetch_schema().unwrap();
+
     let mut results: Vec<Value> = Vec::new();
-    let mut parser = partition.parser().unwrap();
+    let mut parser = reader.parser(&schema).unwrap();
     loop {
         let (n, is_last) = parser.fetch_next().unwrap();
         for _i in 0..n {
@@ -110,7 +110,7 @@ fn test_csv() {
         CXQuery::naked("./tests/data/uint_0.csv"),
         CXQuery::naked("./tests/data/uint_1.csv"),
     ];
-    let source = CSVSource::new(&schema);
+    let source = CSVSource::new(Some(&schema));
 
     let mut destination = ArrowDestination::new();
     let dispatcher = Dispatcher::<_, _, CSVArrowTransport>::new(source, &mut destination, &files);
@@ -139,7 +139,7 @@ fn test_csv() {
 #[test]
 fn test_csv_infer_schema() {
     let files = [CXQuery::naked("./tests/data/infer_0.csv")];
-    let source = CSVSource::new(&[]);
+    let source = CSVSource::new(None);
 
     let mut writer = ArrowDestination::new();
     let dispatcher = Dispatcher::<_, _, CSVArrowTransport>::new(source, &mut writer, &files);

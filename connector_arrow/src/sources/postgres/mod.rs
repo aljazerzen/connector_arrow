@@ -6,6 +6,7 @@ mod typesystem;
 
 pub use self::errors::PostgresSourceError;
 pub use connection::rewrite_tls_args;
+use itertools::zip_eq;
 pub use typesystem::{PostgresTypePairs, PostgresTypeSystem};
 
 use crate::constants::DB_BUFFER_SIZE;
@@ -60,10 +61,6 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     pool: Pool<PgManager<C>>,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<PostgresTypeSystem>,
-    pg_schema: Vec<postgres::types::Type>,
     _protocol: PhantomData<P>,
 }
 
@@ -81,10 +78,6 @@ where
 
         Self {
             pool,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
-            pg_schema: vec![],
             _protocol: PhantomData,
         }
     }
@@ -105,39 +98,6 @@ where
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    #[throws(PostgresSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
-
-        let mut conn = self.pool.get()?;
-        let first_query = &self.queries[0];
-
-        let stmt = conn.prepare(first_query.as_str())?;
-
-        let (names, pg_types): (Vec<String>, Vec<postgres::types::Type>) = stmt
-            .columns()
-            .iter()
-            .map(|col| (col.name().to_string(), col.type_().clone()))
-            .unzip();
-
-        self.names = names;
-        self.types = pg_types.iter().map(PostgresTypeSystem::from).collect();
-        self.pg_schema = self
-            .types
-            .iter()
-            .zip(pg_types.iter())
-            .map(|(t1, t2)| PostgresTypePairs(t2, t1).into())
-            .collect();
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
     #[throws(PostgresSourceError)]
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
@@ -146,7 +106,7 @@ where
 
         let conn = self.pool.get()?;
 
-        PostgresSourcePartition::<P, C>::new(conn, query, &self.types, &self.pg_schema)
+        PostgresSourcePartition::<P, C>::new(conn, query)
     }
 }
 
@@ -159,8 +119,7 @@ where
 {
     conn: PgConn<C>,
     query: CXQuery<String>,
-    schema: Vec<PostgresTypeSystem>,
-    pg_schema: Vec<postgres::types::Type>,
+
     _protocol: PhantomData<P>,
 }
 
@@ -171,19 +130,26 @@ where
     C::Stream: Send,
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pub fn new(
-        conn: PgConn<C>,
-        query: &CXQuery<String>,
-        schema: &[PostgresTypeSystem],
-        pg_schema: &[postgres::types::Type],
-    ) -> Self {
+    pub fn new(conn: PgConn<C>, query: &CXQuery<String>) -> Self {
         Self {
             conn,
             query: query.clone(),
-            schema: schema.to_vec(),
-            pg_schema: pg_schema.to_vec(),
             _protocol: PhantomData,
         }
+    }
+
+    #[throws(PostgresSourceError)]
+    fn fetch_metadata_generic(&mut self) -> Schema<PostgresTypeSystem> {
+        let stmt = self.conn.prepare(self.query.as_str())?;
+
+        let (names, pg_types): (Vec<String>, Vec<postgres::types::Type>) = stmt
+            .columns()
+            .iter()
+            .map(|col| (col.name().to_string(), col.type_().clone()))
+            .unzip();
+
+        let types = pg_types.iter().map(PostgresTypeSystem::from).collect();
+        Schema { names, types }
     }
 }
 
@@ -198,13 +164,31 @@ where
     type Parser<'a> = PostgresBinarySourcePartitionParser<'a>;
     type Error = PostgresSourceError;
 
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
+    }
+
     #[throws(PostgresSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
+        // this could have been done in fetch metadata
+        // but that function might not have been called on this reader
+        // so we call it again here
+        let stmt = self.conn.prepare(self.query.as_str())?;
+        let pg_types: Vec<postgres::types::Type> = stmt
+            .columns()
+            .iter()
+            .map(|col| col.type_().clone())
+            .collect();
+        let types: Vec<_> = pg_types.iter().map(PostgresTypeSystem::from).collect();
+        let pg_schema: Vec<_> = zip_eq(&types, &pg_types)
+            .map(|(t1, t2)| postgres::types::Type::from(PostgresTypePairs(t2, t1)))
+            .collect();
+
         let query = format!("COPY ({}) TO STDOUT WITH BINARY", self.query);
         let reader = self.conn.copy_out(&*query)?; // unless reading the data, it seems like issue the query is fast
-        let iter = BinaryCopyOutIter::new(reader, &self.pg_schema);
+        let iter = BinaryCopyOutIter::new(reader, &pg_schema);
 
-        PostgresBinarySourcePartitionParser::new(iter, &self.schema)
+        PostgresBinarySourcePartitionParser::new(iter, schema)
     }
 }
 
@@ -219,8 +203,12 @@ where
     type Parser<'a> = PostgresCSVSourceParser<'a>;
     type Error = PostgresSourceError;
 
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
+    }
+
     #[throws(PostgresSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
         let query = format!("COPY ({}) TO STDOUT WITH CSV", self.query);
         let reader = self.conn.copy_out(&*query)?; // unless reading the data, it seems like issue the query is fast
         let iter = ReaderBuilder::new()
@@ -228,7 +216,7 @@ where
             .from_reader(reader)
             .into_records();
 
-        PostgresCSVSourceParser::new(iter, &self.schema)
+        PostgresCSVSourceParser::new(iter, schema)
     }
 }
 
@@ -243,12 +231,16 @@ where
     type Parser<'a> = PostgresRawSourceParser<'a>;
     type Error = PostgresSourceError;
 
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
+    }
+
     #[throws(PostgresSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
         let iter = self
             .conn
             .query_raw::<_, bool, _>(self.query.as_str(), vec![])?; // unless reading the data, it seems like issue the query is fast
-        PostgresRawSourceParser::new(iter, &self.schema)
+        PostgresRawSourceParser::new(iter, schema)
     }
 }
 pub struct PostgresBinarySourcePartitionParser<'a> {
@@ -261,7 +253,7 @@ pub struct PostgresBinarySourcePartitionParser<'a> {
 }
 
 impl<'a> PostgresBinarySourcePartitionParser<'a> {
-    pub fn new(iter: BinaryCopyOutIter<'a>, schema: &[PostgresTypeSystem]) -> Self {
+    pub fn new(iter: BinaryCopyOutIter<'a>, schema: &Schema<PostgresTypeSystem>) -> Self {
         Self {
             iter,
             rowbuf: Vec::with_capacity(DB_BUFFER_SIZE),
@@ -408,7 +400,7 @@ pub struct PostgresCSVSourceParser<'a> {
 impl<'a> PostgresCSVSourceParser<'a> {
     pub fn new(
         iter: StringRecordsIntoIter<CopyOutReader<'a>>,
-        schema: &[PostgresTypeSystem],
+        schema: &Schema<PostgresTypeSystem>,
     ) -> Self {
         Self {
             iter,
@@ -851,7 +843,7 @@ pub struct PostgresRawSourceParser<'a> {
 }
 
 impl<'a> PostgresRawSourceParser<'a> {
-    pub fn new(iter: RowIter<'a>, schema: &[PostgresTypeSystem]) -> Self {
+    pub fn new(iter: RowIter<'a>, schema: &Schema<PostgresTypeSystem>) -> Self {
         Self {
             iter,
             rowbuf: Vec::with_capacity(DB_BUFFER_SIZE),
@@ -971,10 +963,14 @@ where
     type Parser<'a> = PostgresSimpleSourceParser;
     type Error = PostgresSourceError;
 
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+        self.fetch_metadata_generic()
+    }
+
     #[throws(PostgresSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
         let rows = self.conn.simple_query(self.query.as_str())?; // unless reading the data, it seems like issue the query is fast
-        PostgresSimpleSourceParser::new(rows, &self.schema)
+        PostgresSimpleSourceParser::new(rows, schema)
     }
 }
 
@@ -985,7 +981,7 @@ pub struct PostgresSimpleSourceParser {
     current_row: usize,
 }
 impl PostgresSimpleSourceParser {
-    pub fn new(rows: Vec<SimpleQueryMessage>, schema: &[PostgresTypeSystem]) -> Self {
+    pub fn new(rows: Vec<SimpleQueryMessage>, schema: &Schema<PostgresTypeSystem>) -> Self {
         Self {
             rows,
             ncols: schema.len(),

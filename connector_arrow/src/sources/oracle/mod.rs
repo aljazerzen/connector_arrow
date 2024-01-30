@@ -45,9 +45,6 @@ impl Dialect for OracleDialect {
 
 pub struct OracleSource {
     pool: Pool<OracleManager>,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<OracleTypeSystem>,
 }
 
 #[throws(OracleSourceError)]
@@ -77,12 +74,7 @@ impl OracleSource {
             .max_size(nconn as u32)
             .build(manager)?;
 
-        Self {
-            pool,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
-        }
+        Self { pool }
     }
 }
 
@@ -95,62 +87,6 @@ where
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    #[throws(OracleSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
-
-        let conn = self.pool.get()?;
-        for (i, query) in self.queries.iter().enumerate() {
-            // assuming all the partition queries yield same schema
-            // without rownum = 1, derived type might be wrong
-            // example: select avg(test_int), test_char from test_table group by test_char
-            // -> (NumInt, Char) instead of (NumtFloat, Char)
-            match conn.query(limit1_query_oracle(query)?.as_str(), &[]) {
-                Ok(rows) => {
-                    let (names, types) = rows
-                        .column_info()
-                        .iter()
-                        .map(|col| {
-                            (
-                                col.name().to_string(),
-                                OracleTypeSystem::from(col.oracle_type()),
-                            )
-                        })
-                        .unzip();
-                    self.names = names;
-                    self.types = types;
-                    return Schema {
-                        names: self.names.clone(),
-                        types: self.types.clone(),
-                    };
-                }
-                Err(e) if i == self.queries.len() - 1 => {
-                    // tried the last query but still get an error
-                    debug!("cannot get metadata for '{}': {}", query, e);
-                    throw!(e);
-                }
-                Err(_) => {}
-            }
-        }
-        // tried all queries but all get empty result set
-        let iter = conn.query(self.queries[0].as_str(), &[])?;
-        let (names, types) = iter
-            .column_info()
-            .iter()
-            .map(|col| (col.name().to_string(), OracleTypeSystem::VarChar(false)))
-            .unzip();
-        self.names = names;
-        self.types = types;
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
     #[throws(OracleSourceError)]
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
@@ -158,22 +94,20 @@ where
         }
 
         let conn = self.pool.get()?;
-        OracleSourcePartition::new(conn, query, &self.types)
+        OracleSourcePartition::new(conn, query)
     }
 }
 
 pub struct OracleSourcePartition {
     conn: OracleConn,
     query: CXQuery<String>,
-    schema: Vec<OracleTypeSystem>,
 }
 
 impl OracleSourcePartition {
-    pub fn new(conn: OracleConn, query: &CXQuery<String>, schema: &[OracleTypeSystem]) -> Self {
+    pub fn new(conn: OracleConn, query: &CXQuery<String>) -> Self {
         Self {
             conn,
             query: query.clone(),
-            schema: schema.to_vec(),
         }
     }
 }
@@ -184,11 +118,42 @@ impl SourceReader for OracleSourcePartition {
     type Error = OracleSourceError;
 
     #[throws(OracleSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+        let conn = &self.conn;
+
+        let query = &self.query;
+
+        // without rownum = 1, derived type might be wrong
+        // example: select avg(test_int), test_char from test_table group by test_char
+        // -> (NumInt, Char) instead of (NumtFloat, Char)
+        match conn.query(limit1_query_oracle(query)?.as_str(), &[]) {
+            Ok(rows) => {
+                let (names, types) = rows
+                    .column_info()
+                    .iter()
+                    .map(|col| {
+                        (
+                            col.name().to_string(),
+                            OracleTypeSystem::from(col.oracle_type()),
+                        )
+                    })
+                    .unzip();
+                Schema { names, types }
+            }
+            Err(e) => {
+                // tried the last query but still get an error
+                debug!("cannot get metadata for '{}': {}", query, e);
+                throw!(e);
+            }
+        }
+    }
+
+    #[throws(OracleSourceError)]
+    fn parser(&mut self, schema: &Schema<OracleTypeSystem>) -> Self::Parser<'_> {
         let query = self.query.clone();
 
         // let iter = self.conn.query(query.as_str(), &[])?;
-        OracleTextSourceParser::new(&self.conn, query.as_str(), &self.schema)?
+        OracleTextSourceParser::new(&self.conn, query.as_str(), schema)?
     }
 }
 
@@ -205,7 +170,7 @@ pub struct OracleTextSourceParser<'a> {
 
 impl<'a> OracleTextSourceParser<'a> {
     #[throws(OracleSourceError)]
-    pub fn new(conn: &'a OracleConn, query: &str, schema: &[OracleTypeSystem]) -> Self {
+    pub fn new(conn: &'a OracleConn, query: &str, schema: &Schema<OracleTypeSystem>) -> Self {
         let stmt = conn
             .statement(query)
             .prefetch_rows(ORACLE_ARRAY_SIZE)

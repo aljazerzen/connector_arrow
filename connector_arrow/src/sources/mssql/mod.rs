@@ -36,9 +36,6 @@ type Conn<'a> = PooledConnection<'a, ConnectionManager>;
 pub struct MsSQLSource {
     rt: Arc<Runtime>,
     pool: Pool<ConnectionManager>,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<MsSQLTypeSystem>,
 }
 
 #[throws(MsSQLSourceError)]
@@ -103,13 +100,7 @@ impl MsSQLSource {
         let manager = bb8_tiberius::ConnectionManager::new(config);
         let pool = rt.block_on(Pool::builder().max_size(nconn as u32).build(manager))?;
 
-        Self {
-            rt,
-            pool,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
-        }
+        Self { rt, pool }
     }
 }
 
@@ -122,16 +113,45 @@ where
     type TypeSystem = MsSQLTypeSystem;
     type Error = MsSQLSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
+    #[throws(MsSQLSourceError)]
+    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
+        if !matches!(data_order, DataOrder::RowMajor) {
+            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
+        }
+
+        MsSQLSourcePartition::new(self.pool.clone(), self.rt.clone(), query)
     }
+}
+
+pub struct MsSQLSourcePartition {
+    pool: Pool<ConnectionManager>,
+    rt: Arc<Runtime>,
+    query: CXQuery<String>,
+}
+
+impl MsSQLSourcePartition {
+    pub fn new(
+        pool: Pool<ConnectionManager>,
+        handle: Arc<Runtime>,
+        query: &CXQuery<String>,
+    ) -> Self {
+        Self {
+            rt: handle,
+            pool,
+            query: query.clone(),
+        }
+    }
+}
+
+impl SourceReader for MsSQLSourcePartition {
+    type TypeSystem = MsSQLTypeSystem;
+    type Parser<'a> = MsSQLSourceParser<'a>;
+    type Error = MsSQLSourceError;
 
     #[throws(MsSQLSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
-
+    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
         let mut conn = self.rt.block_on(self.pool.get())?;
-        let first_query = &self.queries[0];
+        let first_query = &self.query;
         let (names, types) = match self.rt.block_on(conn.query(first_query.as_str(), &[])) {
             Ok(stream) => {
                 let columns = stream.columns().ok_or_else(|| {
@@ -157,56 +177,11 @@ where
             }
         };
 
-        self.names = names;
-        self.types = types;
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
+        Schema { names, types }
     }
 
     #[throws(MsSQLSourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
-        }
-
-        MsSQLSourcePartition::new(self.pool.clone(), self.rt.clone(), query, &self.types)
-    }
-}
-
-pub struct MsSQLSourcePartition {
-    pool: Pool<ConnectionManager>,
-    rt: Arc<Runtime>,
-    query: CXQuery<String>,
-    schema: Vec<MsSQLTypeSystem>,
-    nrows: Option<usize>,
-}
-
-impl MsSQLSourcePartition {
-    pub fn new(
-        pool: Pool<ConnectionManager>,
-        handle: Arc<Runtime>,
-        query: &CXQuery<String>,
-        schema: &[MsSQLTypeSystem],
-    ) -> Self {
-        Self {
-            rt: handle,
-            pool,
-            query: query.clone(),
-            schema: schema.to_vec(),
-            nrows: None,
-        }
-    }
-}
-
-impl SourceReader for MsSQLSourcePartition {
-    type TypeSystem = MsSQLTypeSystem;
-    type Parser<'a> = MsSQLSourceParser<'a>;
-    type Error = MsSQLSourceError;
-
-    #[throws(MsSQLSourceError)]
-    fn parser<'a>(&'a mut self) -> Self::Parser<'a> {
+    fn parser<'a>(&'a mut self, schema: &Schema<MsSQLTypeSystem>) -> Self::Parser<'a> {
         let conn = self.rt.block_on(self.pool.get())?;
         let rows: OwningHandle<Box<Conn<'a>>, DummyBox<QueryResult<'a>>> =
             OwningHandle::new_with_fn(Box::new(conn), |conn: *const Conn<'a>| unsafe {
@@ -219,11 +194,7 @@ impl SourceReader for MsSQLSourcePartition {
                 )
             });
 
-        MsSQLSourceParser::new(self.rt.handle(), rows, &self.schema)
-    }
-
-    fn row_count(&self) -> Option<usize> {
-        self.nrows
+        MsSQLSourceParser::new(self.rt.handle(), rows, schema)
     }
 }
 
@@ -241,7 +212,7 @@ impl<'a> MsSQLSourceParser<'a> {
     fn new(
         rt: &'a Handle,
         iter: OwningHandle<Box<Conn<'a>>, DummyBox<QueryResult<'a>>>,
-        schema: &[MsSQLTypeSystem],
+        schema: &Schema<MsSQLTypeSystem>,
     ) -> Self {
         Self {
             rt,

@@ -14,19 +14,18 @@ use fehler::throw;
 use num_traits::cast::FromPrimitive;
 
 pub struct DummySource {
-    names: Vec<String>,
-    types: Vec<DummyTypeSystem>,
-    queries: Vec<CXQuery<String>>,
+    schema: Schema<DummyTypeSystem>,
 }
 
 impl DummySource {
     pub fn new<S: AsRef<str>>(names: &[S], types: &[DummyTypeSystem]) -> Self {
         assert_eq!(names.len(), types.len());
-        DummySource {
-            names: names.iter().map(|s| s.as_ref().to_string()).collect(),
-            types: types.to_vec(),
-            queries: vec![],
-        }
+
+        let names = names.iter().map(|s| s.as_ref().to_string()).collect();
+        let types = types.to_vec();
+        let schema = Schema { names, types };
+
+        DummySource { schema }
     }
 }
 
@@ -36,40 +35,28 @@ impl Source for DummySource {
     type Reader = DummySourcePartition;
     type Error = ConnectorXError;
 
-    // query: nrows,ncols
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>> {
-        Ok(Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        })
-    }
-
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Result<Self::Reader> {
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        let schema = &self.types;
-
-        Ok(DummySourcePartition::new(schema, query))
+        Ok(DummySourcePartition::new(self.schema.clone(), query))
     }
 }
 
 pub struct DummySourcePartition {
+    schema: Schema<DummyTypeSystem>,
     nrows: usize,
     ncols: usize,
     counter: usize,
 }
 
 impl DummySourcePartition {
-    pub fn new(_schema: &[DummyTypeSystem], q: &CXQuery<String>) -> Self {
+    pub fn new(schema: Schema<DummyTypeSystem>, q: &CXQuery<String>) -> Self {
         let v: Vec<usize> = q.as_str().split(',').map(|s| s.parse().unwrap()).collect();
 
         DummySourcePartition {
+            schema,
             nrows: v[0],
             ncols: v[1],
             counter: 0,
@@ -82,16 +69,16 @@ impl SourceReader for DummySourcePartition {
     type Parser<'a> = DummySourcePartitionParser<'a>;
     type Error = ConnectorXError;
 
-    fn parser(&mut self) -> Result<Self::Parser<'_>> {
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>> {
+        Ok(self.schema.clone())
+    }
+
+    fn parser(&mut self, _schema: &Schema<DummyTypeSystem>) -> Result<Self::Parser<'_>> {
         Ok(DummySourcePartitionParser::new(
             &mut self.counter,
             self.nrows,
             self.ncols,
         ))
-    }
-
-    fn row_count(&self) -> Option<usize> {
-        Some(self.nrows)
     }
 }
 

@@ -12,11 +12,15 @@ fn test_source() {
     let dburl = env::var("BIGQUERY_URL").unwrap();
     let rt = Arc::new(Runtime::new().unwrap());
     let mut source = BigQuerySource::new(rt, &dburl).unwrap();
-    source.set_queries(&[
+
+    let queries = vec![
         CXQuery::naked("SELECT * FROM (SELECT * FROM `dataprep-bigquery.dataprep.lineitem` LIMIT 1000) AS CXTMPTAB_PART WHERE 1281 <= CXTMPTAB_PART.L_ORDERKEY AND CXTMPTAB_PART.L_ORDERKEY < 19419500"),
         CXQuery::naked("SELECT * FROM (SELECT * FROM `dataprep-bigquery.dataprep.lineitem` LIMIT 1000) AS CXTMPTAB_PART WHERE 19419500 <= CXTMPTAB_PART.L_ORDERKEY AND CXTMPTAB_PART.L_ORDERKEY < 38837719"),
-        CXQuery::naked("SELECT * FROM (SELECT * FROM `dataprep-bigquery.dataprep.lineitem` LIMIT 1000) AS CXTMPTAB_PART WHERE 38837719 <= CXTMPTAB_PART.L_ORDERKEY AND CXTMPTAB_PART.L_ORDERKEY < 58255940"),]);
-    source.fetch_metadata().unwrap();
+        CXQuery::naked("SELECT * FROM (SELECT * FROM `dataprep-bigquery.dataprep.lineitem` LIMIT 1000) AS CXTMPTAB_PART WHERE 38837719 <= CXTMPTAB_PART.L_ORDERKEY AND CXTMPTAB_PART.L_ORDERKEY < 58255940")
+    ];
+
+    let mut reader = source.reader(&queries[0], DataOrder::ColumnMajor).unwrap();
+    reader.fetch_schema().unwrap();
 }
 
 #[test]

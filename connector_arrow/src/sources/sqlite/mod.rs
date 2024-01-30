@@ -28,9 +28,6 @@ use urlencoding::decode;
 
 pub struct SQLiteSource {
     pool: Pool<SqliteConnectionManager>,
-    queries: Vec<CXQuery<String>>,
-    names: Vec<String>,
-    types: Vec<SQLiteTypeSystem>,
 }
 
 impl SQLiteSource {
@@ -43,12 +40,7 @@ impl SQLiteSource {
             .max_size(nconn as u32)
             .build(manager)?;
 
-        Self {
-            pool,
-            queries: vec![],
-            names: vec![],
-            types: vec![],
-        }
+        Self { pool }
     }
 }
 
@@ -61,93 +53,6 @@ where
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.queries = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    #[throws(SQLiteSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        assert!(!self.queries.is_empty());
-        let conn = self.pool.get()?;
-        let mut names = vec![];
-        let mut types = vec![];
-        let mut num_empty = 0;
-
-        // assuming all the partition queries yield same schema
-        for (i, query) in self.queries.iter().enumerate() {
-            let l1query = limit1_query(query, &SQLiteDialect {})?;
-
-            let is_sucess = conn.query_row(l1query.as_str(), [], |row| {
-                for (j, col) in row.as_ref().columns().iter().enumerate() {
-                    if j >= names.len() {
-                        names.push(col.name().to_string());
-                    }
-                    if j >= types.len() {
-                        let vr = row.get_ref(j)?;
-                        match SQLiteTypeSystem::try_from((col.decl_type(), vr.data_type())) {
-                            Ok(t) => types.push(Some(t)),
-                            Err(_) => {
-                                types.push(None);
-                            }
-                        }
-                    } else if types[j].is_none() {
-                        // We didn't get the type in the previous round
-                        let vr = row.get_ref(j)?;
-                        if let Ok(t) = SQLiteTypeSystem::try_from((col.decl_type(), vr.data_type()))
-                        {
-                            types[j] = Some(t)
-                        }
-                    }
-                }
-                Ok(())
-            });
-
-            match is_sucess {
-                Ok(()) => {
-                    if !types.contains(&None) {
-                        self.names = names;
-                        self.types = types.into_iter().map(|t| t.unwrap()).collect();
-                        return Schema {
-                            names: self.names.clone(),
-                            types: self.types.clone(),
-                        };
-                    } else if i == self.queries.len() - 1 {
-                        debug!(
-                            "cannot get metadata for '{}' due to null value: {:?}",
-                            query, types
-                        );
-                        throw!(SQLiteSourceError::InferTypeFromNull);
-                    }
-                }
-                Err(e) => {
-                    if let rusqlite::Error::QueryReturnedNoRows = e {
-                        num_empty += 1; // make sure when all partition results are empty, do not throw error
-                    }
-                    if i == self.queries.len() - 1 && num_empty < self.queries.len() {
-                        // tried the last query but still get an error
-                        debug!("cannot get metadata for '{}': {}", query, e);
-                        throw!(e)
-                    }
-                }
-            }
-        }
-
-        // tried all queries but all get empty result set
-        let stmt = conn.prepare(self.queries[0].as_str())?;
-
-        self.names = stmt
-            .column_names()
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
-        // set all columns as string (align with pandas)
-        self.types = vec![SQLiteTypeSystem::Text(false); self.names.len()];
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
     #[throws(SQLiteSourceError)]
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
@@ -155,26 +60,20 @@ where
         }
 
         let conn = self.pool.get()?;
-        SQLiteSourcePartition::new(conn, query, &self.types)
+        SQLiteSourcePartition::new(conn, query)
     }
 }
 
 pub struct SQLiteSourcePartition {
     conn: PooledConnection<SqliteConnectionManager>,
     query: CXQuery<String>,
-    schema: Vec<SQLiteTypeSystem>,
 }
 
 impl SQLiteSourcePartition {
-    pub fn new(
-        conn: PooledConnection<SqliteConnectionManager>,
-        query: &CXQuery<String>,
-        schema: &[SQLiteTypeSystem],
-    ) -> Self {
+    pub fn new(conn: PooledConnection<SqliteConnectionManager>, query: &CXQuery<String>) -> Self {
         Self {
             conn,
             query: query.clone(),
-            schema: schema.to_vec(),
         }
     }
 }
@@ -185,8 +84,59 @@ impl SourceReader for SQLiteSourcePartition {
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
-        SQLiteSourcePartitionParser::new(&self.conn, self.query.as_str(), &self.schema)?
+    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+        let mut names = vec![];
+        let mut types = vec![];
+
+        let l1query = limit1_query(&self.query, &SQLiteDialect {})?;
+
+        let result = self.conn.query_row(l1query.as_str(), [], |row| {
+            for (j, col) in row.as_ref().columns().iter().enumerate() {
+                if j >= names.len() {
+                    names.push(col.name().to_string());
+                }
+                if j >= types.len() {
+                    let vr = row.get_ref(j)?;
+                    match SQLiteTypeSystem::try_from((col.decl_type(), vr.data_type())) {
+                        Ok(t) => types.push(Some(t)),
+                        Err(_) => {
+                            types.push(None);
+                        }
+                    }
+                } else if types[j].is_none() {
+                    // We didn't get the type in the previous round
+                    let vr = row.get_ref(j)?;
+                    if let Ok(t) = SQLiteTypeSystem::try_from((col.decl_type(), vr.data_type())) {
+                        types[j] = Some(t)
+                    }
+                }
+            }
+            Ok(())
+        });
+
+        match result {
+            Ok(()) => {
+                if !types.contains(&None) {
+                    let types = types.into_iter().map(|t| t.unwrap()).collect();
+                    Schema { names, types }
+                } else {
+                    debug!(
+                        "cannot get metadata for '{}' due to null value: {:?}",
+                        self.query, types
+                    );
+                    throw!(SQLiteSourceError::InferTypeFromNull);
+                }
+            }
+            Err(e) => {
+                debug!("cannot get metadata for '{}': {}", self.query, e);
+                throw!(e)
+            }
+        }
+    }
+
+    #[throws(SQLiteSourceError)]
+    fn parser(&mut self, schema: &Schema<SQLiteTypeSystem>) -> Self::Parser<'_> {
+        SQLiteSourcePartitionParser::new(&self.conn, self.query.as_str(), schema)?
     }
 }
 
@@ -205,7 +155,7 @@ impl<'a> SQLiteSourcePartitionParser<'a> {
     pub fn new(
         conn: &'a PooledConnection<SqliteConnectionManager>,
         query: &str,
-        schema: &[SQLiteTypeSystem],
+        schema: &Schema<SQLiteTypeSystem>,
     ) -> Self {
         let stmt: Statement<'a> = conn.prepare(query)?;
 
@@ -218,7 +168,7 @@ impl<'a> SQLiteSourcePartitionParser<'a> {
             });
         Self {
             rows,
-            ncols: schema.len(),
+            ncols: schema.types.len(),
             current_col: 0,
             current_consumed: true,
             is_finished: false,

@@ -51,16 +51,17 @@ where
     pub fn prepare(mut self) -> Result<PreparedDispatch<S, D>, TP::Error> {
         debug!("Prepare");
         let data_order = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-        self.src.set_queries(self.queries.as_slice());
-
-        debug!("Fetching metadata");
-        let src_schema = self.src.fetch_metadata()?;
-        let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
         let mut src_readers = Vec::with_capacity(self.queries.len());
         for query in &self.queries {
-            src_readers.push(self.src.reader(query, data_order)?);
+            let reader = self.src.reader(query, data_order)?;
+            src_readers.push(reader);
         }
+
+        debug!("Fetching metadata");
+        let first_reader = src_readers.first_mut().unwrap();
+        let src_schema = first_reader.fetch_schema()?;
+        let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
 
@@ -94,7 +95,7 @@ where
         compile_error!("branch or fptr, pick one");
 
         #[cfg(feature = "branch")]
-        let types: Vec<_> = zip_eq(src_schema.types, dst_schema.types).collect();
+        let types: Vec<_> = zip_eq(src_schema.types.clone(), dst_schema.types).collect();
 
         debug!("Start writing");
         // parse and write
@@ -108,7 +109,7 @@ where
                     .map(|(src_ty, dst_ty)| TP::processor(*src_ty, *dst_ty))
                     .collect::<crate::errors::Result<Vec<_>>>()?;
 
-                let mut parser = src.parser()?;
+                let mut parser = src.parser(&src_schema)?;
 
                 match data_order {
                     DataOrder::RowMajor => loop {
@@ -166,8 +167,10 @@ where
     /// Only fetch the metadata (header) of the destination.
     pub fn get_meta(&mut self) -> Result<(), TP::Error> {
         let dorder = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-        self.src.set_queries(self.queries.as_slice());
-        let src_schema = self.src.fetch_metadata()?;
+
+        let mut reader = self.src.reader(self.queries.first().unwrap(), dorder)?;
+
+        let src_schema = reader.fetch_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
         self.dst.set_metadata(dst_schema, dorder)?;
         Ok(())

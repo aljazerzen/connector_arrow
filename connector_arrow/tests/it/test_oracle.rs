@@ -12,16 +12,12 @@ fn test_types() {
     #[derive(Debug, PartialEq)]
     struct Row(i64, i64, f64, f64, String, String, String, String);
 
-    source.set_queries(&[CXQuery::naked("select * from admin.test_table")]);
-    source.fetch_metadata().unwrap();
-    let mut partition = source
-        .reader(
-            &CXQuery::naked("select * from admin.test_table"),
-            DataOrder::RowMajor,
-        )
-        .unwrap();
+    let query = CXQuery::naked("select * from admin.test_table");
+    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
 
-    let mut parser = partition.parser().unwrap();
+    let schema = partition.fetch_schema().unwrap();
+
+    let mut parser = partition.parser(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
     loop {

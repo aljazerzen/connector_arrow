@@ -11,127 +11,19 @@ use crate::{data_order::DataOrder, errors::ConnectorXError, sql::CXQuery};
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use fehler::{throw, throws};
-#[cfg(feature = "src_csv")]
 use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::fs::File;
 
 pub struct CSVSource {
-    types: Vec<CSVTypeSystem>,
-    names: Vec<String>,
-    files: Vec<CXQuery<String>>,
+    types_override: Option<Vec<CSVTypeSystem>>,
 }
 
 impl CSVSource {
-    pub fn new(schema: &[CSVTypeSystem]) -> Self {
+    pub fn new(types_override: Option<&[CSVTypeSystem]>) -> Self {
         CSVSource {
-            types: schema.to_vec(),
-            files: vec![],
-            names: vec![],
+            types_override: types_override.map(|x| x.to_vec()),
         }
-    }
-
-    #[throws(CSVSourceError)]
-    pub fn infer_schema(&mut self) -> Vec<CSVTypeSystem> {
-        // regular expressions for infer CSVTypeSystem from string
-        let decimal_re: Regex = Regex::new(r"^-?(\d+\.\d+)$")?;
-        let integer_re: Regex = Regex::new(r"^-?(\d+)$")?;
-        let boolean_re: Regex = RegexBuilder::new(r"^(true)$|^(false)$")
-            .case_insensitive(true)
-            .build()?;
-        let datetime_re: Regex = Regex::new(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$")?;
-
-        // read max_records rows to infer possible CSVTypeSystems for each field
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(true)
-            .from_reader(File::open(self.files[0].as_str())?);
-
-        let max_records_to_read = 50;
-        let num_cols = self.names.len();
-
-        let mut column_types: Vec<HashSet<CSVTypeSystem>> = vec![HashSet::new(); num_cols];
-        let mut nulls: Vec<bool> = vec![false; num_cols];
-
-        let mut record = csv::StringRecord::new();
-
-        for _record_counter in 0..max_records_to_read {
-            if !reader.read_record(&mut record)? {
-                break;
-            }
-            for field_counter in 0..num_cols {
-                if let Some(string) = record.get(field_counter) {
-                    if string.is_empty() {
-                        nulls[field_counter] = true;
-                    } else {
-                        let dt: CSVTypeSystem;
-
-                        if string.starts_with('"') {
-                            dt = CSVTypeSystem::String(false);
-                        } else if boolean_re.is_match(string) {
-                            dt = CSVTypeSystem::Bool(false);
-                        } else if decimal_re.is_match(string) {
-                            dt = CSVTypeSystem::F64(false);
-                        } else if integer_re.is_match(string) {
-                            dt = CSVTypeSystem::I64(false);
-                        } else if datetime_re.is_match(string) {
-                            dt = CSVTypeSystem::DateTime(false);
-                        } else {
-                            dt = CSVTypeSystem::String(false);
-                        }
-                        column_types[field_counter].insert(dt);
-                    }
-                }
-            }
-        }
-
-        // determine CSVTypeSystem based on possible candidates
-        let mut schema = vec![];
-
-        for field_counter in 0..num_cols {
-            let possibilities = &column_types[field_counter];
-            let has_nulls = nulls[field_counter];
-
-            match possibilities.len() {
-                1 => {
-                    for dt in possibilities.iter() {
-                        match *dt {
-                            CSVTypeSystem::I64(false) => {
-                                schema.push(CSVTypeSystem::I64(has_nulls));
-                            }
-                            CSVTypeSystem::F64(false) => {
-                                schema.push(CSVTypeSystem::F64(has_nulls));
-                            }
-                            CSVTypeSystem::Bool(false) => {
-                                schema.push(CSVTypeSystem::Bool(has_nulls));
-                            }
-                            CSVTypeSystem::String(false) => {
-                                schema.push(CSVTypeSystem::String(has_nulls));
-                            }
-                            CSVTypeSystem::DateTime(false) => {
-                                schema.push(CSVTypeSystem::DateTime(has_nulls));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                2 => {
-                    if possibilities.contains(&CSVTypeSystem::I64(false))
-                        && possibilities.contains(&CSVTypeSystem::F64(false))
-                    {
-                        // Integer && Float -> Float
-                        schema.push(CSVTypeSystem::F64(has_nulls));
-                    } else {
-                        // Conflicting CSVTypeSystems -> String
-                        schema.push(CSVTypeSystem::String(has_nulls));
-                    }
-                }
-                _ => {
-                    // Conflicting CSVTypeSystems -> String
-                    schema.push(CSVTypeSystem::String(has_nulls));
-                }
-            }
-        }
-        schema
     }
 }
 
@@ -141,53 +33,41 @@ impl Source for CSVSource {
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]) {
-        self.files = queries.iter().map(|q| q.map(Q::to_string)).collect();
-    }
-
-    #[throws(CSVSourceError)]
-    fn fetch_metadata(&mut self) -> Schema<Self::TypeSystem> {
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(true)
-            .from_reader(File::open(self.files[0].as_str())?);
-        let header = reader.headers()?;
-
-        self.names = header.iter().map(|s| s.to_string()).collect();
-
-        if self.types.is_empty() {
-            self.types = self.infer_schema()?;
-        }
-
-        assert_eq!(header.len(), self.types.len());
-        Schema {
-            names: self.names.clone(),
-            types: self.types.clone(),
-        }
-    }
-
     #[throws(CSVSourceError)]
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
         if !matches!(data_order, DataOrder::RowMajor) {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        CSVSourcePartition::new(query)?
+        CSVSourcePartition::new(query, self.types_override.clone())?
     }
 }
 
 pub struct CSVSourcePartition {
-    records: Vec<csv::StringRecord>,
+    types_override: Option<Vec<CSVTypeSystem>>,
+    filepath: String,
     counter: usize,
-    nrows: Option<usize>,
-    ncols: usize,
+    records: Option<Vec<csv::StringRecord>>,
 }
 
 impl CSVSourcePartition {
     #[throws(CSVSourceError)]
-    pub fn new(fname: &CXQuery<String>) -> Self {
+    pub fn new(filepath: &CXQuery<String>, types_override: Option<Vec<CSVTypeSystem>>) -> Self {
+        let filepath = filepath.to_string();
+
+        Self {
+            types_override,
+            filepath,
+            records: None,
+            counter: 0,
+        }
+    }
+
+    #[throws(CSVSourceError)]
+    fn read(&self) -> Vec<csv::StringRecord> {
         let reader = csv::ReaderBuilder::new()
             .has_headers(true)
-            .from_reader(File::open(fname.as_str())?);
+            .from_reader(File::open(&self.filepath)?);
         let mut records = vec![];
         reader
             .into_records()
@@ -196,16 +76,105 @@ impl CSVSourcePartition {
                 Ok(())
             })?;
 
-        let nrows = records.len();
-        let ncols = if nrows > 0 { records[0].len() } else { 0 };
+        records
+    }
+}
 
-        Self {
-            records,
-            counter: 0,
-            nrows: Some(nrows),
-            ncols,
+#[throws(CSVSourceError)]
+fn infer_schema(reader: &mut csv::Reader<File>, num_cols: usize) -> Vec<CSVTypeSystem> {
+    // regular expressions for infer CSVTypeSystem from string
+    let decimal_re: Regex = Regex::new(r"^-?(\d+\.\d+)$")?;
+    let integer_re: Regex = Regex::new(r"^-?(\d+)$")?;
+    let boolean_re: Regex = RegexBuilder::new(r"^(true)$|^(false)$")
+        .case_insensitive(true)
+        .build()?;
+    let datetime_re: Regex = Regex::new(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$")?;
+
+    let max_records_to_read = 50;
+
+    let mut column_types: Vec<HashSet<CSVTypeSystem>> = vec![HashSet::new(); num_cols];
+    let mut nulls: Vec<bool> = vec![false; num_cols];
+
+    let mut record = csv::StringRecord::new();
+
+    for _record_counter in 0..max_records_to_read {
+        if !reader.read_record(&mut record)? {
+            break;
+        }
+        for field_counter in 0..num_cols {
+            if let Some(string) = record.get(field_counter) {
+                if string.is_empty() {
+                    nulls[field_counter] = true;
+                } else {
+                    let dt: CSVTypeSystem;
+
+                    if string.starts_with('"') {
+                        dt = CSVTypeSystem::String(false);
+                    } else if boolean_re.is_match(string) {
+                        dt = CSVTypeSystem::Bool(false);
+                    } else if decimal_re.is_match(string) {
+                        dt = CSVTypeSystem::F64(false);
+                    } else if integer_re.is_match(string) {
+                        dt = CSVTypeSystem::I64(false);
+                    } else if datetime_re.is_match(string) {
+                        dt = CSVTypeSystem::DateTime(false);
+                    } else {
+                        dt = CSVTypeSystem::String(false);
+                    }
+                    column_types[field_counter].insert(dt);
+                }
+            }
         }
     }
+
+    // determine CSVTypeSystem based on possible candidates
+    let mut schema = vec![];
+
+    for field_counter in 0..num_cols {
+        let possibilities = &column_types[field_counter];
+        let has_nulls = nulls[field_counter];
+
+        match possibilities.len() {
+            1 => {
+                for dt in possibilities.iter() {
+                    match *dt {
+                        CSVTypeSystem::I64(false) => {
+                            schema.push(CSVTypeSystem::I64(has_nulls));
+                        }
+                        CSVTypeSystem::F64(false) => {
+                            schema.push(CSVTypeSystem::F64(has_nulls));
+                        }
+                        CSVTypeSystem::Bool(false) => {
+                            schema.push(CSVTypeSystem::Bool(has_nulls));
+                        }
+                        CSVTypeSystem::String(false) => {
+                            schema.push(CSVTypeSystem::String(has_nulls));
+                        }
+                        CSVTypeSystem::DateTime(false) => {
+                            schema.push(CSVTypeSystem::DateTime(has_nulls));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            2 => {
+                if possibilities.contains(&CSVTypeSystem::I64(false))
+                    && possibilities.contains(&CSVTypeSystem::F64(false))
+                {
+                    // Integer && Float -> Float
+                    schema.push(CSVTypeSystem::F64(has_nulls));
+                } else {
+                    // Conflicting CSVTypeSystems -> String
+                    schema.push(CSVTypeSystem::String(has_nulls));
+                }
+            }
+            _ => {
+                // Conflicting CSVTypeSystems -> String
+                schema.push(CSVTypeSystem::String(has_nulls));
+            }
+        }
+    }
+    schema
 }
 
 impl SourceReader for CSVSourcePartition {
@@ -213,16 +182,32 @@ impl SourceReader for CSVSourcePartition {
     type Parser<'a> = CSVSourcePartitionParser<'a>;
     type Error = CSVSourceError;
 
-    fn row_count(&self) -> Option<usize> {
-        self.nrows
+    #[throws(CSVSourceError)]
+    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_reader(File::open(&self.filepath)?);
+        let header = reader.headers()?;
+
+        let names: Vec<String> = header.iter().map(|s| s.to_string()).collect();
+        let types = if let Some(t) = self.types_override.clone() {
+            t
+        } else {
+            infer_schema(&mut reader, names.len())?
+        };
+
+        assert_eq!(names.len(), types.len());
+        Schema { names, types }
     }
 
     #[throws(CSVSourceError)]
-    fn parser(&mut self) -> Self::Parser<'_> {
+    fn parser(&mut self, schema: &Schema<CSVTypeSystem>) -> Self::Parser<'_> {
+        self.records = Some(self.read()?);
+
         CSVSourcePartitionParser {
-            records: &mut self.records,
+            records: self.records.as_mut().unwrap(),
             counter: &mut self.counter,
-            ncols: self.ncols,
+            ncols: schema.len(),
         }
     }
 }

@@ -33,10 +33,6 @@ pub trait Source {
     type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn set_queries<Q: ToString + AsRef<str>>(&mut self, queries: &[CXQuery<Q>]);
-
-    fn fetch_metadata(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
-
     fn reader(
         &mut self,
         query: &CXQuery,
@@ -53,13 +49,12 @@ pub trait SourceReader {
         Self: 'a;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn parser(&mut self) -> Result<Self::Parser<'_>, Self::Error>;
+    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
 
-    /// Number of rows this partition has.
-    /// Sometimes it is not possible for the source to know how many rows it gets before reading the whole data.
-    fn row_count(&self) -> Option<usize> {
-        None
-    }
+    fn parser(
+        &mut self,
+        schema: &Schema<Self::TypeSystem>,
+    ) -> Result<Self::Parser<'_>, Self::Error>;
 }
 
 pub trait PartitionParser<'a>: Send {
