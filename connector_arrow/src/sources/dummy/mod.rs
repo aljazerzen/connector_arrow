@@ -66,7 +66,7 @@ impl DummyReader {
 
 impl SourceReader for DummyReader {
     type TypeSystem = DummyTypeSystem;
-    type Stream<'a> = DummySourcePartitionParser<'a>;
+    type Stream<'a> = DummyStream<'a>;
     type Error = ConnectorXError;
 
     fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>> {
@@ -74,24 +74,20 @@ impl SourceReader for DummyReader {
     }
 
     fn value_stream(&mut self, _schema: &Schema<DummyTypeSystem>) -> Result<Self::Stream<'_>> {
-        Ok(DummySourcePartitionParser::new(
-            &mut self.counter,
-            self.nrows,
-            self.ncols,
-        ))
+        Ok(DummyStream::new(&mut self.counter, self.nrows, self.ncols))
     }
 }
 
-pub struct DummySourcePartitionParser<'a> {
+pub struct DummyStream<'a> {
     counter: &'a mut usize,
     #[allow(unused)]
     nrows: usize,
     ncols: usize,
 }
 
-impl<'a> DummySourcePartitionParser<'a> {
+impl<'a> DummyStream<'a> {
     fn new(counter: &'a mut usize, nrows: usize, ncols: usize) -> Self {
-        DummySourcePartitionParser {
+        DummyStream {
             counter,
             ncols,
             nrows,
@@ -105,19 +101,23 @@ impl<'a> DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'a> ValueStream<'a> for DummySourcePartitionParser<'a> {
+impl<'a> ValueStream<'a> for DummyStream<'a> {
     type TypeSystem = DummyTypeSystem;
     type Error = ConnectorXError;
 
     fn fetch_batch(&mut self) -> Result<(usize, bool)> {
-        Ok((self.nrows, true))
+        Ok(if *self.counter == 0 {
+            (self.nrows, true)
+        } else {
+            (0, true)
+        })
     }
 }
 
 macro_rules! numeric_impl {
     ($($t: ty),+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for DummySourcePartitionParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for DummyStream<'a> {
                 type Error = ConnectorXError;
 
                 fn produce(&mut self) -> Result<$t> {
@@ -126,7 +126,7 @@ macro_rules! numeric_impl {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for DummySourcePartitionParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for DummyStream<'a> {
                 type Error = ConnectorXError;
 
                 fn produce(&mut self) -> Result<Option<$t>> {
@@ -140,7 +140,7 @@ macro_rules! numeric_impl {
 
 numeric_impl!(u64, i32, i64, f64);
 
-impl<'r, 'a> Produce<'r, String> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, String> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<String> {
@@ -149,7 +149,7 @@ impl<'r, 'a> Produce<'r, String> for DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<String>> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, Option<String>> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<Option<String>> {
@@ -158,7 +158,7 @@ impl<'r, 'a> Produce<'r, Option<String>> for DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, bool> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, bool> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<bool> {
@@ -167,7 +167,7 @@ impl<'r, 'a> Produce<'r, bool> for DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<bool>> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, Option<bool>> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<Option<bool>> {
@@ -182,7 +182,7 @@ impl<'r, 'a> Produce<'r, Option<bool>> for DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, DateTime<Utc>> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, DateTime<Utc>> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<DateTime<Utc>> {
@@ -193,7 +193,7 @@ impl<'r, 'a> Produce<'r, DateTime<Utc>> for DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for DummySourcePartitionParser<'a> {
+impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for DummyStream<'a> {
     type Error = ConnectorXError;
 
     fn produce(&mut self) -> Result<Option<DateTime<Utc>>> {

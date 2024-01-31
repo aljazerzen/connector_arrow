@@ -119,12 +119,11 @@ pub trait Transport {
         + Send
         + std::fmt::Debug;
 
-    /// convert_typesystem convert the source type system TSS to the destination
-    /// type system TSD.
+    /// Convert the source type system TSS to the destination type system TSD.
     fn convert_typesystem(ts: Self::TSS) -> CXResult<Self::TSD>;
 
-    /// convert_type convert the type T1 associated with the source type system
-    /// TSS to a type T2 which is associated with the destination type system TSD.
+    /// Convert the type T1 from the source type system TSS into
+    /// the type T2 from the destination type system TSD.
     fn convert_type<T1, T2>(val: T1) -> T2
     where
         Self: TypeConversion<T1, T2>,
@@ -132,10 +131,10 @@ pub trait Transport {
         <Self as TypeConversion<T1, T2>>::convert(val)
     }
 
-    /// `process` will ask source to produce a value with type T1, based on TSS, and then do
-    /// type conversion using `convert_type` to get value with type T2, which is associated to
-    /// TSD. Finally, it will write the value with type T2 to the destination.
-    fn process<'s, 'd, 'r>(
+    /// Ask source to produce a value of type T1 from TSS, and then
+    /// do type conversion using [Transport::convert_type] to get value of type T2 from TSD.
+    /// Finally, it will write the value of type T2 to the destination.
+    fn transport<'s, 'd, 'r>(
         ts1: Self::TSS,
         ts2: Self::TSD,
         src: &'r mut <<Self::S as Source>::Reader as SourceReader>::Stream<'s>,
@@ -145,7 +144,7 @@ pub trait Transport {
         Self: 'd;
 
     #[allow(clippy::type_complexity)]
-    fn processor<'s, 'd>(
+    fn transporter<'s, 'd>(
         ts1: Self::TSS,
         ts2: Self::TSD,
     ) -> CXResult<

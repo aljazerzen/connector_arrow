@@ -241,6 +241,9 @@ impl<'a> ValueStream<'a> for MsSQLStream<'a> {
     #[throws(MsSQLSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
+        if self.is_finished {
+            return (0, true);
+        }
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
             return (remaining_rows, self.is_finished);

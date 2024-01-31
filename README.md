@@ -11,7 +11,6 @@ Fork of [ConnectorX](https://github.com/sfu-db/connector-x), with focus on being
 We observe that existing solutions more or less do data copy multiple times when downloading the data.
 Additionally, implementing a data intensive application in Python brings additional cost.
 
-Connector Arrow is written in Rust and follows "zero-copy" principle.
 This allows it to make full use of the CPU by becoming cache and branch predictor friendly. Moreover, the architecture of Connector Arrow ensures the data will be copied exactly once, directly from the source to the destination.
 
 ## How does Connector Arrow download the data?

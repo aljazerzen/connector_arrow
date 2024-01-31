@@ -194,6 +194,9 @@ impl<'a> ValueStream<'a> for SQLiteSourcePartitionParser<'a> {
     #[throws(SQLiteSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
+        if self.is_finished {
+            return (0, true);
+        }
 
         if !self.current_consumed {
             return (1, false);

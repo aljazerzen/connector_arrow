@@ -70,9 +70,22 @@ pub trait ValueStream<'a>: Send {
 
     /// Fetch next batch from the data source.
     /// Returns the number of rows that can now be retrieved via [ValueStream::next_value].
+    fn next_batch(&mut self) -> Result<Option<usize>, Self::Error> {
+        #[allow(deprecated)]
+        let (size, is_last) = self.fetch_batch()?;
+        Ok(if size == 0 && is_last {
+            None
+        } else {
+            Some(size)
+        })
+    }
+
+    /// Fetch next batch from the data source.
+    /// Returns the number of rows that can now be retrieved via [ValueStream::next_value].
     /// Also returns a bool, specifying that this is the last batch and that
     /// [ValueStream::fetch_batch] will always produce `(0, true)` from now on.
     /// (although the function might be called even after the last batch is fetched).
+    #[deprecated(note = "use next_batch instead")]
     fn fetch_batch(&mut self) -> Result<(usize, bool), Self::Error>;
 
     /// Returns the next value in the stream. Must not be called without previously calling

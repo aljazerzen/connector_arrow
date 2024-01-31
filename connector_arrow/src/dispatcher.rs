@@ -105,53 +105,54 @@ where
             .enumerate()
             .try_for_each(|(i, (mut dst, mut src))| -> Result<(), TP::Error> {
                 #[cfg(feature = "fptr")]
-                let f: Vec<_> = zip_eq(&src_schema.types, &dst_schema.types)
-                    .map(|(src_ty, dst_ty)| TP::processor(*src_ty, *dst_ty))
+                let transporters: Vec<_> = zip_eq(&src_schema.types, &dst_schema.types)
+                    .map(|(src_ty, dst_ty)| TP::transporter(*src_ty, *dst_ty))
                     .collect::<crate::errors::Result<Vec<_>>>()?;
 
-                let mut parser = src.value_stream(&src_schema)?;
+                let mut value_stream = src.value_stream(&src_schema)?;
 
-                match data_order {
-                    DataOrder::RowMajor => loop {
-                        let (n, is_last) = parser.fetch_batch()?;
-                        for _ in 0..n {
+                while let Some(batch_size) = value_stream.next_batch()? {
+                    match data_order {
+                        DataOrder::RowMajor => {
+                            for _ in 0..batch_size {
+                                #[allow(clippy::needless_range_loop)]
+                                for col in 0..dst.ncols() {
+                                    #[cfg(feature = "fptr")]
+                                    {
+                                        let transporter = transporters[col];
+                                        transporter(&mut value_stream, &mut dst)?;
+                                    }
+
+                                    #[cfg(feature = "branch")]
+                                    {
+                                        let (s1, s2) = types[col];
+                                        TP::transport(s1, s2, &mut value_stream, &mut dst)?;
+                                    }
+                                }
+                            }
+                        }
+                        DataOrder::ColumnMajor => {
+                            // TODO: this could be optimized, since the lookup for the transportor does
+                            // not need to happen for each iteration over rows.
+
                             #[allow(clippy::needless_range_loop)]
                             for col in 0..dst.ncols() {
-                                #[cfg(feature = "fptr")]
-                                f[col](&mut parser, &mut dst)?;
+                                for _ in 0..batch_size {
+                                    #[cfg(feature = "fptr")]
+                                    {
+                                        let transporter = transporters[col];
+                                        transporter(&mut value_stream, &mut dst)?;
+                                    }
 
-                                #[cfg(feature = "branch")]
-                                {
-                                    let (s1, s2) = types[col];
-                                    TP::process(s1, s2, &mut parser, &mut dst)?;
+                                    #[cfg(feature = "branch")]
+                                    {
+                                        let (s1, s2) = types[col];
+                                        TP::transport(s1, s2, &mut value_stream, &mut dst)?;
+                                    }
                                 }
                             }
                         }
-                        if is_last {
-                            break;
-                        }
-                    },
-                    DataOrder::ColumnMajor => loop {
-                        // TODO: this could be optimized, since the lookup for the processor does
-                        // not need to happen for each iteration over rows.
-
-                        let (n, is_last) = parser.fetch_batch()?;
-                        #[allow(clippy::needless_range_loop)]
-                        for col in 0..dst.ncols() {
-                            for _ in 0..n {
-                                #[cfg(feature = "fptr")]
-                                f[col](&mut parser, &mut dst)?;
-                                #[cfg(feature = "branch")]
-                                {
-                                    let (s1, s2) = types[col];
-                                    TP::process(s1, s2, &mut parser, &mut dst)?;
-                                }
-                            }
-                        }
-                        if is_last {
-                            break;
-                        }
-                    },
+                    }
                 }
 
                 debug!("Finalize partition {}", i);

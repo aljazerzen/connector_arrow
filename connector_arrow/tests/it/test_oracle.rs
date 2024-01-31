@@ -20,8 +20,7 @@ fn test_types() {
     let mut parser = partition.value_stream(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
-    loop {
-        let (n, is_last) = parser.fetch_batch().unwrap();
+    while let Some(n) = parser.next_batch().unwrap() {
         for _i in 0..n {
             rows.push(Row(
                 parser.produce().unwrap(),
@@ -33,9 +32,6 @@ fn test_types() {
                 parser.produce().unwrap(),
                 parser.produce().unwrap(),
             ));
-        }
-        if is_last {
-            break;
         }
     }
 

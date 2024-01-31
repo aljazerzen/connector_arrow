@@ -233,7 +233,11 @@ impl<'a> ValueStream<'a> for CSVSourcePartitionParser<'a> {
 
     #[throws(CSVSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
-        (self.records.len(), true)
+        if *self.counter == 0 {
+            (self.records.len(), true)
+        } else {
+            (0, true)
+        }
     }
 }
 

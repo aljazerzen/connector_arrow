@@ -235,7 +235,9 @@ impl<'a> ValueStream<'a> for BigQueryValueStream {
 
     #[throws(BigQuerySourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
-        assert!(self.current_col == 0);
+        if self.current_col != 0 {
+            return (0, true);
+        }
         match self.nrows {
             Some(total_rows) => (total_rows - self.current_row, true),
             None => {

@@ -279,6 +279,10 @@ impl<'a> ValueStream<'a> for PostgresBinarySourcePartitionParser<'a> {
     #[throws(PostgresSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
+        if self.is_finished {
+            return (0, true);
+        }
+
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
             return (remaining_rows, self.is_finished);
@@ -427,6 +431,10 @@ impl<'a> ValueStream<'a> for PostgresCSVStream<'a> {
     #[throws(PostgresSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
+        if self.is_finished {
+            return (0, true);
+        }
+
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
             return (remaining_rows, self.is_finished);
@@ -869,6 +877,10 @@ impl<'a> ValueStream<'a> for PostgresRawStream<'a> {
     #[throws(PostgresSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
+        if self.is_finished {
+            return (0, true);
+        }
+
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
             return (remaining_rows, self.is_finished);
@@ -1004,9 +1016,11 @@ impl<'a> ValueStream<'a> for PostgresSimpleStream {
 
     #[throws(PostgresSourceError)]
     fn fetch_batch(&mut self) -> (usize, bool) {
-        self.current_row = 0;
-        self.current_col = 0;
-        (self.rows.len() - 1, true) // last message is command complete
+        if (self.current_row, self.current_col) == (0, 0) {
+            (self.rows.len() - 1, true) // last message is command complete
+        } else {
+            (0, true)
+        }
     }
 }
 

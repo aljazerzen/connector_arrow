@@ -31,7 +31,7 @@ fn empty_file() {
 
     let mut parser = p.value_stream(&schema).unwrap();
 
-    parser.fetch_batch().unwrap();
+    parser.next_batch().unwrap();
 
     Produce::<i64>::produce(&mut parser).unwrap_err();
 }
@@ -66,8 +66,7 @@ fn load_and_parse() {
 
     let mut results: Vec<Value> = Vec::new();
     let mut parser = reader.value_stream(&schema).unwrap();
-    loop {
-        let (n, is_last) = parser.fetch_batch().unwrap();
+    while let Some(n) = parser.next_batch().unwrap() {
         for _i in 0..n {
             results.push(Value::City(parser.produce().expect("parse city")));
             results.push(Value::State(parser.produce().expect("parse state")));
@@ -76,9 +75,6 @@ fn load_and_parse() {
             ));
             results.push(Value::Longitude(parser.produce().expect("parse longitude")));
             results.push(Value::Latitude(parser.produce().expect("parse latitude")));
-        }
-        if is_last {
-            break;
         }
     }
     assert_eq!(

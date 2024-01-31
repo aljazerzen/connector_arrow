@@ -196,7 +196,7 @@ macro_rules! impl_transport {
     };
 
     (@process [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*) => {
-        fn process<'s, 'd, 'r>(
+        fn transport<'s, 'd, 'r>(
             ts1: Self::TSS,
             ts2: Self::TSD,
             src: &'r mut <<Self::S as $crate::sources::Source>::Reader as $crate::sources::SourceReader>::Stream<'s>,
@@ -228,7 +228,7 @@ macro_rules! impl_transport {
     };
 
     (@processor [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*, $([ $($TOKENS:tt)+ ])*) => {
-        fn processor<'s, 'd>(
+        fn transporter<'s, 'd>(
             ts1: Self::TSS,
             ts2: Self::TSD,
         ) -> $crate::errors::Result<

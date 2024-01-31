@@ -33,8 +33,7 @@ fn load_and_parse() {
     let mut parser = partition.value_stream(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
-    loop {
-        let (n, is_last) = parser.fetch_batch().unwrap();
+    while let Some(n) = parser.next_batch().unwrap() {
         for _i in 0..n {
             rows.push(Row(
                 parser.produce().unwrap(),
@@ -45,9 +44,6 @@ fn load_and_parse() {
                 parser.produce().unwrap(),
                 parser.produce().unwrap(),
             ));
-        }
-        if is_last {
-            break;
         }
     }
 
@@ -84,8 +80,7 @@ fn load_and_parse_csv() {
     let mut parser = partition.value_stream(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
-    loop {
-        let (n, is_last) = parser.fetch_batch().unwrap();
+    while let Some(n) = parser.next_batch().unwrap() {
         for _i in 0..n {
             rows.push(Row(
                 parser.produce().unwrap(),
@@ -96,9 +91,6 @@ fn load_and_parse_csv() {
                 parser.produce().unwrap(),
                 parser.produce().unwrap(),
             ));
-        }
-        if is_last {
-            break;
         }
     }
     assert_eq!(
