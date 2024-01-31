@@ -10,19 +10,15 @@ use crate::{
     sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query, CXQuery},
     typesystem::Schema,
-    utils::DummyBox,
 };
-use anyhow::anyhow;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use fallible_streaming_iterator::FallibleStreamingIterator;
 use fehler::{throw, throws};
 use log::debug;
-use owning_ref::OwningHandle;
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Row, Rows, Statement};
 use sqlparser::dialect::SQLiteDialect;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, pin::Pin};
 pub use typesystem::SQLiteTypeSystem;
 use urlencoding::decode;
 
@@ -80,7 +76,7 @@ impl SQLiteReader {
 
 impl SourceReader for SQLiteReader {
     type TypeSystem = SQLiteTypeSystem;
-    type Stream<'a> = SQLiteSourcePartitionParser<'a>;
+    type Stream<'conn> = SQLiteStream<'conn>;
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
@@ -135,92 +131,81 @@ impl SourceReader for SQLiteReader {
     }
 
     #[throws(SQLiteSourceError)]
-    fn value_stream(&mut self, schema: &Schema<SQLiteTypeSystem>) -> Self::Stream<'_> {
-        SQLiteSourcePartitionParser::new(&self.conn, self.query.as_str(), schema)?
+    fn value_stream(&mut self, _: &Schema<SQLiteTypeSystem>) -> Self::Stream<'_> {
+        SQLiteStream::new(&self.conn, self.query.as_str())?
     }
 }
 
-unsafe impl<'a> Send for SQLiteSourcePartitionParser<'a> {}
-
-pub struct SQLiteSourcePartitionParser<'a> {
-    rows: OwningHandle<Box<Statement<'a>>, DummyBox<Rows<'a>>>,
-    ncols: usize,
+pub struct SQLiteStream<'conn> {
+    stmt: Pin<Box<Statement<'conn>>>,
+    rows: Option<Pin<Box<Rows<'conn>>>>,
+    row: Option<&'conn Row<'conn>>,
     current_col: usize,
-    current_consumed: bool,
-    is_finished: bool,
 }
 
-impl<'a> SQLiteSourcePartitionParser<'a> {
+impl<'conn> SQLiteStream<'conn> {
     #[throws(SQLiteSourceError)]
-    pub fn new(
-        conn: &'a PooledConnection<SqliteConnectionManager>,
-        query: &str,
-        schema: &Schema<SQLiteTypeSystem>,
-    ) -> Self {
-        let stmt: Statement<'a> = conn.prepare(query)?;
+    pub fn new(conn: &'conn PooledConnection<SqliteConnectionManager>, query: &str) -> Self {
+        let stmt: Statement<'conn> = conn.prepare(query)?;
 
-        // Safety: DummyBox borrows the on-heap stmt, which is owned by the OwningHandle.
-        // No matter how we move the owning handle (thus the Box<Statment>), the Statement
-        // keeps its address static on the heap, thus the borrow of MyRows keeps valid.
-        let rows: OwningHandle<Box<Statement<'a>>, DummyBox<Rows<'a>>> =
-            OwningHandle::new_with_fn(Box::new(stmt), |stmt: *const Statement<'a>| unsafe {
-                DummyBox((*(stmt as *mut Statement<'_>)).query([]).unwrap())
-            });
-        Self {
-            rows,
-            ncols: schema.types.len(),
+        let mut res = SQLiteStream {
+            stmt: Box::pin(stmt),
+            rows: None,
+            row: None,
             current_col: 0,
-            current_consumed: true,
-            is_finished: false,
-        }
+        };
+
+        // this is safe, because stmt is on the heap, so pointer to stmt will never change
+        let stmt_mut = unsafe {
+            // extend the lifetime of reference to stmt
+            let stmt: &'conn mut Pin<Box<Statement<'conn>>> = std::mem::transmute(&mut res.stmt);
+            // convert the pin into mutable reference
+            Pin::get_unchecked_mut(stmt.as_mut())
+        };
+        let rows = stmt_mut.query([])?;
+        res.rows = Some(Box::pin(rows));
+
+        res
     }
 
     #[throws(SQLiteSourceError)]
     fn next_loc(&mut self) -> (&Row, usize) {
-        self.current_consumed = true;
-        let row: &Row = (*self.rows)
-            .get()
-            .ok_or_else(|| anyhow!("Sqlite empty current row"))?;
         let col = self.current_col;
-        self.current_col = (self.current_col + 1) % self.ncols;
-        (row, col)
+        self.current_col += 1;
+        (*self.row.as_ref().unwrap(), col)
     }
 }
 
-impl<'a> ValueStream<'a> for SQLiteSourcePartitionParser<'a> {
+impl<'conn> ValueStream<'conn> for SQLiteStream<'conn> {
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
-    #[throws(SQLiteSourceError)]
-    fn fetch_batch(&mut self) -> (usize, bool) {
-        assert!(self.current_col == 0);
-        if self.is_finished {
-            return (0, true);
-        }
+    fn next_batch(&mut self) -> Result<Option<usize>, Self::Error> {
+        // this is safe, because rows are pinned on the heap and will not change address
+        let rows = unsafe {
+            // this is safe, because rows will always be initialized
+            let rows_pin = self.rows.as_mut().unwrap();
+            // extend the lifetime of mutable reference to rows
+            let rows: &'conn mut Pin<Box<Rows<'conn>>> = std::mem::transmute(rows_pin);
+            // convert the pin into mutable reference
+            Pin::get_unchecked_mut(rows.as_mut())
+        };
 
-        if !self.current_consumed {
-            return (1, false);
-        } else if self.is_finished {
-            return (0, true);
-        }
+        self.row = rows.next()?;
+        self.current_col = 0;
 
-        match (*self.rows).next()? {
-            Some(_) => {
-                self.current_consumed = false;
-                (1, false)
-            }
-            None => {
-                self.is_finished = true;
-                (0, true)
-            }
-        }
+        Ok(if self.row.is_some() { Some(1) } else { None })
+    }
+
+    fn fetch_batch(&mut self) -> Result<(usize, bool), Self::Error> {
+        unreachable!()
     }
 }
 
 macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for SQLiteSourcePartitionParser<'a> {
+            impl<'r, 'conn> Produce<'r, $t> for SQLiteStream<'conn> {
                 type Error = SQLiteSourceError;
 
                 #[throws(SQLiteSourceError)]
@@ -231,7 +216,7 @@ macro_rules! impl_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for SQLiteSourcePartitionParser<'a> {
+            impl<'r, 'conn> Produce<'r, Option<$t>> for SQLiteStream<'conn> {
                 type Error = SQLiteSourceError;
 
                 #[throws(SQLiteSourceError)]

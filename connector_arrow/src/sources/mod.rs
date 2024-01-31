@@ -64,7 +64,7 @@ pub trait SourceReader {
 }
 
 /// Ability to provide a stream of values of variate types, representing a relation, in [DataOrder::RowMajor].
-pub trait ValueStream<'a>: Send {
+pub trait ValueStream<'a> {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send + Debug;
 
