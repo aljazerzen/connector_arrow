@@ -5,7 +5,7 @@ mod typesystem;
 
 pub use self::errors::CSVSourceError;
 pub use self::typesystem::CSVTypeSystem;
-use super::{PartitionParser, Produce, Source, SourceReader};
+use super::{Produce, Source, SourceReader, ValueStream};
 use crate::typesystem::Schema;
 use crate::{data_order::DataOrder, errors::ConnectorXError, sql::CXQuery};
 use anyhow::anyhow;
@@ -29,7 +29,7 @@ impl CSVSource {
 
 impl Source for CSVSource {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = CSVSourcePartition;
+    type Reader = CSVReader;
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
@@ -39,18 +39,18 @@ impl Source for CSVSource {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        CSVSourcePartition::new(query, self.types_override.clone())?
+        CSVReader::new(query, self.types_override.clone())?
     }
 }
 
-pub struct CSVSourcePartition {
+pub struct CSVReader {
     types_override: Option<Vec<CSVTypeSystem>>,
     filepath: String,
     counter: usize,
     records: Option<Vec<csv::StringRecord>>,
 }
 
-impl CSVSourcePartition {
+impl CSVReader {
     #[throws(CSVSourceError)]
     pub fn new(filepath: &CXQuery<String>, types_override: Option<Vec<CSVTypeSystem>>) -> Self {
         let filepath = filepath.to_string();
@@ -177,13 +177,13 @@ fn infer_schema(reader: &mut csv::Reader<File>, num_cols: usize) -> Vec<CSVTypeS
     schema
 }
 
-impl SourceReader for CSVSourcePartition {
+impl SourceReader for CSVReader {
     type TypeSystem = CSVTypeSystem;
-    type Parser<'a> = CSVSourcePartitionParser<'a>;
+    type Stream<'a> = CSVSourcePartitionParser<'a>;
     type Error = CSVSourceError;
 
     #[throws(CSVSourceError)]
-    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+    fn fetch_until_schema(&mut self) -> Schema<Self::TypeSystem> {
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(true)
             .from_reader(File::open(&self.filepath)?);
@@ -201,7 +201,7 @@ impl SourceReader for CSVSourcePartition {
     }
 
     #[throws(CSVSourceError)]
-    fn parser(&mut self, schema: &Schema<CSVTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<CSVTypeSystem>) -> Self::Stream<'_> {
         self.records = Some(self.read()?);
 
         CSVSourcePartitionParser {
@@ -227,12 +227,12 @@ impl<'a> CSVSourcePartitionParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for CSVSourcePartitionParser<'a> {
+impl<'a> ValueStream<'a> for CSVSourcePartitionParser<'a> {
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
     #[throws(CSVSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         (self.records.len(), true)
     }
 }

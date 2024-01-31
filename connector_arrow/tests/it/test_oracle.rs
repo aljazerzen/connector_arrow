@@ -15,13 +15,13 @@ fn test_types() {
     let query = CXQuery::naked("select * from admin.test_table");
     let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
 
-    let schema = partition.fetch_schema().unwrap();
+    let schema = partition.fetch_until_schema().unwrap();
 
-    let mut parser = partition.parser(&schema).unwrap();
+    let mut parser = partition.value_stream(&schema).unwrap();
 
     let mut rows: Vec<Row> = Vec::new();
     loop {
-        let (n, is_last) = parser.fetch_next().unwrap();
+        let (n, is_last) = parser.fetch_batch().unwrap();
         for _i in 0..n {
             rows.push(Row(
                 parser.produce().unwrap(),

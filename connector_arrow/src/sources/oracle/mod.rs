@@ -8,7 +8,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query_oracle, CXQuery},
     utils::DummyBox,
 };
@@ -80,10 +80,10 @@ impl OracleSource {
 
 impl Source for OracleSource
 where
-    OracleSourcePartition: SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
+    OracleReader: SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = OracleSourcePartition;
+    type Reader = OracleReader;
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
 
@@ -94,16 +94,16 @@ where
         }
 
         let conn = self.pool.get()?;
-        OracleSourcePartition::new(conn, query)
+        OracleReader::new(conn, query)
     }
 }
 
-pub struct OracleSourcePartition {
+pub struct OracleReader {
     conn: OracleConn,
     query: CXQuery<String>,
 }
 
-impl OracleSourcePartition {
+impl OracleReader {
     pub fn new(conn: OracleConn, query: &CXQuery<String>) -> Self {
         Self {
             conn,
@@ -112,13 +112,13 @@ impl OracleSourcePartition {
     }
 }
 
-impl SourceReader for OracleSourcePartition {
+impl SourceReader for OracleReader {
     type TypeSystem = OracleTypeSystem;
-    type Parser<'a> = OracleTextSourceParser<'a>;
+    type Stream<'a> = OracleTextStream<'a>;
     type Error = OracleSourceError;
 
     #[throws(OracleSourceError)]
-    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+    fn fetch_until_schema(&mut self) -> Schema<Self::TypeSystem> {
         let conn = &self.conn;
 
         let query = &self.query;
@@ -149,17 +149,17 @@ impl SourceReader for OracleSourcePartition {
     }
 
     #[throws(OracleSourceError)]
-    fn parser(&mut self, schema: &Schema<OracleTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<OracleTypeSystem>) -> Self::Stream<'_> {
         let query = self.query.clone();
 
         // let iter = self.conn.query(query.as_str(), &[])?;
-        OracleTextSourceParser::new(&self.conn, query.as_str(), schema)?
+        OracleTextStream::new(&self.conn, query.as_str(), schema)?
     }
 }
 
-unsafe impl<'a> Send for OracleTextSourceParser<'a> {}
+unsafe impl<'a> Send for OracleTextStream<'a> {}
 
-pub struct OracleTextSourceParser<'a> {
+pub struct OracleTextStream<'a> {
     rows: OwningHandle<Box<Statement<'a>>, DummyBox<ResultSet<'a, Row>>>,
     rowbuf: Vec<Row>,
     ncols: usize,
@@ -168,7 +168,7 @@ pub struct OracleTextSourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> OracleTextSourceParser<'a> {
+impl<'a> OracleTextStream<'a> {
     #[throws(OracleSourceError)]
     pub fn new(conn: &'a OracleConn, query: &str, schema: &Schema<OracleTypeSystem>) -> Self {
         let stmt = conn
@@ -200,12 +200,12 @@ impl<'a> OracleTextSourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for OracleTextSourceParser<'a> {
+impl<'a> ValueStream<'a> for OracleTextStream<'a> {
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
 
     #[throws(OracleSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -234,7 +234,7 @@ impl<'a> PartitionParser<'a> for OracleTextSourceParser<'a> {
 macro_rules! impl_produce_text {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for OracleTextSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for OracleTextStream<'a> {
                 type Error = OracleSourceError;
 
                 #[throws(OracleSourceError)]
@@ -245,7 +245,7 @@ macro_rules! impl_produce_text {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for OracleTextSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for OracleTextStream<'a> {
                 type Error = OracleSourceError;
 
                 #[throws(OracleSourceError)]

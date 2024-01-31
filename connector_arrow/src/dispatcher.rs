@@ -3,7 +3,7 @@
 use crate::{
     data_order::{coordinate, DataOrder},
     destinations::{Destination, PartitionWriter},
-    sources::{PartitionParser, Source, SourceReader},
+    sources::{Source, SourceReader, ValueStream},
     sql::CXQuery,
     typesystem::{Schema, Transport},
 };
@@ -60,7 +60,7 @@ where
 
         debug!("Fetching metadata");
         let first_reader = src_readers.first_mut().unwrap();
-        let src_schema = first_reader.fetch_schema()?;
+        let src_schema = first_reader.fetch_until_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
@@ -109,11 +109,11 @@ where
                     .map(|(src_ty, dst_ty)| TP::processor(*src_ty, *dst_ty))
                     .collect::<crate::errors::Result<Vec<_>>>()?;
 
-                let mut parser = src.parser(&src_schema)?;
+                let mut parser = src.value_stream(&src_schema)?;
 
                 match data_order {
                     DataOrder::RowMajor => loop {
-                        let (n, is_last) = parser.fetch_next()?;
+                        let (n, is_last) = parser.fetch_batch()?;
                         for _ in 0..n {
                             #[allow(clippy::needless_range_loop)]
                             for col in 0..dst.ncols() {
@@ -132,7 +132,10 @@ where
                         }
                     },
                     DataOrder::ColumnMajor => loop {
-                        let (n, is_last) = parser.fetch_next()?;
+                        // TODO: this could be optimized, since the lookup for the processor does
+                        // not need to happen for each iteration over rows.
+
+                        let (n, is_last) = parser.fetch_batch()?;
                         #[allow(clippy::needless_range_loop)]
                         for col in 0..dst.ncols() {
                             for _ in 0..n {
@@ -168,7 +171,7 @@ where
 
         let mut reader = self.src.reader(self.queries.first().unwrap(), dorder)?;
 
-        let src_schema = reader.fetch_schema()?;
+        let src_schema = reader.fetch_until_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
         self.dst.set_metadata(dst_schema, dorder)?;
         Ok(())

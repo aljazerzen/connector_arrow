@@ -4,7 +4,7 @@
 mod typesystem;
 
 pub use self::typesystem::DummyTypeSystem;
-use super::{PartitionParser, Produce, Source, SourceReader};
+use super::{Produce, Source, SourceReader, ValueStream};
 use crate::data_order::DataOrder;
 use crate::errors::{ConnectorXError, Result};
 use crate::sql::CXQuery;
@@ -32,7 +32,7 @@ impl DummySource {
 impl Source for DummySource {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
     type TypeSystem = DummyTypeSystem;
-    type Reader = DummySourcePartition;
+    type Reader = DummyReader;
     type Error = ConnectorXError;
 
     fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Result<Self::Reader> {
@@ -40,22 +40,22 @@ impl Source for DummySource {
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        Ok(DummySourcePartition::new(self.schema.clone(), query))
+        Ok(DummyReader::new(self.schema.clone(), query))
     }
 }
 
-pub struct DummySourcePartition {
+pub struct DummyReader {
     schema: Schema<DummyTypeSystem>,
     nrows: usize,
     ncols: usize,
     counter: usize,
 }
 
-impl DummySourcePartition {
+impl DummyReader {
     pub fn new(schema: Schema<DummyTypeSystem>, q: &CXQuery<String>) -> Self {
         let v: Vec<usize> = q.as_str().split(',').map(|s| s.parse().unwrap()).collect();
 
-        DummySourcePartition {
+        DummyReader {
             schema,
             nrows: v[0],
             ncols: v[1],
@@ -64,16 +64,16 @@ impl DummySourcePartition {
     }
 }
 
-impl SourceReader for DummySourcePartition {
+impl SourceReader for DummyReader {
     type TypeSystem = DummyTypeSystem;
-    type Parser<'a> = DummySourcePartitionParser<'a>;
+    type Stream<'a> = DummySourcePartitionParser<'a>;
     type Error = ConnectorXError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>> {
         Ok(self.schema.clone())
     }
 
-    fn parser(&mut self, _schema: &Schema<DummyTypeSystem>) -> Result<Self::Parser<'_>> {
+    fn value_stream(&mut self, _schema: &Schema<DummyTypeSystem>) -> Result<Self::Stream<'_>> {
         Ok(DummySourcePartitionParser::new(
             &mut self.counter,
             self.nrows,
@@ -105,11 +105,11 @@ impl<'a> DummySourcePartitionParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for DummySourcePartitionParser<'a> {
+impl<'a> ValueStream<'a> for DummySourcePartitionParser<'a> {
     type TypeSystem = DummyTypeSystem;
     type Error = ConnectorXError;
 
-    fn fetch_next(&mut self) -> Result<(usize, bool)> {
+    fn fetch_batch(&mut self) -> Result<(usize, bool)> {
         Ok((self.nrows, true))
     }
 }

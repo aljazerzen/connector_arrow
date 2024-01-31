@@ -10,7 +10,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::CXQuery,
     utils::DummyBox,
 };
@@ -106,10 +106,10 @@ impl MsSQLSource {
 
 impl Source for MsSQLSource
 where
-    MsSQLSourcePartition: SourceReader<TypeSystem = MsSQLTypeSystem, Error = MsSQLSourceError>,
+    MsSQLReader: SourceReader<TypeSystem = MsSQLTypeSystem, Error = MsSQLSourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = MsSQLSourcePartition;
+    type Reader = MsSQLReader;
     type TypeSystem = MsSQLTypeSystem;
     type Error = MsSQLSourceError;
 
@@ -119,17 +119,17 @@ where
             throw!(ConnectorXError::UnsupportedDataOrder(data_order))
         }
 
-        MsSQLSourcePartition::new(self.pool.clone(), self.rt.clone(), query)
+        MsSQLReader::new(self.pool.clone(), self.rt.clone(), query)
     }
 }
 
-pub struct MsSQLSourcePartition {
+pub struct MsSQLReader {
     pool: Pool<ConnectionManager>,
     rt: Arc<Runtime>,
     query: CXQuery<String>,
 }
 
-impl MsSQLSourcePartition {
+impl MsSQLReader {
     pub fn new(
         pool: Pool<ConnectionManager>,
         handle: Arc<Runtime>,
@@ -143,13 +143,13 @@ impl MsSQLSourcePartition {
     }
 }
 
-impl SourceReader for MsSQLSourcePartition {
+impl SourceReader for MsSQLReader {
     type TypeSystem = MsSQLTypeSystem;
-    type Parser<'a> = MsSQLSourceParser<'a>;
+    type Stream<'a> = MsSQLStream<'a>;
     type Error = MsSQLSourceError;
 
     #[throws(MsSQLSourceError)]
-    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+    fn fetch_until_schema(&mut self) -> Schema<Self::TypeSystem> {
         let mut conn = self.rt.block_on(self.pool.get())?;
         let first_query = &self.query;
         let (names, types) = match self.rt.block_on(conn.query(first_query.as_str(), &[])) {
@@ -181,7 +181,7 @@ impl SourceReader for MsSQLSourcePartition {
     }
 
     #[throws(MsSQLSourceError)]
-    fn parser<'a>(&'a mut self, schema: &Schema<MsSQLTypeSystem>) -> Self::Parser<'a> {
+    fn value_stream<'a>(&'a mut self, schema: &Schema<MsSQLTypeSystem>) -> Self::Stream<'a> {
         let conn = self.rt.block_on(self.pool.get())?;
         let rows: OwningHandle<Box<Conn<'a>>, DummyBox<QueryResult<'a>>> =
             OwningHandle::new_with_fn(Box::new(conn), |conn: *const Conn<'a>| unsafe {
@@ -194,11 +194,11 @@ impl SourceReader for MsSQLSourcePartition {
                 )
             });
 
-        MsSQLSourceParser::new(self.rt.handle(), rows, schema)
+        MsSQLStream::new(self.rt.handle(), rows, schema)
     }
 }
 
-pub struct MsSQLSourceParser<'a> {
+pub struct MsSQLStream<'a> {
     rt: &'a Handle,
     iter: OwningHandle<Box<Conn<'a>>, DummyBox<QueryResult<'a>>>,
     rowbuf: Vec<Row>,
@@ -208,7 +208,7 @@ pub struct MsSQLSourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> MsSQLSourceParser<'a> {
+impl<'a> MsSQLStream<'a> {
     fn new(
         rt: &'a Handle,
         iter: OwningHandle<Box<Conn<'a>>, DummyBox<QueryResult<'a>>>,
@@ -234,12 +234,12 @@ impl<'a> MsSQLSourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for MsSQLSourceParser<'a> {
+impl<'a> ValueStream<'a> for MsSQLStream<'a> {
     type TypeSystem = MsSQLTypeSystem;
     type Error = MsSQLSourceError;
 
     #[throws(MsSQLSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -269,7 +269,7 @@ impl<'a> PartitionParser<'a> for MsSQLSourceParser<'a> {
 macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for MsSQLSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for MsSQLStream<'a> {
                 type Error = MsSQLSourceError;
 
                 #[throws(MsSQLSourceError)]
@@ -280,7 +280,7 @@ macro_rules! impl_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for MsSQLSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for MsSQLStream<'a> {
                 type Error = MsSQLSourceError;
 
                 #[throws(MsSQLSourceError)]

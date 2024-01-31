@@ -24,12 +24,14 @@ use crate::sql::CXQuery;
 use crate::typesystem::{Schema, TypeAssoc, TypeSystem};
 use std::fmt::Debug;
 
+/// A description of a data storage facility which has the ability to execute some
+/// kind of queries and return relational data.
 pub trait Source {
     /// Supported data orders, ordering by preference.
     const DATA_ORDERS: &'static [DataOrder];
-    /// The type system this `Source` associated with.
+    /// The type system produced by this [Source]
     type TypeSystem: TypeSystem;
-    // Partition needs to be send to different threads for parallel execution
+    /// A "connection" to the [Source], that can be sent between threads.
     type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
@@ -40,41 +42,53 @@ pub trait Source {
     ) -> Result<Self::Reader, Self::Error>;
 }
 
-/// In general, a [PartitionReader] abstracts the data source as a stream, which can produce
-/// a sequence of values of variate types by repetitively calling the function `produce`.
+/// Obtained connection to the [Source], with an intent to execute a query.
 pub trait SourceReader {
     type TypeSystem: TypeSystem;
-    type Parser<'a>: PartitionParser<'a, TypeSystem = Self::TypeSystem, Error = Self::Error>
+    type Stream<'a>: ValueStream<'a, TypeSystem = Self::TypeSystem, Error = Self::Error>
     where
         Self: 'a;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
+    /// Start reading the source until the schema of the result can be constructed.
+    /// All received values are stored in a buffer, so they can be emitted later via [SourceReader::value_stream].
+    ///
+    /// Note: currently most of the readers make a separate request to retrieve the schema.
+    /// Most of them even modify the SQL query and add a LIMIT 1 clause. This is to be removed.
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error>;
 
-    fn parser(
+    fn value_stream(
         &mut self,
         schema: &Schema<Self::TypeSystem>,
-    ) -> Result<Self::Parser<'_>, Self::Error>;
+    ) -> Result<Self::Stream<'_>, Self::Error>;
 }
 
-pub trait PartitionParser<'a>: Send {
+/// Ability to provide a stream of values of variate types, representing a relation, in [DataOrder::RowMajor].
+pub trait ValueStream<'a>: Send {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    /// Read a value `T` by calling `Produce<T>::produce`. Usually this function does not need to be
-    /// implemented.
-    fn parse<'r, T>(&'r mut self) -> Result<T, <Self as PartitionParser<'a>>::Error>
+    /// Fetch next batch from the data source.
+    /// Returns the number of rows that can now be retrieved via [ValueStream::next_value].
+    /// Also returns a bool, specifying that this is the last batch and that
+    /// [ValueStream::fetch_batch] will always produce `(0, true)` from now on.
+    /// (although the function might be called even after the last batch is fetched).
+    fn fetch_batch(&mut self) -> Result<(usize, bool), Self::Error>;
+
+    /// Returns the next value in the stream. Must not be called without previously calling
+    /// [ValueStream::fetch_batch]. Must only be called the number of times specified by the
+    /// result of that call.
+    ///
+    /// Works by obtaining a value of type T by calling [Produce::produce].
+    /// Usually this function does not need to be implemented,
+    /// as it is defined for any T that we can [Produce].
+    fn next_value<'r, T>(&'r mut self) -> Result<T, <Self as ValueStream<'a>>::Error>
     where
         T: TypeAssoc<Self::TypeSystem>,
-        Self: Produce<'r, T, Error = <Self as PartitionParser<'a>>::Error>,
+        Self: Produce<'r, T, Error = <Self as ValueStream<'a>>::Error>,
     {
         self.produce()
     }
-
-    /// Fetch next batch of rows from database, return (number of rows fetched to local, whether all rows are fechted from database).
-    /// There might be rows that are not consumed yet when calling the next fetch_next.
-    /// The function might be called even after the last batch is fetched.
-    fn fetch_next(&mut self) -> Result<(usize, bool), Self::Error>;
 }
 
 /// A type implemented `Produce<T>` means that it can produce a value `T` by consuming part of it's raw data buffer.

@@ -7,7 +7,7 @@ pub use self::errors::BigQuerySourceError;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query, CXQuery},
     typesystem::Schema,
 };
@@ -77,11 +77,10 @@ impl BigQuerySource {
 
 impl Source for BigQuerySource
 where
-    BigQueryPartitionReader:
-        SourceReader<TypeSystem = BigQueryTypeSystem, Error = BigQuerySourceError>,
+    BigQueryReader: SourceReader<TypeSystem = BigQueryTypeSystem, Error = BigQuerySourceError>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = BigQueryPartitionReader;
+    type Reader = BigQueryReader;
     type TypeSystem = BigQueryTypeSystem;
     type Error = BigQuerySourceError;
 
@@ -91,7 +90,7 @@ where
             throw!(ConnectorXError::UnsupportedDataOrder(data_order));
         }
 
-        BigQueryPartitionReader::new(
+        BigQueryReader::new(
             self.rt.clone(),
             self.client.clone(),
             self.project_id.clone(),
@@ -100,14 +99,14 @@ where
     }
 }
 
-pub struct BigQueryPartitionReader {
+pub struct BigQueryReader {
     rt: Arc<Runtime>,
     client: Arc<Client>,
     project_id: String,
     query: CXQuery<String>,
 }
 
-impl BigQueryPartitionReader {
+impl BigQueryReader {
     pub fn new(
         handle: Arc<Runtime>,
         client: Arc<Client>,
@@ -123,13 +122,13 @@ impl BigQueryPartitionReader {
     }
 }
 
-impl SourceReader for BigQueryPartitionReader {
+impl SourceReader for BigQueryReader {
     type TypeSystem = BigQueryTypeSystem;
-    type Parser<'a> = BigQuerySourceParser;
+    type Stream<'a> = BigQueryValueStream;
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
-    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+    fn fetch_until_schema(&mut self) -> Schema<Self::TypeSystem> {
         let job = self.client.job();
         let query = &self.query;
 
@@ -159,7 +158,7 @@ impl SourceReader for BigQueryPartitionReader {
     }
 
     #[throws(BigQuerySourceError)]
-    fn parser(&mut self, schema: &Schema<BigQueryTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<BigQueryTypeSystem>) -> Self::Stream<'_> {
         let job = self.client.job();
         let qry = self.rt.block_on(job.query(
             self.project_id.as_str(),
@@ -189,11 +188,11 @@ impl SourceReader for BigQueryPartitionReader {
                 params,
             ),
         )?;
-        BigQuerySourceParser::new(self.rt.clone(), self.client.clone(), rs, schema)
+        BigQueryValueStream::new(self.rt.clone(), self.client.clone(), rs, schema)
     }
 }
 
-pub struct BigQuerySourceParser {
+pub struct BigQueryValueStream {
     rt: Arc<Runtime>,
     client: Arc<Client>,
     response: GetQueryResultsResponse,
@@ -203,7 +202,7 @@ pub struct BigQuerySourceParser {
     nrows: Option<usize>,
 }
 
-impl BigQuerySourceParser {
+impl BigQueryValueStream {
     fn new(
         rt: Arc<Runtime>,
         client: Arc<Client>,
@@ -230,12 +229,12 @@ impl BigQuerySourceParser {
     }
 }
 
-impl<'a> PartitionParser<'a> for BigQuerySourceParser {
+impl<'a> ValueStream<'a> for BigQueryValueStream {
     type TypeSystem = BigQueryTypeSystem;
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         match self.nrows {
             Some(total_rows) => (total_rows - self.current_row, true),
@@ -257,7 +256,7 @@ impl<'a> PartitionParser<'a> for BigQuerySourceParser {
 macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r> Produce<'r, $t> for BigQuerySourceParser {
+            impl<'r> Produce<'r, $t> for BigQueryValueStream {
                 type Error = BigQuerySourceError;
 
                 #[throws(BigQuerySourceError)]
@@ -290,7 +289,7 @@ macro_rules! impl_produce {
                 }
             }
 
-            impl<'r> Produce<'r, Option<$t>> for BigQuerySourceParser {
+            impl<'r> Produce<'r, Option<$t>> for BigQueryValueStream {
                 type Error = BigQuerySourceError;
 
                 #[throws(BigQuerySourceError)]
@@ -328,7 +327,7 @@ macro_rules! impl_produce {
 
 impl_produce!(i64, f64, String,);
 
-impl<'r> Produce<'r, bool> for BigQuerySourceParser {
+impl<'r> Produce<'r, bool> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -402,7 +401,7 @@ impl<'r> Produce<'r, bool> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<bool>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<bool>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -478,7 +477,7 @@ impl<'r> Produce<'r, Option<bool>> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveDate> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveDate> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -547,7 +546,7 @@ impl<'r> Produce<'r, NaiveDate> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveDate>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveDate>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -622,7 +621,7 @@ impl<'r> Produce<'r, Option<NaiveDate>> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveDateTime> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveDateTime> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -691,7 +690,7 @@ impl<'r> Produce<'r, NaiveDateTime> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveDateTime>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveDateTime>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -766,7 +765,7 @@ impl<'r> Produce<'r, Option<NaiveDateTime>> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveTime> for BigQuerySourceParser {
+impl<'r> Produce<'r, NaiveTime> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -835,7 +834,7 @@ impl<'r> Produce<'r, NaiveTime> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveTime>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<NaiveTime>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -910,7 +909,7 @@ impl<'r> Produce<'r, Option<NaiveTime>> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, DateTime<Utc>> for BigQuerySourceParser {
+impl<'r> Produce<'r, DateTime<Utc>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
@@ -986,7 +985,7 @@ impl<'r> Produce<'r, DateTime<Utc>> for BigQuerySourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<DateTime<Utc>>> for BigQuerySourceParser {
+impl<'r> Produce<'r, Option<DateTime<Utc>>> for BigQueryValueStream {
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]

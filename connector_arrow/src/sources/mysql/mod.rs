@@ -9,7 +9,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::CXQuery,
 };
 use anyhow::anyhow;
@@ -53,11 +53,11 @@ impl<P> MySQLSource<P> {
 
 impl<P> Source for MySQLSource<P>
 where
-    MySQLSourcePartition<P>: SourceReader<TypeSystem = MySQLTypeSystem, Error = MySQLSourceError>,
+    MySQLReader<P>: SourceReader<TypeSystem = MySQLTypeSystem, Error = MySQLSourceError>,
     P: Send,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = MySQLSourcePartition<P>;
+    type Reader = MySQLReader<P>;
     type TypeSystem = MySQLTypeSystem;
     type Error = MySQLSourceError;
 
@@ -68,17 +68,17 @@ where
         }
 
         let conn = self.pool.get()?;
-        MySQLSourcePartition::new(conn, query)
+        MySQLReader::new(conn, query)
     }
 }
 
-pub struct MySQLSourcePartition<P> {
+pub struct MySQLReader<P> {
     conn: MysqlConn,
     query: CXQuery<String>,
     _protocol: PhantomData<P>,
 }
 
-impl<P> MySQLSourcePartition<P> {
+impl<P> MySQLReader<P> {
     pub fn new(conn: MysqlConn, query: &CXQuery<String>) -> Self {
         Self {
             conn,
@@ -117,41 +117,41 @@ impl<P> MySQLSourcePartition<P> {
     }
 }
 
-impl SourceReader for MySQLSourcePartition<BinaryProtocol> {
+impl SourceReader for MySQLReader<BinaryProtocol> {
     type TypeSystem = MySQLTypeSystem;
-    type Parser<'a> = MySQLBinarySourceParser<'a>;
+    type Stream<'a> = MySQLBinaryStream<'a>;
     type Error = MySQLSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(MySQLSourceError)]
-    fn parser(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Stream<'_> {
         let stmt = self.conn.prep(self.query.as_str())?;
         let iter = self.conn.exec_iter(stmt, ())?;
-        MySQLBinarySourceParser::new(iter, schema)
+        MySQLBinaryStream::new(iter, schema)
     }
 }
 
-impl SourceReader for MySQLSourcePartition<TextProtocol> {
+impl SourceReader for MySQLReader<TextProtocol> {
     type TypeSystem = MySQLTypeSystem;
-    type Parser<'a> = MySQLTextSourceParser<'a>;
+    type Stream<'a> = MySQLTextStream<'a>;
     type Error = MySQLSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(MySQLSourceError)]
-    fn parser(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<MySQLTypeSystem>) -> Self::Stream<'_> {
         let query = self.query.clone();
         let iter = self.conn.query_iter(query)?;
-        MySQLTextSourceParser::new(iter, schema)
+        MySQLTextStream::new(iter, schema)
     }
 }
 
-pub struct MySQLBinarySourceParser<'a> {
+pub struct MySQLBinaryStream<'a> {
     iter: QueryResult<'a, 'a, 'a, Binary>,
     rowbuf: Vec<Row>,
     ncols: usize,
@@ -160,7 +160,7 @@ pub struct MySQLBinarySourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> MySQLBinarySourceParser<'a> {
+impl<'a> MySQLBinaryStream<'a> {
     pub fn new(iter: QueryResult<'a, 'a, 'a, Binary>, schema: &Schema<MySQLTypeSystem>) -> Self {
         Self {
             iter,
@@ -181,12 +181,12 @@ impl<'a> MySQLBinarySourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for MySQLBinarySourceParser<'a> {
+impl<'a> ValueStream<'a> for MySQLBinaryStream<'a> {
     type TypeSystem = MySQLTypeSystem;
     type Error = MySQLSourceError;
 
     #[throws(MySQLSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -217,7 +217,7 @@ impl<'a> PartitionParser<'a> for MySQLBinarySourceParser<'a> {
 macro_rules! impl_produce_binary {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for MySQLBinarySourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for MySQLBinaryStream<'a> {
                 type Error = MySQLSourceError;
 
                 #[throws(MySQLSourceError)]
@@ -228,7 +228,7 @@ macro_rules! impl_produce_binary {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for MySQLBinarySourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for MySQLBinaryStream<'a> {
                 type Error = MySQLSourceError;
 
                 #[throws(MySQLSourceError)]
@@ -262,7 +262,7 @@ impl_produce_binary!(
     Value,
 );
 
-pub struct MySQLTextSourceParser<'a> {
+pub struct MySQLTextStream<'a> {
     iter: QueryResult<'a, 'a, 'a, Text>,
     rowbuf: Vec<Row>,
     ncols: usize,
@@ -271,7 +271,7 @@ pub struct MySQLTextSourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> MySQLTextSourceParser<'a> {
+impl<'a> MySQLTextStream<'a> {
     pub fn new(iter: QueryResult<'a, 'a, 'a, Text>, schema: &Schema<MySQLTypeSystem>) -> Self {
         Self {
             iter,
@@ -292,12 +292,12 @@ impl<'a> MySQLTextSourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for MySQLTextSourceParser<'a> {
+impl<'a> ValueStream<'a> for MySQLTextStream<'a> {
     type TypeSystem = MySQLTypeSystem;
     type Error = MySQLSourceError;
 
     #[throws(MySQLSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -326,7 +326,7 @@ impl<'a> PartitionParser<'a> for MySQLTextSourceParser<'a> {
 macro_rules! impl_produce_text {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for MySQLTextSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for MySQLTextStream<'a> {
                 type Error = MySQLSourceError;
 
                 #[throws(MySQLSourceError)]
@@ -337,7 +337,7 @@ macro_rules! impl_produce_text {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for MySQLTextSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for MySQLTextStream<'a> {
                 type Error = MySQLSourceError;
 
                 #[throws(MySQLSourceError)]

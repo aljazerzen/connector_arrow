@@ -167,7 +167,7 @@ pub mod prelude {
     pub use crate::dispatcher::Dispatcher;
     pub use crate::errors::{ConnectorXError, ConnectorXOutError};
     pub use crate::frontend::source_router::*;
-    pub use crate::sources::{PartitionParser, Produce, Source, SourceReader};
+    pub use crate::sources::{Produce, Source, SourceReader, ValueStream};
     pub use crate::sql::CXQuery;
     pub use crate::transports::*;
     pub use crate::typesystem::{

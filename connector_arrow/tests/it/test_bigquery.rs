@@ -20,7 +20,7 @@ fn test_source() {
     ];
 
     let mut reader = source.reader(&queries[0], DataOrder::ColumnMajor).unwrap();
-    reader.fetch_schema().unwrap();
+    reader.fetch_until_schema().unwrap();
 }
 
 #[test]

@@ -13,7 +13,7 @@ fn no_file() {
     let mut source = CSVSource::new(None);
     let query = CXQuery::naked("./a_fake_file.csv");
     let mut reader = source.reader(&query, DataOrder::RowMajor).unwrap();
-    reader.fetch_schema().unwrap_err();
+    reader.fetch_until_schema().unwrap_err();
 }
 
 #[test]
@@ -27,11 +27,11 @@ fn empty_file() {
         )
         .unwrap();
 
-    let schema = p.fetch_schema().unwrap();
+    let schema = p.fetch_until_schema().unwrap();
 
-    let mut parser = p.parser(&schema).unwrap();
+    let mut parser = p.value_stream(&schema).unwrap();
 
-    parser.fetch_next().unwrap();
+    parser.fetch_batch().unwrap();
 
     Produce::<i64>::produce(&mut parser).unwrap_err();
 }
@@ -62,12 +62,12 @@ fn load_and_parse() {
         )
         .unwrap();
 
-    let schema = reader.fetch_schema().unwrap();
+    let schema = reader.fetch_until_schema().unwrap();
 
     let mut results: Vec<Value> = Vec::new();
-    let mut parser = reader.parser(&schema).unwrap();
+    let mut parser = reader.value_stream(&schema).unwrap();
     loop {
-        let (n, is_last) = parser.fetch_next().unwrap();
+        let (n, is_last) = parser.fetch_batch().unwrap();
         for _i in 0..n {
             results.push(Value::City(parser.produce().expect("parse city")));
             results.push(Value::State(parser.produce().expect("parse state")));

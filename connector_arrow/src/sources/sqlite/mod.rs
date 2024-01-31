@@ -7,7 +7,7 @@ pub use self::errors::SQLiteSourceError;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query, CXQuery},
     typesystem::Schema,
     utils::DummyBox,
@@ -46,10 +46,10 @@ impl SQLiteSource {
 
 impl Source for SQLiteSource
 where
-    SQLiteSourcePartition: SourceReader<TypeSystem = SQLiteTypeSystem>,
+    SQLiteReader: SourceReader<TypeSystem = SQLiteTypeSystem>,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = SQLiteSourcePartition;
+    type Reader = SQLiteReader;
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
@@ -60,16 +60,16 @@ where
         }
 
         let conn = self.pool.get()?;
-        SQLiteSourcePartition::new(conn, query)
+        SQLiteReader::new(conn, query)
     }
 }
 
-pub struct SQLiteSourcePartition {
+pub struct SQLiteReader {
     conn: PooledConnection<SqliteConnectionManager>,
     query: CXQuery<String>,
 }
 
-impl SQLiteSourcePartition {
+impl SQLiteReader {
     pub fn new(conn: PooledConnection<SqliteConnectionManager>, query: &CXQuery<String>) -> Self {
         Self {
             conn,
@@ -78,13 +78,13 @@ impl SQLiteSourcePartition {
     }
 }
 
-impl SourceReader for SQLiteSourcePartition {
+impl SourceReader for SQLiteReader {
     type TypeSystem = SQLiteTypeSystem;
-    type Parser<'a> = SQLiteSourcePartitionParser<'a>;
+    type Stream<'a> = SQLiteSourcePartitionParser<'a>;
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
-    fn fetch_schema(&mut self) -> Schema<Self::TypeSystem> {
+    fn fetch_until_schema(&mut self) -> Schema<Self::TypeSystem> {
         let mut names = vec![];
         let mut types = vec![];
 
@@ -135,7 +135,7 @@ impl SourceReader for SQLiteSourcePartition {
     }
 
     #[throws(SQLiteSourceError)]
-    fn parser(&mut self, schema: &Schema<SQLiteTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<SQLiteTypeSystem>) -> Self::Stream<'_> {
         SQLiteSourcePartitionParser::new(&self.conn, self.query.as_str(), schema)?
     }
 }
@@ -187,12 +187,12 @@ impl<'a> SQLiteSourcePartitionParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for SQLiteSourcePartitionParser<'a> {
+impl<'a> ValueStream<'a> for SQLiteSourcePartitionParser<'a> {
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
 
         if !self.current_consumed {

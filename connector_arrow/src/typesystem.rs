@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 use crate::destinations::{Consume, Destination, PartitionWriter};
 use crate::errors::{ConnectorXError, Result as CXResult};
-use crate::sources::{PartitionParser, Produce, Source, SourceReader};
+use crate::sources::{Produce, Source, SourceReader, ValueStream};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Schema<T: TypeSystem> {
@@ -138,7 +138,7 @@ pub trait Transport {
     fn process<'s, 'd, 'r>(
         ts1: Self::TSS,
         ts2: Self::TSD,
-        src: &'r mut <<Self::S as Source>::Reader as SourceReader>::Parser<'s>,
+        src: &'r mut <<Self::S as Source>::Reader as SourceReader>::Stream<'s>,
         dst: &'r mut <Self::D as Destination>::PartitionWriter,
     ) -> Result<(), Self::Error>
     where
@@ -150,7 +150,7 @@ pub trait Transport {
         ts2: Self::TSD,
     ) -> CXResult<
         fn(
-            src: &mut <<Self::S as Source>::Reader as SourceReader>::Parser<'s>,
+            src: &mut <<Self::S as Source>::Reader as SourceReader>::Stream<'s>,
             dst: &mut <Self::D as Destination>::PartitionWriter,
         ) -> Result<(), Self::Error>,
     >
@@ -160,7 +160,7 @@ pub trait Transport {
 
 #[doc(hidden)]
 pub fn process<'s, 'd, 'r, T1, T2, TP, S, D, ES, ED, ET>(
-    src: &'r mut <<S as Source>::Reader as SourceReader>::Parser<'s>,
+    src: &'r mut <<S as Source>::Reader as SourceReader>::Stream<'s>,
     dst: &'r mut <D as Destination>::PartitionWriter,
 ) -> Result<(), ET>
 where
@@ -168,7 +168,7 @@ where
     S: Source<Error = ES>,
     <S as Source>::Reader: SourceReader<Error = ES>,
 
-    <<S as Source>::Reader as SourceReader>::Parser<'s>: Produce<'r, T1, Error = ES>,
+    <<S as Source>::Reader as SourceReader>::Stream<'s>: Produce<'r, T1, Error = ES>,
     ES: From<ConnectorXError> + Send,
 
     T2: TypeAssoc<<D as Destination>::TypeSystem>,
@@ -179,7 +179,7 @@ where
     TP: TypeConversion<T1, T2>,
     ET: From<ES> + From<ED>,
 {
-    let val: T1 = PartitionParser::parse(src)?;
+    let val: T1 = ValueStream::next_value(src)?;
     let val: T2 = <TP as TypeConversion<T1, _>>::convert(val);
     PartitionWriter::write(dst, val)?;
     Ok(())

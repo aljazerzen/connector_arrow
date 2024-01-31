@@ -14,7 +14,7 @@ use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
     errors::ConnectorXError,
-    sources::{PartitionParser, Produce, Source, SourceReader},
+    sources::{Produce, Source, SourceReader, ValueStream},
     sql::CXQuery,
 };
 use anyhow::anyhow;
@@ -85,7 +85,7 @@ where
 
 impl<P, C> Source for PostgresSource<P, C>
 where
-    PostgresSourcePartition<P, C>:
+    PostgresReader<P, C>:
         SourceReader<TypeSystem = PostgresTypeSystem, Error = PostgresSourceError>,
     P: Send,
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
@@ -94,7 +94,7 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
-    type Reader = PostgresSourcePartition<P, C>;
+    type Reader = PostgresReader<P, C>;
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
@@ -106,11 +106,11 @@ where
 
         let conn = self.pool.get()?;
 
-        PostgresSourcePartition::<P, C>::new(conn, query)
+        PostgresReader::<P, C>::new(conn, query)
     }
 }
 
-pub struct PostgresSourcePartition<P, C>
+pub struct PostgresReader<P, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -123,7 +123,7 @@ where
     _protocol: PhantomData<P>,
 }
 
-impl<P, C> PostgresSourcePartition<P, C>
+impl<P, C> PostgresReader<P, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -153,7 +153,7 @@ where
     }
 }
 
-impl<C> SourceReader for PostgresSourcePartition<BinaryProtocol, C>
+impl<C> SourceReader for PostgresReader<BinaryProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -161,15 +161,15 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     type TypeSystem = PostgresTypeSystem;
-    type Parser<'a> = PostgresBinarySourcePartitionParser<'a>;
+    type Stream<'a> = PostgresBinarySourcePartitionParser<'a>;
     type Error = PostgresSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(PostgresSourceError)]
-    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Stream<'_> {
         // this could have been done in fetch metadata
         // but that function might not have been called on this reader
         // so we call it again here
@@ -192,7 +192,7 @@ where
     }
 }
 
-impl<C> SourceReader for PostgresSourcePartition<CSVProtocol, C>
+impl<C> SourceReader for PostgresReader<CSVProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -200,15 +200,15 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     type TypeSystem = PostgresTypeSystem;
-    type Parser<'a> = PostgresCSVSourceParser<'a>;
+    type Stream<'a> = PostgresCSVStream<'a>;
     type Error = PostgresSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(PostgresSourceError)]
-    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Stream<'_> {
         let query = format!("COPY ({}) TO STDOUT WITH CSV", self.query);
         let reader = self.conn.copy_out(&*query)?; // unless reading the data, it seems like issue the query is fast
         let iter = ReaderBuilder::new()
@@ -216,11 +216,11 @@ where
             .from_reader(reader)
             .into_records();
 
-        PostgresCSVSourceParser::new(iter, schema)
+        PostgresCSVStream::new(iter, schema)
     }
 }
 
-impl<C> SourceReader for PostgresSourcePartition<CursorProtocol, C>
+impl<C> SourceReader for PostgresReader<CursorProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -228,19 +228,18 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     type TypeSystem = PostgresTypeSystem;
-    type Parser<'a> = PostgresRawSourceParser<'a>;
+    type Stream<'a> = PostgresRawStream<'a>;
     type Error = PostgresSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(PostgresSourceError)]
-    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
-        let iter = self
-            .conn
-            .query_raw::<_, bool, _>(self.query.as_str(), vec![])?; // unless reading the data, it seems like issue the query is fast
-        PostgresRawSourceParser::new(iter, schema)
+    fn value_stream(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Stream<'_> {
+        let q = self.query.as_str();
+        let iter = self.conn.query_raw::<_, bool, _>(q, vec![])?; // unless reading the data, it seems like issue the query is fast
+        PostgresRawStream::new(iter, schema)
     }
 }
 pub struct PostgresBinarySourcePartitionParser<'a> {
@@ -273,12 +272,12 @@ impl<'a> PostgresBinarySourcePartitionParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for PostgresBinarySourcePartitionParser<'a> {
+impl<'a> ValueStream<'a> for PostgresBinarySourcePartitionParser<'a> {
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -388,7 +387,7 @@ impl<'r, 'a> Produce<'r, Option<HashMap<String, Option<String>>>>
     }
 }
 
-pub struct PostgresCSVSourceParser<'a> {
+pub struct PostgresCSVStream<'a> {
     iter: StringRecordsIntoIter<CopyOutReader<'a>>,
     rowbuf: Vec<StringRecord>,
     ncols: usize,
@@ -397,7 +396,7 @@ pub struct PostgresCSVSourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> PostgresCSVSourceParser<'a> {
+impl<'a> PostgresCSVStream<'a> {
     pub fn new(
         iter: StringRecordsIntoIter<CopyOutReader<'a>>,
         schema: &Schema<PostgresTypeSystem>,
@@ -421,12 +420,12 @@ impl<'a> PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for PostgresCSVSourceParser<'a> {
+impl<'a> ValueStream<'a> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
     type TypeSystem = PostgresTypeSystem;
 
     #[throws(PostgresSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -455,7 +454,7 @@ impl<'a> PartitionParser<'a> for PostgresCSVSourceParser<'a> {
 macro_rules! impl_csv_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for PostgresCSVSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for PostgresCSVStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -467,7 +466,7 @@ macro_rules! impl_csv_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresCSVSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresCSVStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -490,7 +489,7 @@ impl_csv_produce!(i8, i16, i32, i64, f32, f64, Decimal, Uuid,);
 macro_rules! impl_csv_vec_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, Vec<$t>> for PostgresCSVSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Vec<$t>> for PostgresCSVStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -511,7 +510,7 @@ macro_rules! impl_csv_vec_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<Vec<$t>>> for PostgresCSVSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<Vec<$t>>> for PostgresCSVStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -540,7 +539,7 @@ macro_rules! impl_csv_vec_produce {
 
 impl_csv_vec_produce!(i8, i16, i32, i64, f32, f64, Decimal, String,);
 
-impl<'r, 'a> Produce<'r, HashMap<String, Option<String>>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, HashMap<String, Option<String>>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
     #[throws(PostgresSourceError)]
     fn produce(&mut self) -> HashMap<String, Option<String>> {
@@ -548,7 +547,7 @@ impl<'r, 'a> Produce<'r, HashMap<String, Option<String>>> for PostgresCSVSourceP
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<HashMap<String, Option<String>>>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<HashMap<String, Option<String>>>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
     #[throws(PostgresSourceError)]
     fn produce(&mut self) -> Option<HashMap<String, Option<String>>> {
@@ -556,7 +555,7 @@ impl<'r, 'a> Produce<'r, Option<HashMap<String, Option<String>>>> for PostgresCS
     }
 }
 
-impl<'r, 'a> Produce<'r, bool> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, bool> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -573,7 +572,7 @@ impl<'r, 'a> Produce<'r, bool> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<bool>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<bool>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -591,7 +590,7 @@ impl<'r, 'a> Produce<'r, Option<bool>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Vec<bool>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Vec<bool>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -613,7 +612,7 @@ impl<'r, 'a> Produce<'r, Vec<bool>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<Vec<bool>>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<Vec<bool>>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -638,7 +637,7 @@ impl<'r, 'a> Produce<'r, Option<Vec<bool>>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, DateTime<Utc>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, DateTime<Utc>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -652,7 +651,7 @@ impl<'r, 'a> Produce<'r, DateTime<Utc>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -670,7 +669,7 @@ impl<'r, 'a> Produce<'r, Option<DateTime<Utc>>> for PostgresCSVSourceParser<'a> 
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveDate> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, NaiveDate> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -682,7 +681,7 @@ impl<'r, 'a> Produce<'r, NaiveDate> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveDate>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<NaiveDate>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -698,7 +697,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveDate>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveDateTime> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, NaiveDateTime> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -714,7 +713,7 @@ impl<'r, 'a> Produce<'r, NaiveDateTime> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveDateTime>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<NaiveDateTime>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -731,7 +730,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveDateTime>> for PostgresCSVSourceParser<'a> 
     }
 }
 
-impl<'r, 'a> Produce<'r, NaiveTime> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, NaiveTime> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -743,7 +742,7 @@ impl<'r, 'a> Produce<'r, NaiveTime> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<NaiveTime>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<NaiveTime>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -759,7 +758,7 @@ impl<'r, 'a> Produce<'r, Option<NaiveTime>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, &'r str> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, &'r str> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -769,7 +768,7 @@ impl<'r, 'a> Produce<'r, &'r str> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<&'r str>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<&'r str>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -782,7 +781,7 @@ impl<'r, 'a> Produce<'r, Option<&'r str>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Vec<u8>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Vec<u8>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -792,7 +791,7 @@ impl<'r, 'a> Produce<'r, Vec<u8>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<Vec<u8>>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<Vec<u8>>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -806,7 +805,7 @@ impl<'r, 'a> Produce<'r, Option<Vec<u8>>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Value> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Value> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -817,7 +816,7 @@ impl<'r, 'a> Produce<'r, Value> for PostgresCSVSourceParser<'a> {
     }
 }
 
-impl<'r, 'a> Produce<'r, Option<Value>> for PostgresCSVSourceParser<'a> {
+impl<'r, 'a> Produce<'r, Option<Value>> for PostgresCSVStream<'a> {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -833,7 +832,7 @@ impl<'r, 'a> Produce<'r, Option<Value>> for PostgresCSVSourceParser<'a> {
     }
 }
 
-pub struct PostgresRawSourceParser<'a> {
+pub struct PostgresRawStream<'a> {
     iter: RowIter<'a>,
     rowbuf: Vec<Row>,
     ncols: usize,
@@ -842,7 +841,7 @@ pub struct PostgresRawSourceParser<'a> {
     is_finished: bool,
 }
 
-impl<'a> PostgresRawSourceParser<'a> {
+impl<'a> PostgresRawStream<'a> {
     pub fn new(iter: RowIter<'a>, schema: &Schema<PostgresTypeSystem>) -> Self {
         Self {
             iter,
@@ -863,12 +862,12 @@ impl<'a> PostgresRawSourceParser<'a> {
     }
 }
 
-impl<'a> PartitionParser<'a> for PostgresRawSourceParser<'a> {
+impl<'a> ValueStream<'a> for PostgresRawStream<'a> {
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         assert!(self.current_col == 0);
         let remaining_rows = self.rowbuf.len() - self.current_row;
         if remaining_rows > 0 {
@@ -897,7 +896,7 @@ impl<'a> PartitionParser<'a> for PostgresRawSourceParser<'a> {
 macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for PostgresRawSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, $t> for PostgresRawStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -909,7 +908,7 @@ macro_rules! impl_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresRawSourceParser<'a> {
+            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresRawStream<'a> {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -952,7 +951,7 @@ impl_produce!(
     Vec<String>,
 );
 
-impl<C> SourceReader for PostgresSourcePartition<SimpleProtocol, C>
+impl<C> SourceReader for PostgresReader<SimpleProtocol, C>
 where
     C: MakeTlsConnect<Socket> + Clone + 'static + Sync + Send,
     C::TlsConnect: Send,
@@ -960,27 +959,27 @@ where
     <C::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     type TypeSystem = PostgresTypeSystem;
-    type Parser<'a> = PostgresSimpleSourceParser;
+    type Stream<'a> = PostgresSimpleStream;
     type Error = PostgresSourceError;
 
-    fn fetch_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
+    fn fetch_until_schema(&mut self) -> Result<Schema<Self::TypeSystem>, Self::Error> {
         self.fetch_metadata_generic()
     }
 
     #[throws(PostgresSourceError)]
-    fn parser(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Parser<'_> {
+    fn value_stream(&mut self, schema: &Schema<PostgresTypeSystem>) -> Self::Stream<'_> {
         let rows = self.conn.simple_query(self.query.as_str())?; // unless reading the data, it seems like issue the query is fast
-        PostgresSimpleSourceParser::new(rows, schema)
+        PostgresSimpleStream::new(rows, schema)
     }
 }
 
-pub struct PostgresSimpleSourceParser {
+pub struct PostgresSimpleStream {
     rows: Vec<SimpleQueryMessage>,
     ncols: usize,
     current_col: usize,
     current_row: usize,
 }
-impl PostgresSimpleSourceParser {
+impl PostgresSimpleStream {
     pub fn new(rows: Vec<SimpleQueryMessage>, schema: &Schema<PostgresTypeSystem>) -> Self {
         Self {
             rows,
@@ -999,12 +998,12 @@ impl PostgresSimpleSourceParser {
     }
 }
 
-impl<'a> PartitionParser<'a> for PostgresSimpleSourceParser {
+impl<'a> ValueStream<'a> for PostgresSimpleStream {
     type TypeSystem = PostgresTypeSystem;
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
-    fn fetch_next(&mut self) -> (usize, bool) {
+    fn fetch_batch(&mut self) -> (usize, bool) {
         self.current_row = 0;
         self.current_col = 0;
         (self.rows.len() - 1, true) // last message is command complete
@@ -1014,7 +1013,7 @@ impl<'a> PartitionParser<'a> for PostgresSimpleSourceParser {
 macro_rules! impl_simple_produce_unimplemented {
     ($($t: ty,)+) => {
         $(
-            impl<'r, 'a> Produce<'r, $t> for PostgresSimpleSourceParser {
+            impl<'r, 'a> Produce<'r, $t> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1023,7 +1022,7 @@ macro_rules! impl_simple_produce_unimplemented {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresSimpleSourceParser {
+            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1038,7 +1037,7 @@ macro_rules! impl_simple_produce_unimplemented {
 macro_rules! impl_simple_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r> Produce<'r, $t> for PostgresSimpleSourceParser {
+            impl<'r> Produce<'r, $t> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1064,7 +1063,7 @@ macro_rules! impl_simple_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresSimpleSourceParser {
+            impl<'r, 'a> Produce<'r, Option<$t>> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1097,7 +1096,7 @@ impl_simple_produce_unimplemented!(
     Value,
     HashMap<String, Option<String>>,);
 
-impl<'r> Produce<'r, &'r str> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, &'r str> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1119,7 +1118,7 @@ impl<'r> Produce<'r, &'r str> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<&'r str>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<&'r str>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1138,7 +1137,7 @@ impl<'r> Produce<'r, Option<&'r str>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Vec<u8>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Vec<u8>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1171,7 +1170,7 @@ impl<'r> Produce<'r, Vec<u8>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<Vec<u8>>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<Vec<u8>>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1214,7 +1213,7 @@ fn rem_first_and_last(value: &str) -> &str {
 macro_rules! impl_simple_vec_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r> Produce<'r, Vec<$t>> for PostgresSimpleSourceParser {
+            impl<'r> Produce<'r, Vec<$t>> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1240,7 +1239,7 @@ macro_rules! impl_simple_vec_produce {
                 }
             }
 
-            impl<'r, 'a> Produce<'r, Option<Vec<$t>>> for PostgresSimpleSourceParser {
+            impl<'r, 'a> Produce<'r, Option<Vec<$t>>> for PostgresSimpleStream {
                 type Error = PostgresSourceError;
 
                 #[throws(PostgresSourceError)]
@@ -1272,7 +1271,7 @@ macro_rules! impl_simple_vec_produce {
 }
 impl_simple_vec_produce!(i16, i32, i64, f32, f64, Decimal, String,);
 
-impl<'r> Produce<'r, Vec<bool>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Vec<bool>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1307,7 +1306,7 @@ impl<'r> Produce<'r, Vec<bool>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<Vec<bool>>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<Vec<bool>>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1344,7 +1343,7 @@ impl<'r> Produce<'r, Option<Vec<bool>>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveDate> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, NaiveDate> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1367,7 +1366,7 @@ impl<'r> Produce<'r, NaiveDate> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveDate>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<NaiveDate>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1391,7 +1390,7 @@ impl<'r> Produce<'r, Option<NaiveDate>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveTime> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, NaiveTime> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1414,7 +1413,7 @@ impl<'r> Produce<'r, NaiveTime> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveTime>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<NaiveTime>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1438,7 +1437,7 @@ impl<'r> Produce<'r, Option<NaiveTime>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, NaiveDateTime> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, NaiveDateTime> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1462,7 +1461,7 @@ impl<'r> Produce<'r, NaiveDateTime> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<NaiveDateTime>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<NaiveDateTime>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1488,7 +1487,7 @@ impl<'r> Produce<'r, Option<NaiveDateTime>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, DateTime<Utc>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, DateTime<Utc>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]
@@ -1517,7 +1516,7 @@ impl<'r> Produce<'r, DateTime<Utc>> for PostgresSimpleSourceParser {
     }
 }
 
-impl<'r> Produce<'r, Option<DateTime<Utc>>> for PostgresSimpleSourceParser {
+impl<'r> Produce<'r, Option<DateTime<Utc>>> for PostgresSimpleStream {
     type Error = PostgresSourceError;
 
     #[throws(PostgresSourceError)]

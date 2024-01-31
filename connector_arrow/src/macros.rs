@@ -199,20 +199,20 @@ macro_rules! impl_transport {
         fn process<'s, 'd, 'r>(
             ts1: Self::TSS,
             ts2: Self::TSD,
-            src: &'r mut <<Self::S as $crate::sources::Source>::Reader as $crate::sources::SourceReader>::Parser<'s>,
+            src: &'r mut <<Self::S as $crate::sources::Source>::Reader as $crate::sources::SourceReader>::Stream<'s>,
             dst: &'r mut <Self::D as $crate::destinations::Destination>::PartitionWriter,
         ) -> Result<(), Self::Error> where Self: 'd {
             match (ts1, ts2) {
                 $(
                     ($TSS::$V1(true), $TSD::$V2(true)) => {
-                        let val: Option<$T1> = $crate::sources::PartitionParser::parse(src)?;
+                        let val: Option<$T1> = $crate::sources::ValueStream::next_value(src)?;
                         let val: Option<$T2> = <Self as TypeConversion<Option<$T1>, _>>::convert(val);
                         $crate::destinations::PartitionWriter::write(dst, val)?;
                         Ok(())
                     }
 
                     ($TSS::$V1(false), $TSD::$V2(false)) => {
-                        let val: $T1 = $crate::sources::PartitionParser::parse(src)?;
+                        let val: $T1 = $crate::sources::ValueStream::next_value(src)?;
                         let val: $T2 = <Self as TypeConversion<$T1, _>>::convert(val);
                         $crate::destinations::PartitionWriter::write(dst, val)?;
                         Ok(())
@@ -233,7 +233,7 @@ macro_rules! impl_transport {
             ts2: Self::TSD,
         ) -> $crate::errors::Result<
             fn(
-                src: &mut <<Self::S as $crate::sources::Source>::Reader as $crate::sources::SourceReader>::Parser<'s>,
+                src: &mut <<Self::S as $crate::sources::Source>::Reader as $crate::sources::SourceReader>::Stream<'s>,
                 dst: &mut <Self::D as $crate::destinations::Destination>::PartitionWriter,
             ) -> Result<(), Self::Error>
         > where Self: 'd {
