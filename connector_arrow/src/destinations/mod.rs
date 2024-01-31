@@ -51,9 +51,6 @@ pub trait PartitionWriter: Send {
 
     /// Final clean ups
     fn finalize(&mut self) -> Result<(), Self::Error>;
-
-    /// Aquire n rows in final destination
-    fn aquire_row(&mut self, n: usize) -> Result<usize, Self::Error>;
 }
 
 /// A type implemented `Consume<T>` means that it can consume a value `T` by adding it to it's own buffer.

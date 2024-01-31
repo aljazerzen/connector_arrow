@@ -24,7 +24,7 @@ pub struct Dispatcher<'a, S, D, TP> {
 pub struct PreparedDispatch<S: Source, D: Destination> {
     pub data_order: DataOrder,
     pub src_readers: Vec<S::Reader>,
-    pub dst_partitions: Vec<D::PartitionWriter>,
+    pub dst_writers: Vec<D::PartitionWriter>,
     pub src_schema: Schema<S::TypeSystem>,
     pub dst_schema: Schema<D::TypeSystem>,
 }
@@ -66,15 +66,15 @@ where
         self.dst.set_metadata(dst_schema.clone(), data_order)?;
 
         debug!("Create destination partition");
-        let mut dst_partitions = Vec::with_capacity(self.queries.len());
+        let mut dst_writers = Vec::with_capacity(self.queries.len());
         for _ in 0..self.queries.len() {
-            dst_partitions.push(self.dst.allocate_partition()?);
+            dst_writers.push(self.dst.allocate_partition()?);
         }
 
         Ok(PreparedDispatch {
             data_order,
             src_readers,
-            dst_partitions,
+            dst_writers,
             src_schema,
             dst_schema,
         })
@@ -86,7 +86,7 @@ where
         let PreparedDispatch {
             data_order,
             src_readers,
-            dst_partitions,
+            dst_writers: dst_partitions,
             src_schema,
             dst_schema,
         } = self.prepare()?;
@@ -114,7 +114,6 @@ where
                 match data_order {
                     DataOrder::RowMajor => loop {
                         let (n, is_last) = parser.fetch_next()?;
-                        dst.aquire_row(n)?;
                         for _ in 0..n {
                             #[allow(clippy::needless_range_loop)]
                             for col in 0..dst.ncols() {
@@ -134,7 +133,6 @@ where
                     },
                     DataOrder::ColumnMajor => loop {
                         let (n, is_last) = parser.fetch_next()?;
-                        dst.aquire_row(n)?;
                         #[allow(clippy::needless_range_loop)]
                         for col in 0..dst.ncols() {
                             for _ in 0..n {

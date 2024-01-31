@@ -201,11 +201,6 @@ impl PartitionWriter for ArrowPartitionWriter {
         }
     }
 
-    #[throws(ArrowDestinationError)]
-    fn aquire_row(&mut self, _n: usize) -> usize {
-        self.current_row
-    }
-
     fn ncols(&self) -> usize {
         self.schema.len()
     }
