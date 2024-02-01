@@ -1,7 +1,4 @@
-use arrow::{
-    array::{BooleanArray, Float64Array, Int64Array, StringArray},
-    record_batch::RecordBatch,
-};
+use arrow::{record_batch::RecordBatch, util::pretty::pretty_format_batches};
 use connector_arrow::{
     constants::RECORD_BATCH_SIZE,
     destinations::arrow::{ArrowDestination, ArrowTypeSystem},
@@ -14,13 +11,14 @@ use connector_arrow::{
     transports::{DummyArrowTransport, PostgresArrowTransport},
     typesystem::Schema,
 };
+use insta::assert_display_snapshot;
 use postgres::NoTls;
 use std::env;
 use url::Url;
 
 #[test]
 fn arrow_destination_col_major() {
-    let mut dw = ArrowDestination::new();
+    let mut destination = ArrowDestination::new();
     let schema = Schema {
         names: vec!["a".into(), "b".into(), "c".into()],
         types: vec![
@@ -29,8 +27,32 @@ fn arrow_destination_col_major() {
             ArrowTypeSystem::LargeUtf8(true),
         ],
     };
-    dw.set_schema(schema).unwrap();
-    dw.alloc_writer(DataOrder::ColumnMajor).err().unwrap();
+    destination.set_schema(schema).unwrap();
+    {
+        let mut writer = destination.get_writer(DataOrder::ColumnMajor).unwrap();
+
+        writer.prepare_for_batch(2).unwrap();
+        writer.consume(1_i64).unwrap();
+        writer.consume(2_i64).unwrap();
+
+        writer.consume(Some(0.5_f64)).unwrap();
+        writer.consume(None as Option<f64>).unwrap();
+
+        writer.consume(Some("hello".to_string())).unwrap();
+        writer.consume(None as Option<String>).unwrap();
+
+        writer.finalize().unwrap();
+    }
+
+    let results = destination.finish().unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
+    +---+-----+-------+
+    | a | b   | c     |
+    +---+-----+-------+
+    | 1 | 0.5 | hello |
+    | 2 |     |       |
+    +---+-----+-------+
+    "###);
 }
 
 #[test]
@@ -57,85 +79,25 @@ fn test_arrow() {
     );
     dispatcher.run().expect("run dispatcher");
 
-    let records: Vec<RecordBatch> = destination.finish().unwrap();
-    assert_eq!(2, records.len());
-
-    for r in records {
-        match r.num_rows() {
-            4 => {
-                assert!(r
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![0, 1, 2, 3])));
-
-                assert!(r
-                    .column(1)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![0.0, 1.0, 2.0, 3.0])));
-                assert!(r
-                    .column(2)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .eq(&BooleanArray::from(vec![true, false, true, false])));
-                assert!(r
-                    .column(3)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .eq(&StringArray::from(vec!["0", "1", "2", "3"])));
-                assert!(r
-                    .column(4)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![0.0, 1.0, 2.0, 3.0])));
-            }
-            7 => {
-                assert!(r
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![0, 1, 2, 3, 4, 5, 6])));
-                assert!(r
-                    .column(1)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])));
-
-                assert!(r
-                    .column(2)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .eq(&BooleanArray::from(vec![
-                        true, false, true, false, true, false, true
-                    ])));
-                assert!(r
-                    .column(3)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .eq(&StringArray::from(vec!["0", "1", "2", "3", "4", "5", "6"])));
-                assert!(r
-                    .column(4)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])));
-            }
-            _ => {
-                println!("got a batch record with {} rows", r.num_rows());
-                unreachable!();
-            }
-        }
-    }
+    let mut results: Vec<RecordBatch> = destination.finish().unwrap();
+    results.sort_by_key(|r| r.num_rows());
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
+    +---+-----+-------+---+-----+
+    | a | b   | c     | d | e   |
+    +---+-----+-------+---+-----+
+    | 0 | 0.0 | true  | 0 | 0.0 |
+    | 1 | 1.0 | false | 1 | 1.0 |
+    | 2 | 2.0 | true  | 2 | 2.0 |
+    | 3 | 3.0 | false | 3 | 3.0 |
+    | 0 | 0.0 | true  | 0 | 0.0 |
+    | 1 | 1.0 | false | 1 | 1.0 |
+    | 2 | 2.0 | true  | 2 | 2.0 |
+    | 3 | 3.0 | false | 3 | 3.0 |
+    | 4 | 4.0 | true  | 4 | 4.0 |
+    | 5 | 5.0 | false | 5 | 5.0 |
+    | 6 | 6.0 | true  | 6 | 6.0 |
+    +---+-----+-------+---+-----+
+    "###);
 }
 
 #[test]
@@ -149,10 +111,10 @@ fn test_arrow_large() {
     ];
     let nrows = [RECORD_BATCH_SIZE * 2 + 1, RECORD_BATCH_SIZE * 2 - 1];
     let ncols = schema.len();
-    let queries: Vec<CXQuery> = nrows
-        .iter()
-        .map(|v| CXQuery::naked(format!("{},{}", v, ncols)))
-        .collect();
+    let queries = [
+        CXQuery::naked(format!("{},{}", nrows[0], ncols)),
+        CXQuery::naked(format!("{},{}", nrows[1], ncols)),
+    ];
     let mut destination = ArrowDestination::new();
 
     let dispatcher = Dispatcher::<_, _, DummyArrowTransport>::new(
@@ -163,22 +125,13 @@ fn test_arrow_large() {
     dispatcher.run().expect("run dispatcher");
 
     let records: Vec<RecordBatch> = destination.finish().unwrap();
-    assert_eq!(5, records.len());
     let mut rsizes = vec![];
     for r in records {
         rsizes.push(r.num_rows());
     }
     rsizes.sort();
-    assert_eq!(
-        vec![
-            1,
-            RECORD_BATCH_SIZE - 1,
-            RECORD_BATCH_SIZE,
-            RECORD_BATCH_SIZE,
-            RECORD_BATCH_SIZE
-        ],
-        rsizes
-    );
+    rsizes.reverse();
+    assert_eq!(&nrows, rsizes.as_slice());
 }
 
 #[test]
@@ -203,86 +156,18 @@ fn test_postgres_arrow() {
 
     dispatcher.run().expect("run dispatcher");
 
-    let records: Vec<RecordBatch> = destination.finish().unwrap();
-    assert_eq!(2, records.len());
-
-    for r in records {
-        match r.num_rows() {
-            2 => {
-                assert!(r
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![1, 0])));
-                assert!(r
-                    .column(1)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![3, 5])));
-                assert!(r
-                    .column(2)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .eq(&StringArray::from(vec!["str1", "a"])));
-                assert!(r
-                    .column(3)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![None, Some(3.1)])));
-                assert!(r
-                    .column(4)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .eq(&BooleanArray::from(vec![Some(true), None])));
-            }
-            4 => {
-                assert!(r
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![2, 3, 4, 1314])));
-                assert!(r
-                    .column(1)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .eq(&Int64Array::from(vec![None, Some(7), Some(9), Some(2)])));
-                assert!(r
-                    .column(2)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .eq(&StringArray::from(vec![
-                        Some("str2"),
-                        Some("b"),
-                        Some("c"),
-                        None
-                    ])));
-                assert!(r
-                    .column(3)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .eq(&Float64Array::from(vec![2.2, 3., 7.8, -10.])));
-                assert!(r
-                    .column(4)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .eq(&BooleanArray::from(vec![
-                        Some(false),
-                        Some(false),
-                        None,
-                        Some(true)
-                    ])));
-            }
-            _ => unreachable!(),
-        }
-    }
+    let mut results: Vec<RecordBatch> = destination.finish().unwrap();
+    results.sort_by_key(|r| r.num_rows());
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
+    +----------+--------------+----------+------------+-----------+
+    | test_int | test_nullint | test_str | test_float | test_bool |
+    +----------+--------------+----------+------------+-----------+
+    | 1        | 3            | str1     |            | true      |
+    | 0        | 5            | a        | 3.1        |           |
+    | 2        |              | str2     | 2.2        | false     |
+    | 3        | 7            | b        | 3.0        | false     |
+    | 4        | 9            | c        | 7.8        |           |
+    | 1314     | 2            |          | -10.0      | true      |
+    +----------+--------------+----------+------------+-----------+
+    "###);
 }

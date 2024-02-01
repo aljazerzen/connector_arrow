@@ -68,7 +68,7 @@ where
         debug!("Create destination partition");
         let mut dst_writers = Vec::with_capacity(self.queries.len());
         for _ in 0..self.queries.len() {
-            dst_writers.push(self.dst.alloc_writer(data_order)?);
+            dst_writers.push(self.dst.get_writer(data_order)?);
         }
 
         Ok(PreparedDispatch {
@@ -112,6 +112,7 @@ where
                 let mut value_stream = src.value_stream(&src_schema)?;
 
                 while let Some(batch_size) = value_stream.next_batch()? {
+                    dst.prepare_for_batch(batch_size)?;
                     match data_order {
                         DataOrder::RowMajor => {
                             for _ in 0..batch_size {

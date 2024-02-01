@@ -14,12 +14,11 @@ use crate::typesystem::{Realize, Schema, TypeAssoc, TypeSystem};
 use anyhow::anyhow;
 use arrow::{datatypes::Schema as ArrowSchema, record_batch::RecordBatch};
 use arrow_assoc::ArrowAssoc;
-use fehler::{throw, throws};
+use fehler::throws;
 use funcs::{FFinishBuilder, FNewBuilder, FNewField};
-use std::{
-    any::Any,
-    sync::{Arc, Mutex},
-};
+use itertools::zip_eq;
+use std::any::Any;
+use std::sync::{Arc, Mutex};
 
 type Builder = Box<dyn Any + Send>;
 type Builders = Vec<Builder>;
@@ -28,7 +27,7 @@ pub struct ArrowDestination {
     schema: Schema<ArrowTypeSystem>,
     arrow_schema: Arc<ArrowSchema>,
     data: Arc<Mutex<Vec<RecordBatch>>>,
-    batch_size: usize,
+    min_batch_size: usize,
 }
 
 impl Default for ArrowDestination {
@@ -37,7 +36,7 @@ impl Default for ArrowDestination {
             schema: Schema::empty(),
             data: Arc::new(Mutex::new(vec![])),
             arrow_schema: Arc::new(ArrowSchema::empty()),
-            batch_size: RECORD_BATCH_SIZE,
+            min_batch_size: RECORD_BATCH_SIZE,
         }
     }
 }
@@ -52,7 +51,7 @@ impl ArrowDestination {
             schema: Schema::empty(),
             data: Arc::new(Mutex::new(vec![])),
             arrow_schema: Arc::new(ArrowSchema::empty()),
-            batch_size,
+            min_batch_size: batch_size,
         }
     }
 }
@@ -76,18 +75,13 @@ impl Destination for ArrowDestination {
     }
 
     #[throws(ArrowDestinationError)]
-    fn alloc_writer(&mut self, data_order: DataOrder) -> Self::PartitionWriter {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(crate::errors::ConnectorXError::UnsupportedDataOrder(
-                data_order
-            ))
-        }
-
+    fn get_writer(&mut self, data_order: DataOrder) -> Self::PartitionWriter {
         ArrowPartitionWriter::new(
             self.schema.types.clone(),
             Arc::clone(&self.data),
             Arc::clone(&self.arrow_schema),
-            self.batch_size,
+            self.min_batch_size,
+            data_order,
         )
     }
 
@@ -99,7 +93,7 @@ impl Destination for ArrowDestination {
 impl ArrowDestination {
     #[throws(ArrowDestinationError)]
     pub fn finish(self) -> Vec<RecordBatch> {
-        let lock = Arc::try_unwrap(self.data).map_err(|_| anyhow!("Partitions are not freed"))?;
+        let lock = Arc::try_unwrap(self.data).expect("Writers have not been dropped yet");
         lock.into_inner()
             .map_err(|e| anyhow!("mutex poisoned {}", e))?
     }
@@ -123,14 +117,17 @@ impl ArrowDestination {
 pub struct ArrowPartitionWriter {
     // settings
     schema: Vec<ArrowTypeSystem>,
-    batch_size: usize,
+    min_batch_size: usize,
 
-    // buffers
+    /// Determines into which column the next stream value should go.
+    receiver: Organizer,
+
+    /// Array buffers.
     builders: Option<Builders>,
-
-    // counters
-    current_row: usize,
-    current_col: usize,
+    /// Number of rows reserved to be written in by [ArrowPartitionWriter::prepare_for_batch]
+    rows_reserved: usize,
+    /// Number of rows allocated within builders.
+    rows_capacity: usize,
 
     // refs into ArrowDestination
     data: Arc<Mutex<Vec<RecordBatch>>>,
@@ -144,30 +141,52 @@ impl ArrowPartitionWriter {
         schema: Vec<ArrowTypeSystem>,
         data: Arc<Mutex<Vec<RecordBatch>>>,
         arrow_schema: Arc<ArrowSchema>,
-        batch_size: usize,
+        min_batch_size: usize,
+        data_order: DataOrder,
     ) -> Self {
         ArrowPartitionWriter {
-            schema,
+            receiver: Organizer::new(data_order, schema.len()),
+
             builders: None,
-            current_row: 0,
-            current_col: 0,
+            rows_reserved: 0,
+            rows_capacity: 0,
+
+            schema,
+            min_batch_size,
+
             data,
             arrow_schema,
-            batch_size,
         }
     }
 
+    /// Make sure that there is enough memory allocated in builders for the incoming batch.
+    /// Might allocate more than needed, for future row reservations.
     #[throws(ArrowDestinationError)]
-    fn allocate(&mut self) -> &mut Builders {
-        if self.builders.is_none() {
-            let builders = self
-                .schema
-                .iter()
-                .map(|dt| Ok(Realize::<FNewBuilder>::realize(*dt)?(self.batch_size)))
-                .collect::<Result<Vec<_>>>()?;
-            self.builders = Some(builders);
+    fn allocate(&mut self, row_count: usize) {
+        if self.rows_capacity >= row_count + self.rows_reserved {
+            // there is enough capacity, no need to allocate
+            self.rows_reserved += row_count;
+            return;
         }
-        self.builders.as_mut().unwrap()
+
+        if self.rows_reserved > 0 {
+            self.flush()?;
+        }
+
+        let to_allocate = if row_count < self.min_batch_size {
+            self.min_batch_size
+        } else {
+            row_count
+        };
+
+        let builders = self
+            .schema
+            .iter()
+            .map(|dt| Ok(Realize::<FNewBuilder>::realize(*dt)?(to_allocate)))
+            .collect::<Result<Vec<_>>>()?;
+        self.builders = Some(builders);
+        self.rows_reserved = row_count;
+        self.rows_capacity = to_allocate;
     }
 
     #[throws(ArrowDestinationError)]
@@ -175,12 +194,11 @@ impl ArrowPartitionWriter {
         let Some(builders) = self.builders.take() else {
             return Ok(());
         };
-        let columns = builders
-            .into_iter()
-            .zip(self.schema.iter())
-            .map(|(builder, &dt)| Realize::<FFinishBuilder>::realize(dt)?(builder))
+        let columns = zip_eq(builders, &self.schema)
+            .map(|(builder, dt)| Realize::<FFinishBuilder>::realize(*dt)?(builder))
             .collect::<std::result::Result<Vec<_>, crate::errors::ConnectorXError>>()?;
         let rb = RecordBatch::try_new(Arc::clone(&self.arrow_schema), columns)?;
+
         {
             let mut guard = self
                 .data
@@ -189,15 +207,18 @@ impl ArrowPartitionWriter {
             let inner_data = &mut *guard;
             inner_data.push(rb);
         }
-
-        self.current_row = 0;
-        self.current_col = 0;
     }
 }
 
 impl PartitionWriter for ArrowPartitionWriter {
     type TypeSystem = ArrowTypeSystem;
     type Error = ArrowDestinationError;
+
+    #[throws(ArrowDestinationError)]
+    fn prepare_for_batch(&mut self, row_count: usize) {
+        self.receiver.reset_for_batch(row_count);
+        self.allocate(row_count)?;
+    }
 
     #[throws(ArrowDestinationError)]
     fn finalize(&mut self) {
@@ -217,27 +238,73 @@ where
 
     #[throws(ArrowDestinationError)]
     fn consume(&mut self, value: T) {
-        let col = self.current_col;
-
-        self.current_col += 1;
-        if self.current_col == self.column_count() {
-            self.current_row += 1;
-            self.current_col = 0;
-        }
+        let col = self.receiver.next_builder_index();
 
         self.schema[col].check::<T>()?;
 
-        let builders = self.allocate()?;
+        // this is safe, because prepare_for_batch must have been called earlier
+        let builders = self.builders.as_mut().unwrap();
         <T as ArrowAssoc>::append(
             builders[col]
                 .downcast_mut::<T::Builder>()
                 .ok_or_else(|| anyhow!("cannot cast arrow builder for append"))?,
             value,
         )?;
+    }
+}
 
-        // flush if exceed batch_size
-        if self.current_row >= self.batch_size {
-            self.flush()?;
+/// Determines into which column the next stream value should go.
+pub struct Organizer {
+    data_order: DataOrder,
+
+    col_count: usize,
+    row_count: usize,
+
+    next_row: usize,
+    next_col: usize,
+}
+
+impl Organizer {
+    fn new(data_order: DataOrder, col_count: usize) -> Self {
+        Organizer {
+            data_order,
+
+            col_count,
+            row_count: 0,
+
+            next_row: 0,
+            next_col: 0,
+        }
+    }
+
+    fn reset_for_batch(&mut self, row_count: usize) {
+        self.row_count = row_count;
+        self.next_row = 0;
+        self.next_col = 0;
+    }
+
+    fn next_builder_index(&mut self) -> usize {
+        match self.data_order {
+            DataOrder::RowMajor => {
+                let col = self.next_col;
+
+                self.next_col += 1;
+                if self.next_col == self.col_count {
+                    self.next_col = 0;
+                    self.next_row += 1;
+                }
+                col
+            }
+            DataOrder::ColumnMajor => {
+                let col = self.next_col;
+
+                self.next_row += 1;
+                if self.next_row == self.row_count {
+                    self.next_row = 0;
+                    self.next_col += 1;
+                }
+                col
+            }
         }
     }
 }

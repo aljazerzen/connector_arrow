@@ -18,9 +18,8 @@ pub trait Destination: Sized {
     /// Set metadata of the destination writer.
     fn set_schema(&mut self, schema: Schema<Self::TypeSystem>) -> Result<(), Self::Error>;
 
-    /// Allocates memory for a destination partition and returns a writer for that partition.
-    fn alloc_writer(&mut self, data_order: DataOrder)
-        -> Result<Self::PartitionWriter, Self::Error>;
+    /// Creates a writer into a partition of the destination.
+    fn get_writer(&mut self, data_order: DataOrder) -> Result<Self::PartitionWriter, Self::Error>;
 
     /// Return the schema of the destination.
     fn schema(&self) -> &Schema<Self::TypeSystem>;
@@ -30,6 +29,9 @@ pub trait Destination: Sized {
 pub trait PartitionWriter: Send {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send;
+
+    /// Must be called before writing.
+    fn prepare_for_batch(&mut self, row_count: usize) -> Result<(), Self::Error>;
 
     /// The next value into the destination buffer. If T mismatches with the
     /// schema, `ConnectorXError::TypeCheckFailed` will return.

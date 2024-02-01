@@ -18,6 +18,7 @@
           # tools
           just
           cargo-nextest
+          cargo-insta
           cargo-audit
           cargo-release
           pkg-config
