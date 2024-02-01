@@ -1,6 +1,7 @@
 use crate::impl_typesystem;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 
+/// Analogous to [arrow::datatypes::DataType]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ArrowTypeSystem {
     // /// Null type
@@ -198,7 +199,7 @@ impl_typesystem! {
         { Time64      => NaiveTime     }
         { Date32      => NaiveDate     }
         { Date64      => NaiveDateTime }
-        { DateTimeTz => DateTime<Utc>  }
+        { DateTimeTz  => DateTime<Utc> }
         { LargeUtf8   => String        }
         { LargeBinary => Vec<u8>       }
     }

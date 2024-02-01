@@ -80,11 +80,12 @@ where
 
 #[doc(hidden)]
 /// A ParameterizedFunc refers to a function that is parameterized on a type T,
-/// where type T will be dynaically determined by the variant of a TypeSystem.
-/// An example is the `transmit<S,W,T>` function. When piping values from a source
+/// where type T will be dynamically determined by the variant of a TypeSystem.
+/// An example is the `transport<S, W, T>` function. When piping values from a source
 /// to the destination, its type `T` is determined by the schema at the runtime.
 pub trait ParameterizedFunc {
     type Function;
+
     fn realize<T>() -> Self::Function
     where
         Self: ParameterizedOn<T>,

@@ -243,12 +243,10 @@ where
 
         // this is safe, because prepare_for_batch must have been called earlier
         let builders = self.builders.as_mut().unwrap();
-        <T as ArrowAssoc>::append(
-            builders[col]
-                .downcast_mut::<T::Builder>()
-                .ok_or_else(|| anyhow!("cannot cast arrow builder for append"))?,
-            value,
-        )?;
+        let builder = builders[col]
+            .downcast_mut::<T::Builder>()
+            .ok_or_else(|| anyhow!("cannot cast arrow builder for append"))?;
+        <T as ArrowAssoc>::append(builder, value)?;
     }
 }
 

@@ -2,7 +2,6 @@ use super::arrow_assoc::ArrowAssoc;
 use super::Builder;
 use crate::errors::Result;
 use crate::typesystem::{ParameterizedFunc, ParameterizedOn};
-use anyhow::anyhow;
 use arrow::array::{ArrayBuilder, ArrayRef};
 use arrow::datatypes::Field;
 
@@ -44,7 +43,7 @@ where
         {
             let t = builder
                 .downcast_mut::<T::Builder>()
-                .ok_or_else(|| anyhow!("cannot cast arrow builder for finish"))?;
+                .expect("cannot cast arrow builder for finish");
             let a = ArrayBuilder::finish(t);
             Ok(a)
         }
@@ -67,7 +66,7 @@ where
         where
             T: ArrowAssoc,
         {
-            T::field(header)
+            T::new_field(header)
         }
         imp::<T>
     }

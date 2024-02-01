@@ -65,7 +65,7 @@ macro_rules! impl_typesystem {
                     $(
                         $TS::$V(false) => Ok(()),
                     )+
-                    _ => fehler::throw!($crate::errors::ConnectorXError::TypeCheckFailed(format!("{:?}", ts), std::any::type_name::<$NT>()))
+                    _ => Err($crate::errors::ConnectorXError::TypeCheckFailed(format!("{:?}", ts), std::any::type_name::<$NT>()))
                 }
             }
         }
@@ -76,7 +76,7 @@ macro_rules! impl_typesystem {
                     $(
                         $TS::$V(true) => Ok(()),
                     )+
-                    _ => fehler::throw!($crate::errors::ConnectorXError::TypeCheckFailed(format!("{:?}", ts), std::any::type_name::<$NT>()))
+                    _ => Err($crate::errors::ConnectorXError::TypeCheckFailed(format!("{:?}", ts), std::any::type_name::<$NT>()))
                 }
             }
         }

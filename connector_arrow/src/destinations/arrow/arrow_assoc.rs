@@ -16,7 +16,7 @@ pub trait ArrowAssoc {
 
     fn builder(nrows: usize) -> Self::Builder;
     fn append(builder: &mut Self::Builder, value: Self) -> Result<()>;
-    fn field(header: &str) -> Field;
+    fn new_field(name: &str) -> Field;
 }
 
 macro_rules! impl_arrow_assoc {
@@ -33,8 +33,8 @@ macro_rules! impl_arrow_assoc {
                 builder.append_value(value);
             }
 
-            fn field(header: &str) -> Field {
-                Field::new(header, $AT, false)
+            fn new_field(name: &str) -> Field {
+                Field::new(name, $AT, false)
             }
         }
 
@@ -50,8 +50,8 @@ macro_rules! impl_arrow_assoc {
                 builder.append_option(value);
             }
 
-            fn field(header: &str) -> Field {
-                Field::new(header, $AT, true)
+            fn new_field(name: &str) -> Field {
+                Field::new(name, $AT, true)
             }
         }
     };
@@ -65,43 +65,6 @@ impl_arrow_assoc!(f32, ArrowDataType::Float32, Float32Builder);
 impl_arrow_assoc!(f64, ArrowDataType::Float64, Float64Builder);
 impl_arrow_assoc!(bool, ArrowDataType::Boolean, BooleanBuilder);
 
-impl ArrowAssoc for &str {
-    type Builder = StringBuilder;
-
-    fn builder(nrows: usize) -> Self::Builder {
-        StringBuilder::with_capacity(1024, nrows)
-    }
-
-    #[throws(ArrowDestinationError)]
-    fn append(builder: &mut Self::Builder, value: Self) {
-        builder.append_value(value);
-    }
-
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Utf8, false)
-    }
-}
-
-impl ArrowAssoc for Option<&str> {
-    type Builder = StringBuilder;
-
-    fn builder(nrows: usize) -> Self::Builder {
-        StringBuilder::with_capacity(1024, nrows)
-    }
-
-    #[throws(ArrowDestinationError)]
-    fn append(builder: &mut Self::Builder, value: Self) {
-        match value {
-            Some(s) => builder.append_value(s),
-            None => builder.append_null(),
-        }
-    }
-
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Utf8, true)
-    }
-}
-
 impl ArrowAssoc for String {
     type Builder = StringBuilder;
 
@@ -114,8 +77,8 @@ impl ArrowAssoc for String {
         builder.append_value(value.as_str());
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Utf8, false)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Utf8, false)
     }
 }
 
@@ -128,14 +91,11 @@ impl ArrowAssoc for Option<String> {
 
     #[throws(ArrowDestinationError)]
     fn append(builder: &mut Self::Builder, value: Self) {
-        match value {
-            Some(s) => builder.append_value(s.as_str()),
-            None => builder.append_null(),
-        }
+        builder.append_option(value);
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Utf8, true)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Utf8, true)
     }
 }
 
@@ -151,9 +111,9 @@ impl ArrowAssoc for DateTime<Utc> {
         builder.append_option(value.timestamp_nanos_opt())
     }
 
-    fn field(header: &str) -> Field {
+    fn new_field(name: &str) -> Field {
         Field::new(
-            header,
+            name,
             ArrowDataType::Timestamp(TimeUnit::Nanosecond, None),
             false,
         )
@@ -172,9 +132,9 @@ impl ArrowAssoc for Option<DateTime<Utc>> {
         builder.append_option(value.and_then(|x| x.timestamp_nanos_opt()))
     }
 
-    fn field(header: &str) -> Field {
+    fn new_field(name: &str) -> Field {
         Field::new(
-            header,
+            name,
             ArrowDataType::Timestamp(TimeUnit::Nanosecond, None),
             true,
         )
@@ -204,8 +164,8 @@ impl ArrowAssoc for Option<NaiveDate> {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Date32, true)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Date32, true)
     }
 }
 
@@ -221,8 +181,8 @@ impl ArrowAssoc for NaiveDate {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Date32, false)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Date32, false)
     }
 }
 
@@ -238,8 +198,8 @@ impl ArrowAssoc for Option<NaiveDateTime> {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Date64, true)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Date64, true)
     }
 }
 
@@ -255,8 +215,8 @@ impl ArrowAssoc for NaiveDateTime {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Date64, false)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Date64, false)
     }
 }
 
@@ -276,8 +236,8 @@ impl ArrowAssoc for Option<NaiveTime> {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Time64(TimeUnit::Nanosecond), true)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Time64(TimeUnit::Nanosecond), true)
     }
 }
 
@@ -295,8 +255,8 @@ impl ArrowAssoc for NaiveTime {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::Time64(TimeUnit::Nanosecond), false)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::Time64(TimeUnit::Nanosecond), false)
     }
 }
 
@@ -315,8 +275,8 @@ impl ArrowAssoc for Option<Vec<u8>> {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::LargeBinary, true)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::LargeBinary, true)
     }
 }
 
@@ -332,7 +292,7 @@ impl ArrowAssoc for Vec<u8> {
         Ok(())
     }
 
-    fn field(header: &str) -> Field {
-        Field::new(header, ArrowDataType::LargeBinary, false)
+    fn new_field(name: &str) -> Field {
+        Field::new(name, ArrowDataType::LargeBinary, false)
     }
 }
