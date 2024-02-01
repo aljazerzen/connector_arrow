@@ -13,7 +13,7 @@ fn test_types() {
     struct Row(i64, i64, f64, f64, String, String, String, String);
 
     let query = CXQuery::naked("select * from admin.test_table");
-    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
+    let mut partition = source.reader(&query).unwrap();
 
     let schema = partition.fetch_until_schema().unwrap();
 

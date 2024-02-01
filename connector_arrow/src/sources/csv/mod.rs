@@ -10,7 +10,7 @@ use crate::typesystem::Schema;
 use crate::{data_order::DataOrder, errors::ConnectorXError, sql::CXQuery};
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
-use fehler::{throw, throws};
+use fehler::throws;
 use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::fs::File;
@@ -28,17 +28,13 @@ impl CSVSource {
 }
 
 impl Source for CSVSource {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
+    const DATA_ORDER: DataOrder = DataOrder::RowMajor;
     type Reader = CSVReader;
     type TypeSystem = CSVTypeSystem;
     type Error = CSVSourceError;
 
     #[throws(CSVSourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
-        }
-
+    fn reader(&mut self, query: &CXQuery) -> Self::Reader {
         CSVReader::new(query, self.types_override.clone())?
     }
 }

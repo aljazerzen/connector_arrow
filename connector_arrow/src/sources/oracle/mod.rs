@@ -7,7 +7,6 @@ use crate::constants::{DB_BUFFER_SIZE, ORACLE_ARRAY_SIZE};
 use crate::typesystem::Schema;
 use crate::{
     data_order::DataOrder,
-    errors::ConnectorXError,
     sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query_oracle, CXQuery},
     utils::DummyBox,
@@ -82,17 +81,13 @@ impl Source for OracleSource
 where
     OracleReader: SourceReader<TypeSystem = OracleTypeSystem, Error = OracleSourceError>,
 {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
+    const DATA_ORDER: DataOrder = DataOrder::RowMajor;
     type Reader = OracleReader;
     type TypeSystem = OracleTypeSystem;
     type Error = OracleSourceError;
 
     #[throws(OracleSourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-
+    fn reader(&mut self, query: &CXQuery) -> Self::Reader {
         let conn = self.pool.get()?;
         OracleReader::new(conn, query)
     }

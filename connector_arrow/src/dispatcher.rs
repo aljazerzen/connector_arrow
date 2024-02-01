@@ -1,7 +1,7 @@
 //! This module provides [`dispatcher::Dispatcher`], the core struct in ConnectorX
 //! that drives the data loading from a source to a destination.
 use crate::{
-    data_order::{coordinate, DataOrder},
+    data_order::DataOrder,
     destinations::{Destination, PartitionWriter},
     sources::{Source, SourceReader, ValueStream},
     sql::CXQuery,
@@ -50,11 +50,11 @@ where
 
     pub fn prepare(mut self) -> Result<PreparedDispatch<S, D>, TP::Error> {
         debug!("Prepare");
-        let data_order = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
+        let data_order = S::DATA_ORDER;
 
         let mut src_readers = Vec::with_capacity(self.queries.len());
         for query in &self.queries {
-            let reader = self.src.reader(query, data_order)?;
+            let reader = self.src.reader(query)?;
             src_readers.push(reader);
         }
 
@@ -169,9 +169,7 @@ where
 
     /// Only fetch the metadata (header) of the destination.
     pub fn get_meta(&mut self) -> Result<(), TP::Error> {
-        let dorder = coordinate(S::DATA_ORDERS, D::DATA_ORDERS)?;
-
-        let mut reader = self.src.reader(self.queries.first().unwrap(), dorder)?;
+        let mut reader = self.src.reader(self.queries.first().unwrap())?;
 
         let src_schema = reader.fetch_until_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;

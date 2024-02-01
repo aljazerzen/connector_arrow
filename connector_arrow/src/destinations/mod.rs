@@ -10,7 +10,6 @@ use crate::typesystem::{Schema, TypeAssoc, TypeSystem};
 /// A `Destination` is associated with a `TypeSystem` and a `PartitionDestination`.
 /// `PartitionDestination` allows multiple threads write data into the buffer owned by `Destination`.
 pub trait Destination: Sized {
-    const DATA_ORDERS: &'static [DataOrder];
     type TypeSystem: TypeSystem;
     type PartitionWriter: PartitionWriter<TypeSystem = Self::TypeSystem, Error = Self::Error>;
     type Error: From<ConnectorXError> + Send;

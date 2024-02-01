@@ -28,18 +28,14 @@ use std::fmt::Debug;
 /// kind of queries and return relational data.
 pub trait Source {
     /// Supported data orders, ordering by preference.
-    const DATA_ORDERS: &'static [DataOrder];
+    const DATA_ORDER: DataOrder;
     /// The type system produced by this [Source]
     type TypeSystem: TypeSystem;
     /// A "connection" to the [Source], that can be sent between threads.
     type Reader: SourceReader<TypeSystem = Self::TypeSystem, Error = Self::Error> + Send;
     type Error: From<ConnectorXError> + Send + Debug;
 
-    fn reader(
-        &mut self,
-        query: &CXQuery,
-        data_order: DataOrder,
-    ) -> Result<Self::Reader, Self::Error>;
+    fn reader(&mut self, query: &CXQuery) -> Result<Self::Reader, Self::Error>;
 }
 
 /// Obtained connection to the [Source], with an intent to execute a query.

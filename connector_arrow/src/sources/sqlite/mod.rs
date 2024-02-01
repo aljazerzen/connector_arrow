@@ -6,7 +6,6 @@ mod typesystem;
 pub use self::errors::SQLiteSourceError;
 use crate::{
     data_order::DataOrder,
-    errors::ConnectorXError,
     sources::{Produce, Source, SourceReader, ValueStream},
     sql::{limit1_query, CXQuery},
     typesystem::Schema,
@@ -44,17 +43,13 @@ impl Source for SQLiteSource
 where
     SQLiteReader: SourceReader<TypeSystem = SQLiteTypeSystem>,
 {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
+    const DATA_ORDER: DataOrder = DataOrder::RowMajor;
     type Reader = SQLiteReader;
     type TypeSystem = SQLiteTypeSystem;
     type Error = SQLiteSourceError;
 
     #[throws(SQLiteSourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-
+    fn reader(&mut self, query: &CXQuery) -> Self::Reader {
         let conn = self.pool.get()?;
         SQLiteReader::new(conn, query)
     }

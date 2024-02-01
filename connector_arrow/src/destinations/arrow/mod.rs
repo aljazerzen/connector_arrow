@@ -57,7 +57,6 @@ impl ArrowDestination {
 }
 
 impl Destination for ArrowDestination {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::ColumnMajor, DataOrder::RowMajor];
     type TypeSystem = ArrowTypeSystem;
     type PartitionWriter = ArrowPartitionWriter;
     type Error = ArrowDestinationError;

@@ -146,7 +146,7 @@ pub mod typesystem;
 mod macros;
 
 pub mod constants;
-pub mod data_order;
+mod data_order;
 pub mod destinations;
 mod dispatcher;
 pub mod errors;
@@ -162,7 +162,7 @@ pub mod prelude {
     pub use crate::destinations::arrow::{ArrowDestination, ArrowPartitionWriter, ArrowTypeSystem};
     pub use crate::frontend::get_arrow::get_arrow;
 
-    pub use crate::data_order::{coordinate, DataOrder};
+    pub use crate::data_order::DataOrder;
     pub use crate::destinations::{Consume, Destination, PartitionWriter};
     pub use crate::dispatcher::Dispatcher;
     pub use crate::errors::{ConnectorXError, ConnectorXOutError};

@@ -12,7 +12,7 @@ use connector_arrow::{
 fn no_file() {
     let mut source = CSVSource::new(None);
     let query = CXQuery::naked("./a_fake_file.csv");
-    let mut reader = source.reader(&query, DataOrder::RowMajor).unwrap();
+    let mut reader = source.reader(&query).unwrap();
     reader.fetch_until_schema().unwrap_err();
 }
 
@@ -21,10 +21,7 @@ fn no_file() {
 fn empty_file() {
     let mut source = CSVSource::new(None);
     let mut p = source
-        .reader(
-            &CXQuery::naked("./tests/data/empty.csv"),
-            DataOrder::RowMajor,
-        )
+        .reader(&CXQuery::naked("./tests/data/empty.csv"))
         .unwrap();
 
     let schema = p.fetch_until_schema().unwrap();
@@ -56,10 +53,7 @@ fn load_and_parse() {
     ]));
 
     let mut reader = source
-        .reader(
-            &CXQuery::naked("./tests/data/uspop_0.csv"),
-            DataOrder::RowMajor,
-        )
+        .reader(&CXQuery::naked("./tests/data/uspop_0.csv"))
         .unwrap();
 
     let schema = reader.fetch_until_schema().unwrap();

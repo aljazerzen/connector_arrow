@@ -10,7 +10,7 @@ use crate::errors::{ConnectorXError, Result};
 use crate::sql::CXQuery;
 use crate::typesystem::Schema;
 use chrono::{offset, DateTime, Utc};
-use fehler::throw;
+
 use num_traits::cast::FromPrimitive;
 
 pub struct DummySource {
@@ -30,16 +30,12 @@ impl DummySource {
 }
 
 impl Source for DummySource {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
+    const DATA_ORDER: DataOrder = DataOrder::RowMajor;
     type TypeSystem = DummyTypeSystem;
     type Reader = DummyReader;
     type Error = ConnectorXError;
 
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Result<Self::Reader> {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order))
-        }
-
+    fn reader(&mut self, query: &CXQuery) -> Result<Self::Reader> {
         Ok(DummyReader::new(self.schema.clone(), query))
     }
 }

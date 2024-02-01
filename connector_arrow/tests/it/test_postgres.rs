@@ -27,7 +27,7 @@ fn load_and_parse() {
     let mut source = PostgresSource::<BinaryProtocol, NoTls>::new(config, NoTls, 1).unwrap();
 
     let query = CXQuery::naked("select * from test_table");
-    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
+    let mut partition = source.reader(&query).unwrap();
     let schema = partition.fetch_until_schema().unwrap();
 
     let mut parser = partition.value_stream(&schema).unwrap();
@@ -73,7 +73,7 @@ fn load_and_parse_csv() {
     let mut source = PostgresSource::<CSVProtocol, NoTls>::new(config, NoTls, 1).unwrap();
 
     let query = CXQuery::naked("select * from test_table");
-    let mut partition = source.reader(&query, DataOrder::RowMajor).unwrap();
+    let mut partition = source.reader(&query).unwrap();
 
     let schema = partition.fetch_until_schema().unwrap();
 

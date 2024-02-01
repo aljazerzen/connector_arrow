@@ -79,17 +79,13 @@ impl Source for BigQuerySource
 where
     BigQueryReader: SourceReader<TypeSystem = BigQueryTypeSystem, Error = BigQuerySourceError>,
 {
-    const DATA_ORDERS: &'static [DataOrder] = &[DataOrder::RowMajor];
+    const DATA_ORDER: DataOrder = DataOrder::RowMajor;
     type Reader = BigQueryReader;
     type TypeSystem = BigQueryTypeSystem;
     type Error = BigQuerySourceError;
 
     #[throws(BigQuerySourceError)]
-    fn reader(&mut self, query: &CXQuery, data_order: DataOrder) -> Self::Reader {
-        if !matches!(data_order, DataOrder::RowMajor) {
-            throw!(ConnectorXError::UnsupportedDataOrder(data_order));
-        }
-
+    fn reader(&mut self, query: &CXQuery) -> Self::Reader {
         BigQueryReader::new(
             self.rt.clone(),
             self.client.clone(),

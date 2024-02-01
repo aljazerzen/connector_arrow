@@ -19,7 +19,7 @@ fn test_source() {
         CXQuery::naked("SELECT * FROM (SELECT * FROM `dataprep-bigquery.dataprep.lineitem` LIMIT 1000) AS CXTMPTAB_PART WHERE 38837719 <= CXTMPTAB_PART.L_ORDERKEY AND CXTMPTAB_PART.L_ORDERKEY < 58255940")
     ];
 
-    let mut reader = source.reader(&queries[0], DataOrder::ColumnMajor).unwrap();
+    let mut reader = source.reader(&queries[0]).unwrap();
     reader.fetch_until_schema().unwrap();
 }
 
