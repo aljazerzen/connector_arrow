@@ -16,27 +16,22 @@ pub trait Destination: Sized {
     type Error: From<ConnectorXError> + Send;
 
     /// Set metadata of the destination writer.
-    fn set_metadata(
-        &mut self,
-        schema: Schema<Self::TypeSystem>,
-        data_order: DataOrder,
-    ) -> Result<(), Self::Error>;
+    fn set_schema(&mut self, schema: Schema<Self::TypeSystem>) -> Result<(), Self::Error>;
 
     /// Allocates memory for a destination partition and returns a writer for that partition.
-    fn allocate_partition(&mut self) -> Result<Self::PartitionWriter, Self::Error>;
+    fn alloc_writer(&mut self, data_order: DataOrder)
+        -> Result<Self::PartitionWriter, Self::Error>;
 
     /// Return the schema of the destination.
     fn schema(&self) -> &Schema<Self::TypeSystem>;
 }
 
-/// `PartitionDestination` writes values to its own region. `PartitionDestination` is parameterized
-/// on lifetime `'a`, which is the lifetime of the parent `Destination`. Usually,
-/// a `PartitionDestination` can never live longer than the parent.
+/// Ability to write values to its own partition of the destination.
 pub trait PartitionWriter: Send {
     type TypeSystem: TypeSystem;
     type Error: From<ConnectorXError> + Send;
 
-    /// Write a value of type T to the location (row, col). If T mismatch with the
+    /// The next value into the destination buffer. If T mismatches with the
     /// schema, `ConnectorXError::TypeCheckFailed` will return.
     fn write<T>(&mut self, value: T) -> Result<(), <Self as PartitionWriter>::Error>
     where
@@ -47,7 +42,7 @@ pub trait PartitionWriter: Send {
     }
 
     /// Number of rows this `PartitionDestination` controls.
-    fn ncols(&self) -> usize;
+    fn column_count(&self) -> usize;
 
     /// Final clean ups
     fn finalize(&mut self) -> Result<(), Self::Error>;

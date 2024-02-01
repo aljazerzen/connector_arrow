@@ -29,7 +29,8 @@ fn arrow_destination_col_major() {
             ArrowTypeSystem::LargeUtf8(true),
         ],
     };
-    let _ = dw.set_metadata(schema, DataOrder::ColumnMajor).unwrap_err();
+    dw.set_schema(schema).unwrap();
+    dw.alloc_writer(DataOrder::ColumnMajor).err().unwrap();
 }
 
 #[test]

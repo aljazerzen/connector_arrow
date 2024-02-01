@@ -63,12 +63,12 @@ where
         let src_schema = first_reader.fetch_until_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
 
-        self.dst.set_metadata(dst_schema.clone(), data_order)?;
+        self.dst.set_schema(dst_schema.clone())?;
 
         debug!("Create destination partition");
         let mut dst_writers = Vec::with_capacity(self.queries.len());
         for _ in 0..self.queries.len() {
-            dst_writers.push(self.dst.allocate_partition()?);
+            dst_writers.push(self.dst.alloc_writer(data_order)?);
         }
 
         Ok(PreparedDispatch {
@@ -116,7 +116,7 @@ where
                         DataOrder::RowMajor => {
                             for _ in 0..batch_size {
                                 #[allow(clippy::needless_range_loop)]
-                                for col in 0..dst.ncols() {
+                                for col in 0..dst.column_count() {
                                     #[cfg(feature = "fptr")]
                                     {
                                         let transporter = transporters[col];
@@ -136,7 +136,7 @@ where
                             // not need to happen for each iteration over rows.
 
                             #[allow(clippy::needless_range_loop)]
-                            for col in 0..dst.ncols() {
+                            for col in 0..dst.column_count() {
                                 for _ in 0..batch_size {
                                     #[cfg(feature = "fptr")]
                                     {
@@ -174,7 +174,7 @@ where
 
         let src_schema = reader.fetch_until_schema()?;
         let dst_schema = src_schema.convert::<TP::TSD, TP>()?;
-        self.dst.set_metadata(dst_schema, dorder)?;
+        self.dst.set_schema(dst_schema)?;
         Ok(())
     }
 }

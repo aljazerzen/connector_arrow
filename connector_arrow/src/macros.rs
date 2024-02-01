@@ -175,8 +175,8 @@ macro_rules! impl_transport {
             type Error = $ET;
 
             impl_transport!(@cvtts [$TSS, $TSD] $([ $($TOKENS)+ ])*);
-            impl_transport!(@process [$TSS, $TSD] $([ $($TOKENS)+ ])*);
-            impl_transport!(@processor [$TSS, $TSD] $([ $($TOKENS)+ ])*, $([ $($TOKENS)+ ])*);
+            impl_transport!(@transport_fn [$TSS, $TSD] $([ $($TOKENS)+ ])*);
+            impl_transport!(@transporter [$TSS, $TSD] $([ $($TOKENS)+ ])*, $([ $($TOKENS)+ ])*);
         }
     };
 
@@ -195,7 +195,7 @@ macro_rules! impl_transport {
         }
     };
 
-    (@process [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*) => {
+    (@transport_fn [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*) => {
         fn transport<'s, 'd, 'r>(
             ts1: Self::TSS,
             ts2: Self::TSD,
@@ -227,7 +227,7 @@ macro_rules! impl_transport {
         }
     };
 
-    (@processor [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*, $([ $($TOKENS:tt)+ ])*) => {
+    (@transporter [$TSS:tt, $TSD:tt] $([ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ])*, $([ $($TOKENS:tt)+ ])*) => {
         fn transporter<'s, 'd>(
             ts1: Self::TSS,
             ts2: Self::TSD,
@@ -240,11 +240,11 @@ macro_rules! impl_transport {
             match (ts1, ts2) {
                 $(
                     ($TSS::$V1(true), $TSD::$V2(true)) => {
-                        impl_transport!(@process_func_branch true [ $($TOKENS)+ ])
+                        impl_transport!(@transport_fn_branch true [ $($TOKENS)+ ])
                     }
 
                     ($TSS::$V1(false), $TSD::$V2(false)) => {
-                        impl_transport!(@process_func_branch false [ $($TOKENS)+ ])
+                        impl_transport!(@transport_fn_branch false [ $($TOKENS)+ ])
                     }
                 )*
                 #[allow(unreachable_patterns)]
@@ -256,24 +256,24 @@ macro_rules! impl_transport {
         }
     };
 
-    (@process_func_branch $OPT:ident [ $V1:tt [&$L1:lifetime $T1:ty] => $V2:tt [&$L2:lifetime $T2:ty] | conversion $HOW:ident ]) => {
-        impl_transport!(@process_func_branch $OPT &$T1, &$T2)
+    (@transport_fn_branch $OPT:ident [ $V1:tt [&$L1:lifetime $T1:ty] => $V2:tt [&$L2:lifetime $T2:ty] | conversion $HOW:ident ]) => {
+        impl_transport!(@transport_fn_branch $OPT &$T1, &$T2)
     };
-    (@process_func_branch $OPT:ident [ $V1:tt [$T1:ty] => $V2:tt [&$L2:lifetime $T2:ty] | conversion $HOW:ident ]) => {
-        impl_transport!(@process_func_branch $OPT $T1, &$T2)
+    (@transport_fn_branch $OPT:ident [ $V1:tt [$T1:ty] => $V2:tt [&$L2:lifetime $T2:ty] | conversion $HOW:ident ]) => {
+        impl_transport!(@transport_fn_branch $OPT $T1, &$T2)
     };
-    (@process_func_branch $OPT:ident [ $V1:tt [&$L1:lifetime $T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ]) => {
-        impl_transport!(@process_func_branch $OPT &$T1, $T2)
+    (@transport_fn_branch $OPT:ident [ $V1:tt [&$L1:lifetime $T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ]) => {
+        impl_transport!(@transport_fn_branch $OPT &$T1, $T2)
     };
-    (@process_func_branch $OPT:ident [ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ]) => {
-        impl_transport!(@process_func_branch $OPT $T1, $T2)
+    (@transport_fn_branch $OPT:ident [ $V1:tt [$T1:ty] => $V2:tt [$T2:ty] | conversion $HOW:ident ]) => {
+        impl_transport!(@transport_fn_branch $OPT $T1, $T2)
     };
-    (@process_func_branch true $T1:ty, $T2:ty) => {
+    (@transport_fn_branch true $T1:ty, $T2:ty) => {
         Ok(
             |s: &mut _, d: &mut _| $crate::typesystem::process::<Option<$T1>, Option<$T2>, Self, Self::S, Self::D, <Self::S as $crate::sources::Source>::Error, <Self::D as $crate::destinations::Destination>::Error, Self::Error>(s, d)
         )
     };
-    (@process_func_branch false $T1:ty, $T2:ty) => {
+    (@transport_fn_branch false $T1:ty, $T2:ty) => {
         Ok(
             |s: &mut _, d: &mut _| $crate::typesystem::process::<$T1, $T2, Self, Self::S, Self::D, <Self::S as $crate::sources::Source>::Error, <Self::D as $crate::destinations::Destination>::Error, Self::Error>(s, d)
         )
