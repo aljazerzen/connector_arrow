@@ -29,6 +29,7 @@
           postgresql_15
           sqlite
           mysql
+          duckdb
         ];
 
       in
