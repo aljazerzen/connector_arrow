@@ -1,5 +1,4 @@
 use arrow::datatypes::{DataType, Field};
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 
 /// Take a value of type `ty` from [Produce] and insert it into [Consume].
 pub fn transport<'r, P: Produce<'r>, C: Consume>(f: &Field, src: &P, dst: &mut C) {
@@ -45,24 +44,6 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(f: &Field, src: &P, dst: &mut C
         DataType::Float64 => {
             Consume::consume(dst, Produce::produce::<Option<f64>>(src));
         }
-        DataType::Date32 if !f.is_nullable() => {
-            Consume::consume(dst, Produce::produce::<NaiveDate>(src));
-        }
-        DataType::Date32 => {
-            Consume::consume(dst, Produce::produce::<Option<NaiveDate>>(src));
-        }
-        DataType::Date64 if !f.is_nullable() => {
-            Consume::consume(dst, Produce::produce::<NaiveDateTime>(src));
-        }
-        DataType::Date64 => {
-            Consume::consume(dst, Produce::produce::<Option<NaiveDateTime>>(src));
-        }
-        DataType::Time64(_) if !f.is_nullable() => {
-            Consume::consume(dst, Produce::produce::<NaiveTime>(src));
-        }
-        DataType::Time64(_) => {
-            Consume::consume(dst, Produce::produce::<Option<NaiveTime>>(src));
-        }
         DataType::LargeBinary if !f.is_nullable() => {
             Consume::consume(dst, Produce::produce::<Vec<u8>>(src));
         }
@@ -81,10 +62,6 @@ pub trait Produce<'r>:
     + ProduceTy<'r, i8>
     + ProduceTy<'r, String>
     + ProduceTy<'r, f64>
-    + ProduceTy<'r, NaiveDate>
-    + ProduceTy<'r, NaiveDateTime>
-    + ProduceTy<'r, NaiveTime>
-    + ProduceTy<'r, DateTime<Utc>>
     + ProduceTy<'r, Vec<u8>>
     + ProduceTy<'r, Option<bool>>
     + ProduceTy<'r, Option<i64>>
@@ -93,10 +70,6 @@ pub trait Produce<'r>:
     + ProduceTy<'r, Option<i8>>
     + ProduceTy<'r, Option<String>>
     + ProduceTy<'r, Option<f64>>
-    + ProduceTy<'r, Option<NaiveDate>>
-    + ProduceTy<'r, Option<NaiveDateTime>>
-    + ProduceTy<'r, Option<NaiveTime>>
-    + ProduceTy<'r, Option<DateTime<Utc>>>
     + ProduceTy<'r, Option<Vec<u8>>>
 {
     fn produce<T>(&self) -> T
@@ -119,10 +92,6 @@ pub trait Consume:
     + ConsumeTy<i8>
     + ConsumeTy<String>
     + ConsumeTy<f64>
-    + ConsumeTy<NaiveDate>
-    + ConsumeTy<NaiveDateTime>
-    + ConsumeTy<NaiveTime>
-    + ConsumeTy<DateTime<Utc>>
     + ConsumeTy<Vec<u8>>
     + ConsumeTy<Option<bool>>
     + ConsumeTy<Option<i64>>
@@ -131,10 +100,6 @@ pub trait Consume:
     + ConsumeTy<Option<i8>>
     + ConsumeTy<Option<String>>
     + ConsumeTy<Option<f64>>
-    + ConsumeTy<Option<NaiveDate>>
-    + ConsumeTy<Option<NaiveDateTime>>
-    + ConsumeTy<Option<NaiveTime>>
-    + ConsumeTy<Option<DateTime<Utc>>>
     + ConsumeTy<Option<Vec<u8>>>
 {
     fn consume<T>(&mut self, value: T)
