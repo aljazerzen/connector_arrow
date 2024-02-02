@@ -1,4 +1,5 @@
 use std::string::FromUtf8Error;
+use std::sync::Arc;
 
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use fehler::throws;
@@ -101,13 +102,13 @@ pub struct SQLiteRowsReader<'task> {
 impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
     type Error = SQLiteError;
     type RowsReader = Self;
-    type BatchReader = UnsupportedReader<'task>;
+    type BatchReader = UnsupportedReader<'task, ()>;
 
     fn try_into_rows(self) -> Result<Self::RowsReader, Self> {
         Ok(self)
     }
 
-    fn read_until_schema(&mut self) -> Result<Option<arrow::datatypes::Schema>, Self::Error> {
+    fn read_until_schema(&mut self) -> Result<Option<Arc<arrow::datatypes::Schema>>, Self::Error> {
         self.rows.advance()?;
         self.advanced_but_not_consumed = true;
         let first_row: Option<&Row<'_>> = self.rows.get();
@@ -134,7 +135,7 @@ impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
             fields.push(arrow::datatypes::Field::new(col.name(), ty, nullable));
         }
 
-        Ok(Some(arrow::datatypes::Schema::new(fields)))
+        Ok(Some(Arc::new(arrow::datatypes::Schema::new(fields))))
     }
 }
 

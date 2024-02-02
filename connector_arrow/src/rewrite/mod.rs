@@ -1,11 +1,10 @@
 mod consumer_row;
 mod data_store;
+pub mod duckdb;
 pub mod sqlite;
 mod transport;
 
-use std::sync::Arc;
-
-use arrow::{error::ArrowError, record_batch::RecordBatch};
+use arrow::record_batch::RecordBatch;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use self::data_store::{
@@ -40,14 +39,9 @@ pub fn query_one<S: DataStore>(store: &S, query: &str) -> Result<Vec<RecordBatch
 
     log::debug!("got schema: {schema:?}");
 
-    let schema = Arc::new(schema);
-
     let reader = match reader.try_into_batch() {
         Ok(batch_reader) => {
-            let res = batch_reader
-                .into_iter()
-                .collect::<Result<Vec<_>, ArrowError>>()
-                .unwrap();
+            let res = batch_reader.into_iter().collect::<Vec<_>>();
 
             return Ok(res);
         }

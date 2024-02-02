@@ -4,6 +4,8 @@ mod test_arrow;
 mod test_bigquery;
 #[cfg(feature = "src_csv")]
 mod test_csv;
+#[cfg(feature = "src_duckdb")]
+mod test_duckdb;
 #[cfg(feature = "src_mssql")]
 mod test_mssql;
 #[cfg(feature = "src_mysql")]

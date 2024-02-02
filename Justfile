@@ -1,16 +1,6 @@
 export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
-export SQLITE_URL := "sqlite://sqlite.db"
-
-export MYSQL_HOST := "localhost"
-export MYSQL_PORT := "3306"
-export MYSQL_USER := "root"
-export MYSQL_PASSWORD := "root"
-export MYSQL_DB := "dummy"
-
-export MSSQL_HOST := "localhost"
-export MSSQL_USER := "sa"
-export MSSQL_PASSWORD := "Wordpass123##"
-export MSSQL_DB := "db"
+export SQLITE_URL := "sqlite://dbs/sqlite.db"
+export DUCKDB_URL := "../dbs/duckdb.db"
 
 
 default:
@@ -22,7 +12,7 @@ build-release:
 build-debug:
     cargo build --features all
 
-features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite"
+features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite,src_duckdb"
 test:
     cargo nextest run {{features_test}}
     cargo fmt --check

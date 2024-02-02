@@ -1,7 +1,7 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
-use arrow::error::ArrowError;
-use arrow::record_batch::{RecordBatch, RecordBatchReader};
+use arrow::record_batch::RecordBatch;
 
 use super::transport::{Produce, ProduceTy};
 
@@ -42,7 +42,7 @@ pub trait ResultReader<'task>: Sized {
     type RowsReader: RowsReader<'task, Error = Self::Error>;
     type BatchReader: BatchReader<'task>;
 
-    fn read_until_schema(&mut self) -> Result<Option<arrow::datatypes::Schema>, Self::Error>;
+    fn read_until_schema(&mut self) -> Result<Option<Arc<arrow::datatypes::Schema>>, Self::Error>;
 
     fn try_into_batch(self) -> Result<Self::BatchReader, Self> {
         Err(self)
@@ -53,7 +53,7 @@ pub trait ResultReader<'task>: Sized {
     }
 }
 
-pub trait BatchReader<'task>: RecordBatchReader {}
+pub trait BatchReader<'task>: Iterator<Item = RecordBatch> {}
 
 pub trait RowsReader<'task> {
     type Error: Send + Debug;
@@ -79,30 +79,27 @@ pub use unsupported::UnsupportedReader;
 mod unsupported {
     use std::marker::PhantomData;
 
+    use arrow::record_batch::RecordBatch;
+
     use super::*;
 
     /// A noop reader whose type can be used for non-supported readers in implementation of [TaskReader].
-    pub struct UnsupportedReader<'task>(&'task PhantomData<bool>);
+    pub struct UnsupportedReader<'task, Err>(&'task PhantomData<Err>);
 
-    impl<'task> Iterator for UnsupportedReader<'task> {
-        type Item = Result<RecordBatch, ArrowError>;
+    impl<'task> Iterator for UnsupportedReader<'task, ()> {
+        type Item = RecordBatch;
 
         fn next(&mut self) -> Option<Self::Item> {
             unimplemented!()
         }
     }
 
-    impl<'task> BatchReader<'task> for UnsupportedReader<'task> {}
-    impl<'task> RecordBatchReader for UnsupportedReader<'task> {
-        fn schema(&self) -> arrow::datatypes::SchemaRef {
-            unimplemented!()
-        }
-    }
+    impl<'task> BatchReader<'task> for UnsupportedReader<'task, ()> {}
 
-    impl<'task> RowsReader<'task> for UnsupportedReader<'task> {
-        type Error = ();
+    impl<'task, Err: Debug + Send> RowsReader<'task> for UnsupportedReader<'task, Err> {
+        type Error = Err;
 
-        type RowReader<'rows> = UnsupportedReader<'rows>
+        type RowReader<'rows> = UnsupportedReader<'rows, Err>
         where
             Self: 'rows;
 
@@ -111,10 +108,10 @@ mod unsupported {
         }
     }
 
-    impl<'task> RowReader<'task> for UnsupportedReader<'task> {
-        type Error = ();
+    impl<'task, Err: Debug + Send> RowReader<'task> for UnsupportedReader<'task, Err> {
+        type Error = Err;
 
-        type CellReader<'row> = UnsupportedReader<'row>
+        type CellReader<'row> = UnsupportedReader<'row, ()>
         where
             Self: 'row;
 
@@ -123,9 +120,9 @@ mod unsupported {
         }
     }
 
-    impl<'r> Produce<'r> for UnsupportedReader<'r> {}
+    impl<'r> Produce<'r> for UnsupportedReader<'r, ()> {}
 
-    impl<'r, T> ProduceTy<'r, T> for UnsupportedReader<'r> {
+    impl<'r, T> ProduceTy<'r, T> for UnsupportedReader<'r, ()> {
         fn produce(&self) -> T {
             unimplemented!()
         }
