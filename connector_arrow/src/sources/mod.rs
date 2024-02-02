@@ -21,7 +21,7 @@ pub mod sqlite;
 use crate::data_order::DataOrder;
 use crate::errors::ConnectorXError;
 use crate::sql::CXQuery;
-use crate::typesystem::{Schema, TypeAssoc, TypeSystem};
+use crate::typesystem::{Schema, TypeSystem};
 use std::fmt::Debug;
 
 /// A description of a data storage facility which has the ability to execute some
@@ -93,7 +93,6 @@ pub trait ValueStream<'a> {
     /// as it is defined for any T that we can [Produce].
     fn next_value<'r, T>(&'r mut self) -> Result<T, <Self as ValueStream<'a>>::Error>
     where
-        T: TypeAssoc<Self::TypeSystem>,
         Self: Produce<'r, T, Error = <Self as ValueStream<'a>>::Error>,
     {
         self.produce()

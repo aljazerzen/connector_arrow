@@ -151,6 +151,7 @@ pub mod destinations;
 mod dispatcher;
 pub mod errors;
 pub mod frontend;
+pub mod rewrite;
 pub mod sources;
 #[doc(hidden)]
 pub mod sql;
