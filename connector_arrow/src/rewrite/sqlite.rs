@@ -159,6 +159,9 @@ impl<'r, T: FromSql> ProduceTy<'r, T> for SQLCellRef<'r> {
     fn produce(&self) -> T {
         self.0.get_unwrap::<usize, T>(self.1)
     }
+    fn produce_opt(&self) -> Option<T> {
+        self.0.get_unwrap::<usize, Option<T>>(self.1)
+    }
 }
 
 fn convert_type_with_name(

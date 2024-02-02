@@ -118,5 +118,8 @@ mod unsupported {
         fn produce(&self) -> T {
             unimplemented!()
         }
+        fn produce_opt(&self) -> Option<T> {
+            unimplemented!()
+        }
     }
 }

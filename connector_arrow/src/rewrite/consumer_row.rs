@@ -1,10 +1,7 @@
 //! Destination implementation for Arrow and Polars.
 
 use arrow::array::builder::ArrayBuilder;
-use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
-    Int8Builder, LargeBinaryBuilder, LargeStringBuilder, StringBuilder,
-};
+use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use fehler::throws;
@@ -12,7 +9,7 @@ use std::any::Any;
 use std::sync::Arc;
 
 use super::errors::ConnectorError;
-use super::transport::{Consume, ConsumeTy};
+use super::transport::Consume;
 
 type Builder = Box<dyn ArrayBuilder>;
 
@@ -117,136 +114,6 @@ impl ArrowRowWriter {
 
 impl Consume for ArrowRowWriter {}
 
-impl ConsumeTy<bool> for ArrowRowWriter {
-    fn consume(&mut self, value: bool) {
-        self.next_builder()
-            .downcast_mut::<BooleanBuilder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<i64> for ArrowRowWriter {
-    fn consume(&mut self, value: i64) {
-        self.next_builder()
-            .downcast_mut::<Int64Builder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<i32> for ArrowRowWriter {
-    fn consume(&mut self, value: i32) {
-        self.next_builder()
-            .downcast_mut::<Int32Builder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<i16> for ArrowRowWriter {
-    fn consume(&mut self, value: i16) {
-        self.next_builder()
-            .downcast_mut::<Int16Builder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<i8> for ArrowRowWriter {
-    fn consume(&mut self, value: i8) {
-        self.next_builder()
-            .downcast_mut::<Int8Builder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<String> for ArrowRowWriter {
-    fn consume(&mut self, value: String) {
-        self.next_builder()
-            .downcast_mut::<StringBuilder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<f64> for ArrowRowWriter {
-    fn consume(&mut self, value: f64) {
-        self.next_builder()
-            .downcast_mut::<Float64Builder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-impl ConsumeTy<Vec<u8>> for ArrowRowWriter {
-    fn consume(&mut self, value: Vec<u8>) {
-        self.next_builder()
-            .downcast_mut::<LargeBinaryBuilder>()
-            .unwrap()
-            .append_value(value);
-    }
-}
-
-impl ConsumeTy<Option<bool>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<bool>) {
-        self.next_builder()
-            .downcast_mut::<BooleanBuilder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<i64>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<i64>) {
-        self.next_builder()
-            .downcast_mut::<Int64Builder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<i32>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<i32>) {
-        self.next_builder()
-            .downcast_mut::<Int32Builder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<i16>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<i16>) {
-        self.next_builder()
-            .downcast_mut::<Int16Builder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<i8>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<i8>) {
-        self.next_builder()
-            .downcast_mut::<Int8Builder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<String>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<String>) {
-        self.next_builder()
-            .downcast_mut::<LargeStringBuilder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<f64>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<f64>) {
-        self.next_builder()
-            .downcast_mut::<Float64Builder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-impl ConsumeTy<Option<Vec<u8>>> for ArrowRowWriter {
-    fn consume(&mut self, value: Option<Vec<u8>>) {
-        self.next_builder()
-            .downcast_mut::<LargeBinaryBuilder>()
-            .unwrap()
-            .append_option(value);
-    }
-}
-
 /// Determines into which column the next stream value should go.
 pub struct Organizer {
     col_count: usize,
@@ -283,4 +150,54 @@ impl Organizer {
         }
         col
     }
+}
+
+macro_rules! impl_consume_ty {
+    (
+        $(
+            { $Native:ty => $Builder:tt }
+        )*
+    ) => {
+        $(
+            impl super::transport::ConsumeTy<$Native> for ArrowRowWriter {
+                fn consume(&mut self, value: $Native) {
+                    self.next_builder()
+                        .downcast_mut::<arrow::array::builder::$Builder>().unwrap()
+                        .append_value(value);
+                }
+                fn consume_opt(&mut self, value: Option<$Native>) {
+                    self.next_builder()
+                        .downcast_mut::<arrow::array::builder::$Builder>().unwrap()
+                        .append_option(value);
+                }
+            }
+        )+
+    };
+}
+
+// List of ConsumeTy implementations to generate.
+// Must match with arrow::array::make_builder
+impl_consume_ty! {
+    // {         => NullBuilder            }  // Null
+       { bool    => BooleanBuilder         }  // Boolean
+       { i8      => Int8Builder            }  // Int8
+       { i16     => Int16Builder           }  // Int16
+       { i32     => Int32Builder           }  // Int32
+       { i64     => Int64Builder           }  // Int64
+       { u8      => UInt8Builder           }  // UInt8
+       { u16     => UInt16Builder          }  // UInt16
+       { u32     => UInt32Builder          }  // UInt32
+       { u64     => UInt64Builder          }  // UInt64
+    // {         => Float16Builder         }  // Float16
+       { f32     => Float32Builder         }  // Float32
+       { f64     => Float64Builder         }  // Float64
+    // {         => BinaryBuilder          }  // Binary
+       { Vec<u8> => LargeBinaryBuilder     }  // LargeBinary
+    // {         => FixedSizeBinaryBuilder }  // FixedSizeBinary
+    // {         => Decimal128Builde       }  // Decimal128
+    // {         => Decimal256Builde       }  // Decimal256
+    // {         => StringBuilde           }  // Utf8
+       { String  => LargeStringBuilder     }  // LargeUtf8
+    // {         => Date32Builde           }  // Date32
+    // {         => Date64Builde           }  // Date64
 }
