@@ -1,4 +1,3 @@
-use std::string::FromUtf8Error;
 use std::sync::Arc;
 
 use fallible_streaming_iterator::FallibleStreamingIterator;
@@ -8,8 +7,8 @@ use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, Type};
 use rusqlite::{Row, Rows, Statement};
-use thiserror::Error;
 
+use super::errors::ConnectorError;
 use super::transport::ProduceTy;
 use super::{data_store::*, transport::Produce};
 
@@ -18,27 +17,8 @@ pub struct SQLiteSource {
     pool: Pool<SqliteConnectionManager>,
 }
 
-#[derive(Error, Debug)]
-pub enum SQLiteError {
-    #[error(transparent)]
-    ConnectorXError(#[from] crate::errors::ConnectorXError),
-
-    #[error(transparent)]
-    SQLiteError(#[from] rusqlite::Error),
-
-    #[error(transparent)]
-    SQLitePoolError(#[from] r2d2::Error),
-
-    #[error(transparent)]
-    SQLiteUrlDecodeError(#[from] FromUtf8Error),
-
-    /// Any other errors that are too trivial to be put here explicitly.
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
 impl SQLiteSource {
-    #[throws(SQLiteError)]
+    #[throws(ConnectorError)]
     pub fn new(url: &str, max_conn: usize) -> Self {
         let decoded_conn = urlencoding::decode(url)?.into_owned();
         log::debug!("decoded conn: {}", decoded_conn);
@@ -50,10 +30,9 @@ impl SQLiteSource {
 }
 
 impl DataStore for SQLiteSource {
-    type Error = SQLiteError;
     type Conn = SQLiteConnection;
 
-    #[throws(SQLiteError)]
+    #[throws(ConnectorError)]
     fn new_connection(&self) -> Self::Conn {
         let conn = self.pool.get()?;
         SQLiteConnection { conn }
@@ -65,10 +44,9 @@ pub struct SQLiteConnection {
 }
 
 impl DataStoreConnection for SQLiteConnection {
-    type Error = SQLiteError;
     type Task<'conn> = SQLiteTask<'conn> where Self: 'conn;
 
-    #[throws(SQLiteError)]
+    #[throws(ConnectorError)]
     fn prepare_task(&mut self, query: &str) -> SQLiteTask {
         let stmt = self.conn.prepare(query)?;
         SQLiteTask { stmt }
@@ -80,11 +58,10 @@ pub struct SQLiteTask<'conn> {
 }
 
 impl<'conn> DataStoreTask<'conn> for SQLiteTask<'conn> {
-    type Error = SQLiteError;
     type Params = ();
     type Reader<'task> = SQLiteRowsReader<'task> where Self: 'task;
 
-    fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, Self::Error> {
+    fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
         let rows = self.stmt.query(params)?;
         let reader = SQLiteRowsReader {
             rows,
@@ -100,15 +77,16 @@ pub struct SQLiteRowsReader<'task> {
 }
 
 impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
-    type Error = SQLiteError;
     type RowsReader = Self;
-    type BatchReader = UnsupportedReader<'task, ()>;
+    type BatchReader = UnsupportedReader<'task>;
 
     fn try_into_rows(self) -> Result<Self::RowsReader, Self> {
         Ok(self)
     }
 
-    fn read_until_schema(&mut self) -> Result<Option<Arc<arrow::datatypes::Schema>>, Self::Error> {
+    fn read_until_schema(
+        &mut self,
+    ) -> Result<Option<Arc<arrow::datatypes::Schema>>, ConnectorError> {
         self.rows.advance()?;
         self.advanced_but_not_consumed = true;
         let first_row: Option<&Row<'_>> = self.rows.get();
@@ -140,12 +118,11 @@ impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
 }
 
 impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
-    type Error = SQLiteError;
     type RowReader<'rows> = SQLiteRowReader<'rows>
     where
         Self: 'rows;
 
-    #[throws(SQLiteError)]
+    #[throws(ConnectorError)]
     fn next_row(&mut self) -> Option<Self::RowReader<'_>> {
         let row = if self.advanced_but_not_consumed {
             self.advanced_but_not_consumed = false;
@@ -163,7 +140,6 @@ pub struct SQLiteRowReader<'rows> {
 }
 
 impl<'rows> RowReader<'rows> for SQLiteRowReader<'rows> {
-    type Error = SQLiteError;
     type CellReader<'row> = SQLCellRef<'row>
     where
         Self: 'row;

@@ -1,30 +1,23 @@
 //! Destination implementation for Arrow and Polars.
 
+use arrow::array::builder::ArrayBuilder;
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Date32Builder, Date64Builder, Float16Builder, Float32Builder,
-    Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, LargeBinaryBuilder,
-    LargeStringBuilder, NullBuilder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder,
-    UInt8Builder,
+    ArrayRef, BooleanBuilder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
+    Int8Builder, LargeBinaryBuilder, LargeStringBuilder, StringBuilder,
 };
-use arrow::datatypes::Schema as ArrowSchema;
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use fehler::throws;
 use std::any::Any;
 use std::sync::Arc;
-use thiserror::Error;
 
+use super::errors::ConnectorError;
 use super::transport::{Consume, ConsumeTy};
 
-type Builder = Box<dyn arrow::array::builder::ArrayBuilder>;
-
-#[derive(Error, Debug)]
-pub enum ArrowDestinationError {
-    #[error(transparent)]
-    ArrowError(#[from] arrow::error::ArrowError),
-}
+type Builder = Box<dyn ArrayBuilder>;
 
 pub struct ArrowRowWriter {
-    schema: Arc<ArrowSchema>,
+    schema: Arc<Schema>,
     min_batch_size: usize,
     data: Vec<RecordBatch>,
 
@@ -42,8 +35,8 @@ pub struct ArrowRowWriter {
 // unsafe impl Sync for ArrowPartitionWriter {}
 
 impl ArrowRowWriter {
-    #[throws(ArrowDestinationError)]
-    pub fn new(schema: Arc<ArrowSchema>, min_batch_size: usize) -> Self {
+    #[throws(ConnectorError)]
+    pub fn new(schema: Arc<Schema>, min_batch_size: usize) -> Self {
         ArrowRowWriter {
             receiver: Organizer::new(schema.fields().len()),
             data: Vec::new(),
@@ -57,7 +50,7 @@ impl ArrowRowWriter {
         }
     }
 
-    #[throws(ArrowDestinationError)]
+    #[throws(ConnectorError)]
     pub fn prepare_for_batch(&mut self, row_count: usize) {
         self.receiver.reset_for_batch(row_count);
         self.allocate(row_count)?;
@@ -65,7 +58,7 @@ impl ArrowRowWriter {
 
     /// Make sure that there is enough memory allocated in builders for the incoming batch.
     /// Might allocate more than needed, for future row reservations.
-    #[throws(ArrowDestinationError)]
+    #[throws(ConnectorError)]
     fn allocate(&mut self, row_count: usize) {
         if self.rows_capacity >= row_count + self.rows_reserved {
             // there is enough capacity, no need to allocate
@@ -87,79 +80,7 @@ impl ArrowRowWriter {
             .schema
             .fields
             .iter()
-            .map(|dt| -> Builder {
-                match dt.data_type() {
-                    arrow::datatypes::DataType::Null => {
-                        Box::new(NullBuilder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Boolean => {
-                        Box::new(BooleanBuilder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Int8 => {
-                        Box::new(Int8Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Int16 => {
-                        Box::new(Int16Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Int32 => {
-                        Box::new(Int32Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Int64 => {
-                        Box::new(Int64Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::UInt8 => {
-                        Box::new(UInt8Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::UInt16 => {
-                        Box::new(UInt16Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::UInt32 => {
-                        Box::new(UInt32Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::UInt64 => {
-                        Box::new(UInt64Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Float16 => {
-                        Box::new(Float16Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Float32 => {
-                        Box::new(Float32Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Float64 => {
-                        Box::new(Float64Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Timestamp(_, _) => todo!(),
-                    arrow::datatypes::DataType::Date32 => {
-                        Box::new(Date32Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Date64 => {
-                        Box::new(Date64Builder::with_capacity(to_allocate))
-                    }
-                    arrow::datatypes::DataType::Time32(_) => todo!(),
-                    arrow::datatypes::DataType::Time64(_) => todo!(),
-                    arrow::datatypes::DataType::Duration(_) => todo!(),
-                    arrow::datatypes::DataType::Interval(_) => todo!(),
-                    arrow::datatypes::DataType::Binary => todo!(),
-                    arrow::datatypes::DataType::FixedSizeBinary(_) => todo!(),
-                    arrow::datatypes::DataType::LargeBinary => todo!(),
-                    arrow::datatypes::DataType::Utf8 => {
-                        Box::new(StringBuilder::with_capacity(to_allocate, to_allocate * 256))
-                    }
-                    arrow::datatypes::DataType::LargeUtf8 => Box::new(
-                        LargeStringBuilder::with_capacity(to_allocate, to_allocate * 256),
-                    ),
-                    arrow::datatypes::DataType::List(_) => todo!(),
-                    arrow::datatypes::DataType::FixedSizeList(_, _) => todo!(),
-                    arrow::datatypes::DataType::LargeList(_) => todo!(),
-                    arrow::datatypes::DataType::Struct(_) => todo!(),
-                    arrow::datatypes::DataType::Union(_, _) => todo!(),
-                    arrow::datatypes::DataType::Dictionary(_, _) => todo!(),
-                    arrow::datatypes::DataType::Decimal128(_, _) => todo!(),
-                    arrow::datatypes::DataType::Decimal256(_, _) => todo!(),
-                    arrow::datatypes::DataType::Map(_, _) => todo!(),
-                    arrow::datatypes::DataType::RunEndEncoded(_, _) => todo!(),
-                }
-            })
+            .map(|f| arrow::array::make_builder(f.data_type(), to_allocate))
             .collect();
 
         self.builders = Some(builders);
@@ -167,7 +88,7 @@ impl ArrowRowWriter {
         self.rows_capacity = to_allocate;
     }
 
-    #[throws(ArrowDestinationError)]
+    #[throws(ConnectorError)]
     fn flush(&mut self) {
         let Some(mut builders) = self.builders.take() else {
             return Ok(());
@@ -180,7 +101,7 @@ impl ArrowRowWriter {
         self.data.push(rb);
     }
 
-    #[throws(ArrowDestinationError)]
+    #[throws(ConnectorError)]
     pub fn finish(mut self) -> Vec<RecordBatch> {
         self.flush()?;
         self.data
