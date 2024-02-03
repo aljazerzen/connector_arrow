@@ -21,7 +21,7 @@ pub trait DataStoreConnection: Send {
     fn prepare_task<'a>(&'a mut self, query: &str) -> Result<Self::Task<'a>, ConnectorError>;
 }
 
-/// Statement
+/// A task that is to be executed in the data store, over a connection.
 pub trait DataStoreTask<'conn> {
     type Params: Send + Sync + Clone;
 
@@ -29,6 +29,8 @@ pub trait DataStoreTask<'conn> {
     where
         Self: 'task;
 
+    /// Start executing.
+    /// This will create a reader that can retrieve schema and then the data.
     fn start(&mut self, params: ()) -> Result<Self::Reader<'_>, ConnectorError>;
 }
 
@@ -38,36 +40,47 @@ pub trait ResultReader<'task>: Sized {
     type RowsReader: RowsReader<'task>;
     type BatchReader: BatchReader<'task>;
 
+    /// Read the results until the schema can be produced.
+    /// Results are not discarded, but kept in a buffer to be read by one of the readers.
     fn read_until_schema(
         &mut self,
     ) -> Result<Option<Arc<arrow::datatypes::Schema>>, ConnectorError>;
 
+    /// If implemented, returns a [BatchReader] that can iterate over [arrow::array::RecordBatch].
+    /// If not implemented, returns self back.
     fn try_into_batch(self) -> Result<Self::BatchReader, Self> {
         Err(self)
     }
 
+    /// If implemented, returns a [RowsReader] that can iterate over rows of the result.
+    /// If not implemented, returns self back.
     fn try_into_rows(self) -> Result<Self::RowsReader, Self> {
         Err(self)
     }
 }
 
+/// Iterator over [RecordBatch]es.
 pub trait BatchReader<'task>: Iterator<Item = RecordBatch> {}
 
+/// Iterator over rows.
+// Cannot be an actual iterator, because of lifetime requirements (I think).
 pub trait RowsReader<'task> {
-    type RowReader<'rows>: RowReader<'rows>
-    where
-        Self: 'rows;
-
-    fn next_row(&mut self) -> Result<Option<Self::RowReader<'_>>, ConnectorError>;
-}
-
-pub trait RowReader<'rows> {
-    type CellReader<'row>: Produce<'row>
+    type CellReader<'row>: CellReader<'row>
     where
         Self: 'row;
 
+    fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError>;
+}
+
+/// Iterator over cells of a row.
+// Cannot be an actual iterator, because of lifetime requirements (I think).
+pub trait CellReader<'row> {
+    type CellRef<'cell>: Produce<'cell>
+    where
+        Self: 'cell;
+
     /// Will panic if called too many times.
-    fn next_cell(&mut self) -> Self::CellReader<'_>;
+    fn next_cell(&mut self) -> Option<Self::CellRef<'_>>;
 }
 
 pub use unsupported::UnsupportedReader;
@@ -79,7 +92,7 @@ mod unsupported {
 
     use super::*;
 
-    /// A noop reader whose type can be used for non-supported readers in implementation of [TaskReader].
+    /// A noop reader whose type can be used for non-supported readers in implementation of [ResultReader].
     pub struct UnsupportedReader<'task>(&'task PhantomData<()>);
 
     impl<'task> Iterator for UnsupportedReader<'task> {
@@ -93,21 +106,21 @@ mod unsupported {
     impl<'task> BatchReader<'task> for UnsupportedReader<'task> {}
 
     impl<'task> RowsReader<'task> for UnsupportedReader<'task> {
-        type RowReader<'rows> = UnsupportedReader<'rows>
+        type CellReader<'rows> = UnsupportedReader<'rows>
         where
             Self: 'rows;
 
-        fn next_row(&mut self) -> Result<Option<Self::RowReader<'_>>, ConnectorError> {
+        fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
             unimplemented!()
         }
     }
 
-    impl<'task> RowReader<'task> for UnsupportedReader<'task> {
-        type CellReader<'row> = UnsupportedReader<'row>
+    impl<'task> CellReader<'task> for UnsupportedReader<'task> {
+        type CellRef<'row> = UnsupportedReader<'row>
         where
             Self: 'row;
 
-        fn next_cell(&mut self) -> Self::CellReader<'_> {
+        fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
             unimplemented!()
         }
     }

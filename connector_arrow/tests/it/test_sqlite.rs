@@ -12,15 +12,9 @@ fn test_sqlite() {
 
     log::debug!("source");
 
-    let queries = [
-        "select test_int, test_nullint, test_str from test_table where test_int < 2",
-        "select test_int, test_nullint, test_str from test_table where test_int >= 2",
-        "select 1 as a from test_table",
-    ];
-
-    let results = rewrite::query_many(&source, &queries).unwrap();
-
-    assert_display_snapshot!(pretty_format_batches(&results[0]).unwrap(), @r###"
+    let query = "select test_int, test_nullint, test_str from test_table where test_int < 2";
+    let results = rewrite::query_one(&source, &query).unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +----------+--------------+------------+
     | test_int | test_nullint | test_str   |
     +----------+--------------+------------+
@@ -29,7 +23,9 @@ fn test_sqlite() {
     +----------+--------------+------------+
     "###);
 
-    assert_display_snapshot!(pretty_format_batches(&results[1]).unwrap(), @r###"
+    let query = "select test_int, test_nullint, test_str from test_table where test_int >= 2";
+    let results = rewrite::query_one(&source, &query).unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +----------+--------------+------------+
     | test_int | test_nullint | test_str   |
     +----------+--------------+------------+
@@ -40,16 +36,15 @@ fn test_sqlite() {
     +----------+--------------+------------+
     "###);
 
-    assert_display_snapshot!(pretty_format_batches(&results[2]).unwrap(), @r###"
+    let query = "select 1 + test_int as a from test_table order by test_int limit 3";
+    let results = rewrite::query_one(&source, &query).unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +---+
     | a |
     +---+
     | 1 |
-    | 1 |
-    | 1 |
-    | 1 |
-    | 1 |
-    | 1 |
+    | 2 |
+    | 3 |
     +---+
     "###);
 }

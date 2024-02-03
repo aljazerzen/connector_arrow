@@ -6,26 +6,13 @@ pub mod sqlite;
 mod transport;
 
 use arrow::record_batch::RecordBatch;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use self::data_store::{
-    DataStore, DataStoreConnection, DataStoreTask, ResultReader, RowReader, RowsReader,
+    CellReader, DataStore, DataStoreConnection, DataStoreTask, ResultReader, RowsReader,
 };
 use self::errors::ConnectorError;
 
-pub fn query_many<S: DataStore>(
-    store: &S,
-    queries: &[&str],
-) -> Result<Vec<Vec<RecordBatch>>, ConnectorError>
-where
-    S: DataStore,
-{
-    queries
-        .into_par_iter()
-        .map(|query| query_one(store, query))
-        .collect()
-}
-
+/// Open a connection, execute a single query and return the connection back into the pool.
 pub fn query_one<S: DataStore>(store: &S, query: &str) -> Result<Vec<RecordBatch>, ConnectorError> {
     log::debug!("query: {query}");
 
@@ -68,7 +55,7 @@ pub fn query_one<S: DataStore>(store: &S, query: &str) -> Result<Vec<RecordBatch
                     let cell_ref = row_reader.next_cell();
                     log::debug!("transporting cell");
 
-                    transport::transport(field, &cell_ref, &mut consumer);
+                    transport::transport(field, &cell_ref.unwrap(), &mut consumer);
                 }
             }
 

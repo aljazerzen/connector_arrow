@@ -62,10 +62,12 @@ impl<'conn> DataStoreTask<'conn> for SQLiteTask<'conn> {
     type Reader<'task> = SQLiteRowsReader<'task> where Self: 'task;
 
     fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
+        let column_count = self.stmt.column_count();
         let rows = self.stmt.query(params)?;
         let reader = SQLiteRowsReader {
             rows,
             advanced_but_not_consumed: false,
+            column_count,
         };
         Ok(reader)
     }
@@ -74,6 +76,7 @@ impl<'conn> DataStoreTask<'conn> for SQLiteTask<'conn> {
 pub struct SQLiteRowsReader<'task> {
     rows: Rows<'task>,
     advanced_but_not_consumed: bool,
+    column_count: usize,
 }
 
 impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
@@ -96,8 +99,7 @@ impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
             return Ok(None);
         };
 
-        let column_count = stmt.column_count();
-        let mut fields = Vec::with_capacity(column_count);
+        let mut fields = Vec::with_capacity(self.column_count);
 
         for (i, col) in stmt.columns().iter().enumerate() {
             let ty_of_first_val = first_row.map(|r| r.get_ref(i).unwrap().data_type());
@@ -118,36 +120,46 @@ impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
 }
 
 impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
-    type RowReader<'rows> = SQLiteRowReader<'rows>
+    type CellReader<'rows> = SQLiteRowReader<'rows>
     where
         Self: 'rows;
 
     #[throws(ConnectorError)]
-    fn next_row(&mut self) -> Option<Self::RowReader<'_>> {
+    fn next_row(&mut self) -> Option<Self::CellReader<'_>> {
+        let column_count = self.column_count;
         let row = if self.advanced_but_not_consumed {
             self.advanced_but_not_consumed = false;
             self.rows.get()
         } else {
             self.rows.next()?
         };
-        row.map(|row| SQLiteRowReader { row, next_col: 0 })
+        row.map(|row| SQLiteRowReader {
+            row,
+            next_col: 0,
+            column_count,
+        })
     }
 }
 
 pub struct SQLiteRowReader<'rows> {
     row: &'rows Row<'rows>,
     next_col: usize,
+    column_count: usize,
 }
 
-impl<'rows> RowReader<'rows> for SQLiteRowReader<'rows> {
-    type CellReader<'row> = SQLCellRef<'row>
+impl<'rows> CellReader<'rows> for SQLiteRowReader<'rows> {
+    type CellRef<'row> = SQLCellRef<'row>
     where
         Self: 'row;
 
-    fn next_cell(&mut self) -> Self::CellReader<'_> {
-        let col = self.next_col;
-        self.next_col += 1;
-        (self.row, col)
+    fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
+        if self.next_col == self.column_count {
+            None
+        } else {
+            let col = self.next_col;
+            self.next_col += 1;
+            Some((self.row, col))
+        }
     }
 }
 
