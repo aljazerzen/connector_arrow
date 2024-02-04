@@ -1,13 +1,15 @@
 mod api;
 pub mod duckdb;
 mod errors;
+pub mod postgres;
 pub mod sqlite;
 pub mod util;
+
+pub use errors::ConnectorError;
 
 use arrow::record_batch::RecordBatch;
 
 use self::api::{Connection, Statement};
-use self::errors::ConnectorError;
 
 /// Open a connection, execute a single query and return the connection back into the pool.
 pub fn query_one<C: Connection>(

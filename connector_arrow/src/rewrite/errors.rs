@@ -2,9 +2,17 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
+use super::postgres::PostgresError;
+
 /// Errors that can be raised from this library.
 #[derive(Error, Debug)]
 pub enum ConnectorError {
+    #[error("Schema of the result cannot be inferred or converted to Arrow schema.")]
+    CannotConvertSchema,
+
+    #[error("Result data does not match the schema")]
+    DataSchemaMismatch(String),
+
     #[error(transparent)]
     Arrow(#[from] arrow::error::ArrowError),
 
@@ -20,6 +28,6 @@ pub enum ConnectorError {
     #[error(transparent)]
     UrlEncoding(#[from] FromUtf8Error),
 
-    #[error("Schema of the result cannot be inferred or converted to Arrow schema.")]
-    CannotConvertSchema,
+    #[error(transparent)]
+    Postgres(#[from] PostgresError),
 }
