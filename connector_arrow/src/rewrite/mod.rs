@@ -1,15 +1,12 @@
-mod consumer_row;
-mod data_store;
+mod api;
 pub mod duckdb;
 mod errors;
 pub mod sqlite;
-mod transport;
+pub mod util;
 
 use arrow::record_batch::RecordBatch;
 
-use self::data_store::{
-    CellReader, DataStore, DataStoreConnection, DataStoreTask, ResultReader, RowsReader,
-};
+use self::api::{Connection, DataStore, Statement};
 use self::errors::ConnectorError;
 
 /// Open a connection, execute a single query and return the connection back into the pool.
@@ -23,47 +20,9 @@ pub fn query_one<S: DataStore>(store: &S, query: &str) -> Result<Vec<RecordBatch
     let mut task = connection.prepare_task(query)?;
 
     // start reading
-    let mut reader = task.start(())?;
-    let Some(schema) = reader.read_until_schema()? else {
-        panic!("cannot read schema, probably empty result");
-    };
-
-    log::debug!("got schema: {schema:?}");
+    let reader = task.start(())?;
 
     // try to read as arrow record batches directly
-    let reader = match reader.try_into_batch() {
-        Ok(batch_reader) => {
-            let res = batch_reader.into_iter().collect::<Vec<_>>();
-
-            return Ok(res);
-        }
-        Err(r) => r,
-    };
-
-    // fallback to reading row-by-row
-    let _reader = match reader.try_into_rows() {
-        Ok(mut rows_reader) => {
-            let mut consumer = consumer_row::ArrowRowWriter::new(schema.clone(), 1024)?;
-
-            log::debug!("reading rows");
-            while let Some(mut row_reader) = rows_reader.next_row()? {
-                consumer.prepare_for_batch(1)?;
-
-                log::debug!("reading row");
-                for field in &schema.fields {
-                    log::debug!("reading cell");
-                    let cell_ref = row_reader.next_cell();
-                    log::debug!("transporting cell");
-
-                    transport::transport(field, &cell_ref.unwrap(), &mut consumer);
-                }
-            }
-
-            return consumer.finish();
-        }
-        Err(r) => r,
-    };
-
-    // cannot read as arrow or as rows, the reader is not implemented correctly
-    panic!("none of the readers are implemented for")
+    let batches = reader.collect::<Result<_, _>>()?;
+    Ok(batches)
 }

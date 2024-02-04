@@ -1,16 +1,14 @@
 //! Source implementation for DuckDB embedded database.
 
 use arrow::record_batch::RecordBatch;
-use duckdb::{Arrow, DuckdbConnectionManager, Statement};
+use duckdb::{Arrow, DuckdbConnectionManager};
 use fehler::throws;
 use log::debug;
 use r2d2::{Pool, PooledConnection};
 use std::sync::Arc;
 use urlencoding::decode;
 
-use super::data_store::{
-    BatchReader, DataStore, DataStoreConnection, DataStoreTask, ResultReader, UnsupportedReader,
-};
+use super::api::{Connection, DataStore, ResultReader, Statement};
 use super::errors::ConnectorError;
 
 #[derive(Clone)]
@@ -47,28 +45,28 @@ pub struct DuckDBConnection {
     conn: PooledConnection<DuckdbConnectionManager>,
 }
 
-impl DataStoreConnection for DuckDBConnection {
-    type Task<'conn> = DuckDBTask<'conn>
+impl Connection for DuckDBConnection {
+    type Stmt<'conn> = DuckDBStatement<'conn>
     where
         Self: 'conn;
 
-    fn prepare_task<'a>(&'a mut self, query: &str) -> Result<Self::Task<'a>, ConnectorError> {
+    fn prepare_task<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self.conn.prepare(query)?;
 
-        Ok(DuckDBTask { stmt })
+        Ok(DuckDBStatement { stmt })
     }
 }
 
-pub struct DuckDBTask<'conn> {
-    stmt: Statement<'conn>,
+pub struct DuckDBStatement<'conn> {
+    stmt: duckdb::Statement<'conn>,
 }
 
-impl<'conn> DataStoreTask<'conn> for DuckDBTask<'conn> {
+impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
     type Params = ();
 
-    type Reader<'task> = DuckDBReader<'task>
+    type Reader<'stmt> = DuckDBReader<'stmt>
     where
-        Self: 'task;
+        Self: 'stmt;
 
     fn start(&mut self, _params: ()) -> Result<Self::Reader<'_>, ConnectorError> {
         let arrow = self.stmt.query_arrow([])?;
@@ -76,31 +74,21 @@ impl<'conn> DataStoreTask<'conn> for DuckDBTask<'conn> {
     }
 }
 
-pub struct DuckDBReader<'task> {
-    arrow: Arrow<'task>,
+pub struct DuckDBReader<'stmt> {
+    arrow: Arrow<'stmt>,
 }
 
-impl<'task> ResultReader<'task> for DuckDBReader<'task> {
-    type RowsReader = UnsupportedReader<'task>;
-    type BatchReader = Self;
-
+impl<'stmt> ResultReader<'stmt> for DuckDBReader<'stmt> {
     #[throws(ConnectorError)]
-    fn read_until_schema(&mut self) -> Option<Arc<arrow::datatypes::Schema>> {
-        let schema = self.arrow.get_schema();
-        Some(schema)
-    }
-
-    fn try_into_batch(self) -> Result<Self::BatchReader, Self> {
-        Ok(self)
+    fn read_until_schema(&mut self) -> Arc<arrow::datatypes::Schema> {
+        self.arrow.get_schema()
     }
 }
 
-impl<'task> BatchReader<'task> for DuckDBReader<'task> {}
-
-impl<'task> Iterator for DuckDBReader<'task> {
-    type Item = RecordBatch;
+impl<'stmt> Iterator for DuckDBReader<'stmt> {
+    type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.arrow.next()
+        self.arrow.next().map(Ok)
     }
 }

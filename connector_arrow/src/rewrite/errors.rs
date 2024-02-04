@@ -19,4 +19,7 @@ pub enum ConnectorError {
 
     #[error(transparent)]
     UrlEncoding(#[from] FromUtf8Error),
+
+    #[error("Schema of the result cannot be inferred or converted to Arrow schema.")]
+    CannotConvertSchema,
 }

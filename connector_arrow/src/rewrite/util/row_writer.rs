@@ -1,18 +1,15 @@
-//! Destination implementation for Arrow and Polars.
+use std::{any::Any, sync::Arc};
 
-use arrow::array::builder::ArrayBuilder;
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayBuilder, ArrayRef};
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use fehler::throws;
-use std::any::Any;
-use std::sync::Arc;
 
-use super::errors::ConnectorError;
 use super::transport::Consume;
+use crate::rewrite::errors::ConnectorError;
 
-type Builder = Box<dyn ArrayBuilder>;
-
+/// Receives values row-by-row and passes them to [ArrayBuilder]s,
+/// which construct [RecordBatch]es.
 pub struct ArrowRowWriter {
     schema: Arc<Schema>,
     min_batch_size: usize,
@@ -22,7 +19,7 @@ pub struct ArrowRowWriter {
     receiver: Organizer,
 
     /// Array buffers.
-    builders: Option<Vec<Builder>>,
+    builders: Option<Vec<Box<dyn ArrayBuilder>>>,
     /// Number of rows reserved to be written in by [ArrowPartitionWriter::prepare_for_batch]
     rows_reserved: usize,
     /// Number of rows allocated within builders.
@@ -73,7 +70,7 @@ impl ArrowRowWriter {
             row_count
         };
 
-        let builders: Vec<Builder> = self
+        let builders: Vec<Box<dyn ArrayBuilder>> = self
             .schema
             .fields
             .iter()

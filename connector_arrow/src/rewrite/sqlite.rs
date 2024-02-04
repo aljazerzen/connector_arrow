@@ -6,11 +6,13 @@ use log;
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, Type};
-use rusqlite::{Row, Rows, Statement};
+use rusqlite::{Row, Rows};
 
+use super::api::*;
 use super::errors::ConnectorError;
-use super::transport::ProduceTy;
-use super::{data_store::*, transport::Produce};
+use super::util::arrow_reader::ArrowReader;
+use super::util::transport::{Produce, ProduceTy};
+use super::util::{collect_rows_to_arrow, CellReader, RowsReader};
 
 #[derive(Clone)]
 pub struct SQLiteSource {
@@ -43,33 +45,38 @@ pub struct SQLiteConnection {
     conn: PooledConnection<SqliteConnectionManager>,
 }
 
-impl DataStoreConnection for SQLiteConnection {
-    type Task<'conn> = SQLiteTask<'conn> where Self: 'conn;
+impl Connection for SQLiteConnection {
+    type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
     #[throws(ConnectorError)]
-    fn prepare_task(&mut self, query: &str) -> SQLiteTask {
+    fn prepare_task(&mut self, query: &str) -> SQLiteStatement {
         let stmt = self.conn.prepare(query)?;
-        SQLiteTask { stmt }
+        SQLiteStatement { stmt }
     }
 }
 
-pub struct SQLiteTask<'conn> {
-    stmt: Statement<'conn>,
+pub struct SQLiteStatement<'conn> {
+    stmt: rusqlite::Statement<'conn>,
 }
 
-impl<'conn> DataStoreTask<'conn> for SQLiteTask<'conn> {
+impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
     type Params = ();
-    type Reader<'task> = SQLiteRowsReader<'task> where Self: 'task;
+    type Reader<'task> = ArrowReader where Self: 'task;
 
     fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
         let column_count = self.stmt.column_count();
-        let rows = self.stmt.query(params)?;
-        let reader = SQLiteRowsReader {
+        let mut rows = self.stmt.query(params)?;
+
+        let schema = read_schema(&mut rows, column_count)?;
+
+        let mut rows = SQLiteRowsReader {
             rows,
-            advanced_but_not_consumed: false,
+            advanced_but_not_consumed: true, // read_schema has advanced the first row
             column_count,
         };
-        Ok(reader)
+        let batches = collect_rows_to_arrow(schema.clone(), &mut rows, 1024)?;
+
+        Ok(ArrowReader::new(schema, batches))
     }
 }
 
@@ -79,48 +86,8 @@ pub struct SQLiteRowsReader<'task> {
     column_count: usize,
 }
 
-impl<'task> ResultReader<'task> for SQLiteRowsReader<'task> {
-    type RowsReader = Self;
-    type BatchReader = UnsupportedReader<'task>;
-
-    fn try_into_rows(self) -> Result<Self::RowsReader, Self> {
-        Ok(self)
-    }
-
-    fn read_until_schema(
-        &mut self,
-    ) -> Result<Option<Arc<arrow::datatypes::Schema>>, ConnectorError> {
-        self.rows.advance()?;
-        self.advanced_but_not_consumed = true;
-        let first_row: Option<&Row<'_>> = self.rows.get();
-
-        let stmt = self.rows.as_ref();
-        let Some(stmt) = stmt else {
-            return Ok(None);
-        };
-
-        let mut fields = Vec::with_capacity(self.column_count);
-
-        for (i, col) in stmt.columns().iter().enumerate() {
-            let ty_of_first_val = first_row.map(|r| r.get_ref(i).unwrap().data_type());
-
-            let ty = convert_type_with_name(col.decl_type(), ty_of_first_val);
-
-            let Some(ty) = ty else {
-                return Ok(None);
-            };
-
-            let nullable = true; // dynamic type system FTW
-
-            fields.push(arrow::datatypes::Field::new(col.name(), ty, nullable));
-        }
-
-        Ok(Some(Arc::new(arrow::datatypes::Schema::new(fields))))
-    }
-}
-
 impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
-    type CellReader<'rows> = SQLiteRowReader<'rows>
+    type CellReader<'rows> = SQLiteCellReader<'rows>
     where
         Self: 'rows;
 
@@ -133,7 +100,7 @@ impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
         } else {
             self.rows.next()?
         };
-        row.map(|row| SQLiteRowReader {
+        row.map(|row| SQLiteCellReader {
             row,
             next_col: 0,
             column_count,
@@ -141,13 +108,13 @@ impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
     }
 }
 
-pub struct SQLiteRowReader<'rows> {
+pub struct SQLiteCellReader<'rows> {
     row: &'rows Row<'rows>,
     next_col: usize,
     column_count: usize,
 }
 
-impl<'rows> CellReader<'rows> for SQLiteRowReader<'rows> {
+impl<'rows> CellReader<'rows> for SQLiteCellReader<'rows> {
     type CellRef<'row> = SQLCellRef<'row>
     where
         Self: 'row;
@@ -174,6 +141,37 @@ impl<'r, T: FromSql> ProduceTy<'r, T> for SQLCellRef<'r> {
     fn produce_opt(&self) -> Option<T> {
         self.0.get_unwrap::<usize, Option<T>>(self.1)
     }
+}
+
+fn read_schema(
+    rows: &mut Rows,
+    column_count: usize,
+) -> Result<Arc<arrow::datatypes::Schema>, ConnectorError> {
+    rows.advance()?;
+    let first_row: Option<&Row<'_>> = rows.get();
+
+    let stmt = rows.as_ref();
+    let Some(stmt) = stmt else {
+        return Err(ConnectorError::CannotConvertSchema);
+    };
+
+    let mut fields = Vec::with_capacity(column_count);
+
+    for (i, col) in stmt.columns().iter().enumerate() {
+        let ty_of_first_val = first_row.map(|r| r.get_ref(i).unwrap().data_type());
+
+        let ty = convert_type_with_name(col.decl_type(), ty_of_first_val);
+
+        let Some(ty) = ty else {
+            return Err(ConnectorError::CannotConvertSchema);
+        };
+
+        let nullable = true; // dynamic type system FTW
+
+        fields.push(arrow::datatypes::Field::new(col.name(), ty, nullable));
+    }
+
+    Ok(Arc::new(arrow::datatypes::Schema::new(fields)))
 }
 
 fn convert_type_with_name(
