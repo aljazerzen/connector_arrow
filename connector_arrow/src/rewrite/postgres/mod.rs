@@ -1,3 +1,4 @@
+mod protocol_cursor;
 mod protocol_simple;
 mod types;
 

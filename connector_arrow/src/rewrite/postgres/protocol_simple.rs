@@ -86,11 +86,11 @@ macro_rules! impl_simple_produce_unimplemented {
         $(
             impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
                 fn produce(&self) -> Result<$t, ConnectorError> {
-                   unimplemented!("not implemented!");
+                   unimplemented!();
                 }
 
                 fn produce_opt(&self) -> Result<Option<$t>, ConnectorError> {
-                   unimplemented!("not implemented!");
+                   unimplemented!();
                 }
             }
         )+
