@@ -1,7 +1,13 @@
 use arrow::datatypes::{DataType, Field};
 
+use crate::rewrite::errors::ConnectorError;
+
 /// Take a value of type `ty` from [Produce] and insert it into [Consume].
-pub fn transport<'r, P: Produce<'r>, C: Consume>(f: &Field, p: &P, c: &mut C) {
+pub fn transport<'r, P: Produce<'r>, C: Consume>(
+    f: &Field,
+    p: &P,
+    c: &mut C,
+) -> Result<(), ConnectorError> {
     log::debug!("transporting value of type {f:?}");
 
     // TODO: connector-x goes a step further here: instead of having this match in the hot path,
@@ -11,39 +17,40 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(f: &Field, p: &P, c: &mut C) {
 
     if !f.is_nullable() {
         match f.data_type() {
-            Boolean => c.consume(ProduceTy::<bool>::produce(p)),
-            Int8 => c.consume(ProduceTy::<i8>::produce(p)),
-            Int16 => c.consume(ProduceTy::<i16>::produce(p)),
-            Int32 => c.consume(ProduceTy::<i32>::produce(p)),
-            Int64 => c.consume(ProduceTy::<i64>::produce(p)),
-            UInt8 => c.consume(ProduceTy::<u8>::produce(p)),
-            UInt16 => c.consume(ProduceTy::<u16>::produce(p)),
-            UInt32 => c.consume(ProduceTy::<u32>::produce(p)),
-            UInt64 => c.consume(ProduceTy::<u64>::produce(p)),
-            Float32 => c.consume(ProduceTy::<f32>::produce(p)),
-            Float64 => c.consume(ProduceTy::<f64>::produce(p)),
-            Binary | LargeBinary => c.consume(ProduceTy::<Vec<u8>>::produce(p)),
-            Utf8 | LargeUtf8 => c.consume(ProduceTy::<String>::produce(p)),
+            Boolean => c.consume(ProduceTy::<bool>::produce(p)?),
+            Int8 => c.consume(ProduceTy::<i8>::produce(p)?),
+            Int16 => c.consume(ProduceTy::<i16>::produce(p)?),
+            Int32 => c.consume(ProduceTy::<i32>::produce(p)?),
+            Int64 => c.consume(ProduceTy::<i64>::produce(p)?),
+            UInt8 => c.consume(ProduceTy::<u8>::produce(p)?),
+            UInt16 => c.consume(ProduceTy::<u16>::produce(p)?),
+            UInt32 => c.consume(ProduceTy::<u32>::produce(p)?),
+            UInt64 => c.consume(ProduceTy::<u64>::produce(p)?),
+            Float32 => c.consume(ProduceTy::<f32>::produce(p)?),
+            Float64 => c.consume(ProduceTy::<f64>::produce(p)?),
+            Binary | LargeBinary => c.consume(ProduceTy::<Vec<u8>>::produce(p)?),
+            Utf8 | LargeUtf8 => c.consume(ProduceTy::<String>::produce(p)?),
             _ => todo!("unimplemented transport of {:?}", f.data_type()),
         }
     } else {
         match f.data_type() {
-            Boolean => c.consume_opt(ProduceTy::<bool>::produce_opt(p)),
-            Int8 => c.consume_opt(ProduceTy::<i8>::produce_opt(p)),
-            Int16 => c.consume_opt(ProduceTy::<i16>::produce_opt(p)),
-            Int32 => c.consume_opt(ProduceTy::<i32>::produce_opt(p)),
-            Int64 => c.consume_opt(ProduceTy::<i64>::produce_opt(p)),
-            UInt8 => c.consume_opt(ProduceTy::<u8>::produce_opt(p)),
-            UInt16 => c.consume_opt(ProduceTy::<u16>::produce_opt(p)),
-            UInt32 => c.consume_opt(ProduceTy::<u32>::produce_opt(p)),
-            UInt64 => c.consume_opt(ProduceTy::<u64>::produce_opt(p)),
-            Float32 => c.consume_opt(ProduceTy::<f32>::produce_opt(p)),
-            Float64 => c.consume_opt(ProduceTy::<f64>::produce_opt(p)),
-            Binary | LargeBinary => c.consume_opt(ProduceTy::<Vec<u8>>::produce_opt(p)),
-            Utf8 | LargeUtf8 => c.consume_opt(ProduceTy::<String>::produce_opt(p)),
+            Boolean => c.consume_opt(ProduceTy::<bool>::produce_opt(p)?),
+            Int8 => c.consume_opt(ProduceTy::<i8>::produce_opt(p)?),
+            Int16 => c.consume_opt(ProduceTy::<i16>::produce_opt(p)?),
+            Int32 => c.consume_opt(ProduceTy::<i32>::produce_opt(p)?),
+            Int64 => c.consume_opt(ProduceTy::<i64>::produce_opt(p)?),
+            UInt8 => c.consume_opt(ProduceTy::<u8>::produce_opt(p)?),
+            UInt16 => c.consume_opt(ProduceTy::<u16>::produce_opt(p)?),
+            UInt32 => c.consume_opt(ProduceTy::<u32>::produce_opt(p)?),
+            UInt64 => c.consume_opt(ProduceTy::<u64>::produce_opt(p)?),
+            Float32 => c.consume_opt(ProduceTy::<f32>::produce_opt(p)?),
+            Float64 => c.consume_opt(ProduceTy::<f64>::produce_opt(p)?),
+            Binary | LargeBinary => c.consume_opt(ProduceTy::<Vec<u8>>::produce_opt(p)?),
+            Utf8 | LargeUtf8 => c.consume_opt(ProduceTy::<String>::produce_opt(p)?),
             _ => todo!("unimplemented transport of {:?}", f.data_type()),
         }
     }
+    Ok(())
 }
 
 pub trait Produce<'r>:
@@ -64,9 +71,9 @@ pub trait Produce<'r>:
 }
 
 pub trait ProduceTy<'r, T> {
-    fn produce(&self) -> T;
+    fn produce(&self) -> Result<T, ConnectorError>;
 
-    fn produce_opt(&self) -> Option<T>;
+    fn produce_opt(&self) -> Result<Option<T>, ConnectorError>;
 }
 
 pub trait Consume:

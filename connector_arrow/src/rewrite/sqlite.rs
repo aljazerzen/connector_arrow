@@ -101,9 +101,11 @@ type SQLCellRef<'row> = (&'row Row<'row>, usize);
 impl<'r> Produce<'r> for SQLCellRef<'r> {}
 
 impl<'r, T: FromSql> ProduceTy<'r, T> for SQLCellRef<'r> {
+    #[throws(ConnectorError)]
     fn produce(&self) -> T {
         self.0.get_unwrap::<usize, T>(self.1)
     }
+    #[throws(ConnectorError)]
     fn produce_opt(&self) -> Option<T> {
         self.0.get_unwrap::<usize, Option<T>>(self.1)
     }

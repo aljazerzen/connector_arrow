@@ -25,7 +25,7 @@ pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
             let cell_ref = row_reader.next_cell();
             log::debug!("transporting cell");
 
-            transport::transport(field, &cell_ref.unwrap(), &mut writer);
+            transport::transport(field, &cell_ref.unwrap(), &mut writer)?;
         }
     }
     writer.finish()
