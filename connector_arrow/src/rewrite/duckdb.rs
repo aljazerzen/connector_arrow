@@ -1,57 +1,21 @@
 //! Source implementation for DuckDB embedded database.
 
 use arrow::record_batch::RecordBatch;
-use duckdb::{Arrow, DuckdbConnectionManager};
+use duckdb::Arrow;
 use fehler::throws;
-use log::debug;
-use r2d2::{Pool, PooledConnection};
-use std::sync::Arc;
-use urlencoding::decode;
 
-use super::api::{Connection, DataStore, ResultReader, Statement};
+use std::sync::Arc;
+
+use super::api::{Connection, ResultReader, Statement};
 use super::errors::ConnectorError;
 
-#[derive(Clone)]
-pub struct DuckDBDataStore {
-    pool: Pool<DuckdbConnectionManager>,
-}
-
-impl DuckDBDataStore {
-    #[throws(ConnectorError)]
-    pub fn new(connection_url: &str, nconn: usize) -> Self {
-        let decoded_conn = decode(connection_url)?.into_owned();
-        debug!("decoded conn: {}", decoded_conn);
-
-        let manager = DuckdbConnectionManager::file(decoded_conn)?;
-
-        let pool = r2d2::Pool::builder()
-            .max_size(nconn as u32)
-            .build(manager)?;
-
-        Self { pool }
-    }
-}
-
-impl DataStore for DuckDBDataStore {
-    type Conn = DuckDBConnection;
-
-    fn new_connection(&self) -> Result<Self::Conn, ConnectorError> {
-        let conn = self.pool.get()?;
-        Ok(DuckDBConnection { conn })
-    }
-}
-
-pub struct DuckDBConnection {
-    conn: PooledConnection<DuckdbConnectionManager>,
-}
-
-impl Connection for DuckDBConnection {
+impl Connection for duckdb::Connection {
     type Stmt<'conn> = DuckDBStatement<'conn>
     where
         Self: 'conn;
 
-    fn prepare_task<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        let stmt = self.conn.prepare(query)?;
+    fn prepare<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
+        let stmt = duckdb::Connection::prepare(self, query)?;
 
         Ok(DuckDBStatement { stmt })
     }
@@ -80,7 +44,7 @@ pub struct DuckDBReader<'stmt> {
 
 impl<'stmt> ResultReader<'stmt> for DuckDBReader<'stmt> {
     #[throws(ConnectorError)]
-    fn read_until_schema(&mut self) -> Arc<arrow::datatypes::Schema> {
+    fn get_schema(&mut self) -> Arc<arrow::datatypes::Schema> {
         self.arrow.get_schema()
     }
 }

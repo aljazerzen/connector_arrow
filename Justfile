@@ -1,5 +1,5 @@
 export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
-export SQLITE_URL := "sqlite://dbs/sqlite.db"
+export SQLITE_URL := "../dbs/sqlite.db"
 export DUCKDB_URL := "../dbs/duckdb.db"
 
 

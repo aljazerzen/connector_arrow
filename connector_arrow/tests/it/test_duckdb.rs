@@ -1,18 +1,27 @@
 use arrow::util::pretty::pretty_format_batches;
 use connector_arrow::rewrite;
+use duckdb::DuckdbConnectionManager;
 use insta::assert_display_snapshot;
-use std::env;
+use std::{env, ops::DerefMut};
+
+fn init() -> r2d2::Pool<DuckdbConnectionManager> {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let url = env::var("DUCKDB_URL").unwrap();
+
+    let manager = DuckdbConnectionManager::file(url).unwrap();
+
+    r2d2::Pool::builder().max_size(5).build(manager).unwrap()
+}
 
 #[test]
 fn load_and_parse() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    let url = "../dbs/".to_string() + env::var("DUCKDB_URL").unwrap().as_str();
-    let store = rewrite::duckdb::DuckDBDataStore::new(&url, 1).unwrap();
+    let pool = init();
+    let mut conn = pool.get().unwrap();
 
     let query = "select * from test_table";
 
-    let results = rewrite::query_one(&store, query).unwrap();
+    let results = rewrite::query_one(conn.deref_mut(), query).unwrap();
 
     assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +----------+--------------+----------+------------+-----------+

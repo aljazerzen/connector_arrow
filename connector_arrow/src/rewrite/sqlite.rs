@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use fehler::throws;
-use log;
-use r2d2::{Pool, PooledConnection};
-use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, Type};
 use rusqlite::{Row, Rows};
 
@@ -14,43 +11,12 @@ use super::util::arrow_reader::ArrowReader;
 use super::util::transport::{Produce, ProduceTy};
 use super::util::{collect_rows_to_arrow, CellReader, RowsReader};
 
-#[derive(Clone)]
-pub struct SQLiteSource {
-    pool: Pool<SqliteConnectionManager>,
-}
-
-impl SQLiteSource {
-    #[throws(ConnectorError)]
-    pub fn new(url: &str, max_conn: usize) -> Self {
-        let decoded_conn = urlencoding::decode(url)?.into_owned();
-        log::debug!("decoded conn: {}", decoded_conn);
-        let manager = SqliteConnectionManager::file(decoded_conn);
-        let pool = Pool::builder().max_size(max_conn as u32).build(manager)?;
-
-        Self { pool }
-    }
-}
-
-impl DataStore for SQLiteSource {
-    type Conn = SQLiteConnection;
-
-    #[throws(ConnectorError)]
-    fn new_connection(&self) -> Self::Conn {
-        let conn = self.pool.get()?;
-        SQLiteConnection { conn }
-    }
-}
-
-pub struct SQLiteConnection {
-    conn: PooledConnection<SqliteConnectionManager>,
-}
-
-impl Connection for SQLiteConnection {
+impl Connection for rusqlite::Connection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
     #[throws(ConnectorError)]
-    fn prepare_task(&mut self, query: &str) -> SQLiteStatement {
-        let stmt = self.conn.prepare(query)?;
+    fn prepare(&mut self, query: &str) -> SQLiteStatement {
+        let stmt = rusqlite::Connection::prepare(self, query)?;
         SQLiteStatement { stmt }
     }
 }
