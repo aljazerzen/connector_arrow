@@ -6,10 +6,10 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::rewrite::api::Statement;
-use crate::rewrite::util::transport::{Produce, ProduceTy};
-use crate::rewrite::util::{arrow_reader::ArrowReader, collect_rows_to_arrow, CellReader};
-use crate::rewrite::{errors::ConnectorError, util::RowsReader};
+use crate::api::Statement;
+use crate::util::transport::{Produce, ProduceTy};
+use crate::util::{arrow_reader::ArrowReader, collect_rows_to_arrow, CellReader};
+use crate::{errors::ConnectorError, util::RowsReader};
 
 use super::{types, PostgresStatement};
 pub use super::{PostgresError, SimpleProtocol};

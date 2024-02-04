@@ -4,9 +4,9 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use std::sync::Arc;
 
-use crate::rewrite::errors::ConnectorError;
-use crate::rewrite::util::row_writer;
-use crate::rewrite::util::transport;
+use crate::errors::ConnectorError;
+use crate::util::row_writer;
+use crate::util::transport;
 
 pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
     schema: Arc<Schema>,

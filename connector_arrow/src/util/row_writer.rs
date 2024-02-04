@@ -6,7 +6,7 @@ use arrow::record_batch::RecordBatch;
 use fehler::throws;
 
 use super::transport::Consume;
-use crate::rewrite::errors::ConnectorError;
+use crate::errors::ConnectorError;
 
 /// Receives values row-by-row and passes them to [ArrayBuilder]s,
 /// which construct [RecordBatch]es.

@@ -12,21 +12,16 @@ build-release:
 build-debug:
     cargo build --features all
 
-features_test := "--features=src_csv,src_postgres,src_dummy,src_sqlite,src_duckdb"
+features_test := "--features=src_sqlite,src_duckdb,src_postgres"
 test:
     cargo nextest run {{features_test}}
     cargo fmt --check
     cargo clippy {{features_test}} -- -D warnings
 
 test-feature-gate:
-    cargo check --features branch --no-default-features
     cargo check --features src_postgres
-    cargo check --features src_mysql
-    cargo check --features src_mssql
     cargo check --features src_sqlite
-    cargo check --features src_oracle
-    cargo check --features src_csv
-    cargo check --features src_dummy
+    cargo check --features src_duckdb
     cargo clippy -- -D warnings
     cargo clippy --features all -- -D warnings
 

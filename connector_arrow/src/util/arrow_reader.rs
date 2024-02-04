@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use arrow::{datatypes::Schema, record_batch::RecordBatch};
 
-use crate::rewrite::api::ResultReader;
-use crate::rewrite::errors::ConnectorError;
+use crate::api::ResultReader;
+use crate::errors::ConnectorError;
 
 /// Reader that contain all of the batches preloaded and just returns them one by one.
 ///

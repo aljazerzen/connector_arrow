@@ -1,6 +1,6 @@
 use arrow::datatypes::{DataType, Field};
 
-use crate::rewrite::errors::ConnectorError;
+use crate::errors::ConnectorError;
 
 /// Take a value of type `ty` from [Produce] and insert it into [Consume].
 pub fn transport<'r, P: Produce<'r>, C: Consume>(

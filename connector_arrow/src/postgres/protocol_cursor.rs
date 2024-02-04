@@ -7,11 +7,11 @@ use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::{Row, RowIter};
 
-use crate::rewrite::api::{ResultReader, Statement};
-use crate::rewrite::util::row_writer;
-use crate::rewrite::util::transport::{self, Produce, ProduceTy};
-use crate::rewrite::util::CellReader;
-use crate::rewrite::{errors::ConnectorError, util::RowsReader};
+use crate::api::{ResultReader, Statement};
+use crate::util::row_writer;
+use crate::util::transport::{self, Produce, ProduceTy};
+use crate::util::CellReader;
+use crate::{errors::ConnectorError, util::RowsReader};
 
 use super::{types, CursorProtocol, PostgresStatement};
 pub use super::{PostgresError, SimpleProtocol};

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType as ArrowType, Field, Schema};
 use postgres::types::Type as PgType;
 
-use crate::rewrite::errors::ConnectorError;
+use crate::errors::ConnectorError;
 
 pub fn convert_schema(
     stmt: &postgres::Statement,
