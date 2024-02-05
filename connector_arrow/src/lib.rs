@@ -16,6 +16,8 @@
 //! // reader implements Iterator<Item = Result<RecordBatch, _>>
 //! let batches: Vec<RecordBatch> = reader.collect::<Result<_, ConnectorError>>().unwrap();
 //! ```
+//!
+//! For a list of supported databases, refer to [creates page](https://creates.io/crate/connector_arrow).
 
 pub mod api;
 mod errors;
