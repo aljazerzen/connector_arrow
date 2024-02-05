@@ -1,0 +1,4 @@
+[toolchain]
+# Generally run 1 behind latest
+channel = "1.74.0"
+components = ["rustfmt", "clippy"]

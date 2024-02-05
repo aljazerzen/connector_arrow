@@ -3,10 +3,10 @@ export SQLITE_URL := "sqlite://sqlite.db"
 export DUCKDB_URL := "duckdb://duckdb.db"
 
 start:
-    docker-compose up -d
+    docker-compose up --detach --wait
 
 stop:
-    docker-compose down -d
+    docker-compose down
 
 
 seed:

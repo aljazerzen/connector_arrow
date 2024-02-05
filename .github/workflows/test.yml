@@ -1,0 +1,26 @@
+---
+name: Test
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  test-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v22
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the nix shell
+        run: nix develop --command just --version
+      - name: Install Rust toolchain with rustup
+        run: nix develop --command cargo --version
+      - uses: Swatinem/rust-cache@v2
+      - name: Start databases
+        run: nix develop --command just dbs/start
+      - name: Seed databases
+        run: nix develop --command just dbs/seed
+      - name: Run tests
+        run: nix develop --command just test

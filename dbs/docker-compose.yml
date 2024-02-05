@@ -1,17 +1,23 @@
+---
 services:
   postgres:
-    image: "postgres:16-alpine"
-    ports:
-      - "5432:5432"
+    image: postgres:16-alpine
+    ports: [5432:5432]
     environment:
       POSTGRES_DB: dummy
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
-  mysql:
-    image: "mariadb:10"
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_DATABASE: dummy
-      MYSQL_ROOT_PASSWORD: root
-    command: --secure-file-priv=""
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U root]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # mysql:
+  #   image: "mariadb:10"
+  #   ports:
+  #     - "3306:3306"
+  #   environment:
+  #     MYSQL_DATABASE: dummy
+  #     MYSQL_ROOT_PASSWORD: root
+  #   command: --secure-file-priv=""

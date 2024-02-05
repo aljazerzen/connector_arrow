@@ -11,6 +11,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
+        dontCheckPython = drv: drv.overridePythonAttrs (old: { doCheck = false; });
+
         essentials = with pkgs; [
           rustup
           clang
@@ -22,7 +24,9 @@
           cargo-audit
           cargo-release
           pkg-config
-          openssl
+          docker-compose 
+          (dontCheckPython python311Packages.yamlfix)
+          fd
         ];
 
         dbs = with pkgs; [
