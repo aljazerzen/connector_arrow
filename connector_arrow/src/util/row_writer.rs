@@ -191,10 +191,10 @@ impl_consume_ty! {
     // {         => BinaryBuilder          }  // Binary
        { Vec<u8> => LargeBinaryBuilder     }  // LargeBinary
     // {         => FixedSizeBinaryBuilder }  // FixedSizeBinary
-    // {         => Decimal128Builde       }  // Decimal128
-    // {         => Decimal256Builde       }  // Decimal256
-    // {         => StringBuilde           }  // Utf8
+    // {         => Decimal128Builder      }  // Decimal128
+    // {         => Decimal256Builder      }  // Decimal256
+    // {         => StringBuilder          }  // Utf8
        { String  => LargeStringBuilder     }  // LargeUtf8
-    // {         => Date32Builde           }  // Date32
-    // {         => Date64Builde           }  // Date64
+    // {         => Date32Builder          }  // Date32
+    // {         => Date64Builder          }  // Date64
 }

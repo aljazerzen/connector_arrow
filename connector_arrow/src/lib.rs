@@ -1,3 +1,22 @@
+//! An database client for many databases, exposing an interface that produces Apache Arrow.
+//!
+//! The API provided by each data source is described in [api] module.
+//!
+//! Example for SQLite:
+//! ```
+//! use connector_arrow::{Connection, Statement, ConnectorError, arrow};
+//! use connector_arrow::arrow::record_batch::RecordBatch;
+//!
+//! let mut conn = rusqlite::Connection::open_in_memory();
+//!
+//! let mut stmt = Connection::prepare(&mut conn, "SELECT 1 as a");
+//!
+//! let reader = stmt.start(());
+//!
+//! // reader implements Iterator<Item = Result<RecordBatch, _>>
+//! let batches: Vec<RecordBatch> = reader.collect::<Result<_, ConnectorError>>().unwrap();
+//! ```
+
 pub mod api;
 mod errors;
 pub mod util;
@@ -9,6 +28,7 @@ pub mod postgres;
 #[cfg(feature = "src_sqlite")]
 pub mod sqlite;
 
+pub use arrow;
 pub use errors::ConnectorError;
 
 use arrow::record_batch::RecordBatch;
