@@ -85,11 +85,11 @@ macro_rules! impl_simple_produce_unimplemented {
     ($($t: ty,)+) => {
         $(
             impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(&self) -> Result<$t, ConnectorError> {
+                fn produce(self) -> Result<$t, ConnectorError> {
                    unimplemented!();
                 }
 
-                fn produce_opt(&self) -> Result<Option<$t>, ConnectorError> {
+                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
                    unimplemented!();
                 }
             }
@@ -101,11 +101,11 @@ macro_rules! impl_simple_produce {
     ($($t: ty,)+) => {
         $(
             impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(&self) -> Result<$t, ConnectorError> {
+                fn produce(self) -> Result<$t, ConnectorError> {
                     self.produce_opt()?.ok_or_else(err_null)
                 }
 
-                fn produce_opt(&self) -> Result<Option<$t>, ConnectorError> {
+                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
                     let s = self.0.get(self.1);
 
                     Ok(match s {
@@ -127,13 +127,13 @@ impl_simple_produce_unimplemented!(
 
 impl<'r> ProduceTy<'r, String> for CellRef<'r> {
     #[throws(ConnectorError)]
-    fn produce(&self) -> String {
+    fn produce(self) -> String {
         let val = self.0.get(self.1).unwrap().to_string();
         val
     }
 
     #[throws(ConnectorError)]
-    fn produce_opt(&self) -> Option<String> {
+    fn produce_opt(self) -> Option<String> {
         self.0.get(self.1).map(|x| x.to_string())
     }
 }
@@ -149,23 +149,23 @@ fn parse_bool(token: &str) -> Result<bool, ConnectorError> {
 }
 
 impl<'r> ProduceTy<'r, bool> for CellRef<'r> {
-    fn produce(&self) -> Result<bool, ConnectorError> {
+    fn produce(self) -> Result<bool, ConnectorError> {
         self.produce_opt()?.ok_or_else(err_null)
     }
 
-    fn produce_opt(&self) -> Result<Option<bool>, ConnectorError> {
+    fn produce_opt(self) -> Result<Option<bool>, ConnectorError> {
         let s = self.0.get(self.1);
         s.map(parse_bool).transpose()
     }
 }
 
 impl<'r> ProduceTy<'r, Vec<u8>> for CellRef<'r> {
-    fn produce(&self) -> Result<Vec<u8>, ConnectorError> {
+    fn produce(self) -> Result<Vec<u8>, ConnectorError> {
         self.produce_opt()?.ok_or_else(err_null)
     }
 
     #[throws(ConnectorError)]
-    fn produce_opt(&self) -> Option<Vec<u8>> {
+    fn produce_opt(self) -> Option<Vec<u8>> {
         let s = self.0.get(self.1);
 
         match s {
@@ -213,11 +213,11 @@ macro_rules! impl_simple_vec_produce {
     ($($t: ty,)+) => {
         $(
             impl<'r> ProduceTy<'r, Vec<$t>> for CellRef<'r> {
-                fn produce(&self) -> Result<Vec<$t>, ConnectorError> {
+                fn produce(self) -> Result<Vec<$t>, ConnectorError> {
                     self.produce_opt()?.ok_or_else(err_null)
                 }
 
-                fn produce_opt(&self) -> Result<Option<Vec<$t>>, ConnectorError> {
+                fn produce_opt(self) -> Result<Option<Vec<$t>>, ConnectorError> {
                     let s = self.0.get(self.1);
 
                     parse_array(
@@ -232,11 +232,11 @@ macro_rules! impl_simple_vec_produce {
 impl_simple_vec_produce!(i16, i32, i64, f32, f64, Decimal, String,);
 
 impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
-    fn produce(&self) -> Result<Vec<bool>, ConnectorError> {
+    fn produce(self) -> Result<Vec<bool>, ConnectorError> {
         self.produce_opt()?.ok_or_else(err_null)
     }
 
-    fn produce_opt(&self) -> Result<Option<Vec<bool>>, ConnectorError> {
+    fn produce_opt(self) -> Result<Option<Vec<bool>>, ConnectorError> {
         let s = self.0.get(self.1);
 
         parse_array(s, parse_bool)
@@ -244,7 +244,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 }
 
 // impl<'r> ProduceTy<'r, NaiveDate> for CellRef<'r> {
-//     fn produce(&self) -> NaiveDate {
+//     fn produce(self) -> NaiveDate {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -264,7 +264,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, Option<NaiveDate>> for CellRef<'r> {
-//     fn produce(&self) -> Option<NaiveDate> {
+//     fn produce(self) -> Option<NaiveDate> {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -285,7 +285,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, NaiveTime> for CellRef<'r> {
-//     fn produce(&self) -> NaiveTime {
+//     fn produce(self) -> NaiveTime {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -305,7 +305,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, Option<NaiveTime>> for CellRef<'r> {
-//     fn produce(&self) -> Option<NaiveTime> {
+//     fn produce(self) -> Option<NaiveTime> {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -326,7 +326,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, NaiveDateTime> for CellRef<'r> {
-//     fn produce(&self) -> NaiveDateTime {
+//     fn produce(self) -> NaiveDateTime {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -347,7 +347,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, Option<NaiveDateTime>> for CellRef<'r> {
-//     fn produce(&self) -> Option<NaiveDateTime> {
+//     fn produce(self) -> Option<NaiveDateTime> {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -370,7 +370,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, DateTime<Utc>> for CellRef<'r> {
-//     fn produce(&self) -> DateTime<Utc> {
+//     fn produce(self) -> DateTime<Utc> {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {
@@ -396,7 +396,7 @@ impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
 // }
 
 // impl<'r> ProduceTy<'r, Option<DateTime<Utc>>> for CellRef<'r> {
-//     fn produce(&self) -> Option<DateTime<Utc>> {
+//     fn produce(self) -> Option<DateTime<Utc>> {
 //         let (ridx, cidx) = self.next_cell();
 //         let val = match &self.rows[ridx] {
 //             SimpleQueryMessage::Row(row) => match row.try_get(cidx)? {

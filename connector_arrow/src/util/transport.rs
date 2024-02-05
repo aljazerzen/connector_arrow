@@ -5,7 +5,7 @@ use crate::errors::ConnectorError;
 /// Take a value of type `ty` from [Produce] and insert it into [Consume].
 pub fn transport<'r, P: Produce<'r>, C: Consume>(
     f: &Field,
-    p: &P,
+    p: P,
     c: &mut C,
 ) -> Result<(), ConnectorError> {
     log::debug!("transporting value of type {f:?}");
@@ -71,9 +71,9 @@ pub trait Produce<'r>:
 }
 
 pub trait ProduceTy<'r, T> {
-    fn produce(&self) -> Result<T, ConnectorError>;
+    fn produce(self) -> Result<T, ConnectorError>;
 
-    fn produce_opt(&self) -> Result<Option<T>, ConnectorError>;
+    fn produce_opt(self) -> Result<Option<T>, ConnectorError>;
 }
 
 pub trait Consume:

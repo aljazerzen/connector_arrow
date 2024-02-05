@@ -68,7 +68,7 @@ impl<'a> PostgresBatchStream<'a> {
                 for field in &self.schema.fields {
                     let cell_ref = cell_reader.next_cell();
 
-                    transport::transport(field, &cell_ref.unwrap(), &mut writer)?;
+                    transport::transport(field, cell_ref.unwrap(), &mut writer)?;
                 }
             } else {
                 self.is_finished = true;
@@ -141,12 +141,12 @@ macro_rules! impl_produce {
         $(
             impl<'c> ProduceTy<'c, $t> for CellRef<'c> {
                 #[throws(ConnectorError)]
-                fn produce(&self) -> $t {
+                fn produce(self) -> $t {
                     self.0.get::<usize, $t>(self.1)
                 }
 
                 #[throws(ConnectorError)]
-                fn produce_opt(&self) -> Option<$t> {
+                fn produce_opt(self) -> Option<$t> {
                     self.0.get::<usize, Option<$t>>(self.1)
                 }
             }
@@ -158,11 +158,11 @@ macro_rules! impl_produce_unimplemented {
     ($($t: ty,)+) => {
         $(
             impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(&self) -> Result<$t, ConnectorError> {
+                fn produce(self) -> Result<$t, ConnectorError> {
                    unimplemented!();
                 }
 
-                fn produce_opt(&self) -> Result<Option<$t>, ConnectorError> {
+                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
                    unimplemented!();
                 }
             }

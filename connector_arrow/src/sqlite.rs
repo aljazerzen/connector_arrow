@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use fallible_streaming_iterator::FallibleStreamingIterator;
 use fehler::throws;
-use rusqlite::types::{FromSql, Type};
-use rusqlite::{Row, Rows};
+use itertools::zip_eq;
+use rusqlite::types::{Type, Value};
 
 use super::api::*;
 use super::errors::ConnectorError;
@@ -31,162 +30,185 @@ impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
 
     fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
         let column_count = self.stmt.column_count();
-        let mut rows = self.stmt.query(params)?;
 
-        let schema = read_schema(&mut rows, column_count)?;
+        let rows = {
+            let mut rows_iter = self.stmt.query(params)?;
 
-        let mut rows = SQLiteRowsReader {
-            rows,
-            advanced_but_not_consumed: true, // read_schema has advanced the first row
-            column_count,
+            // read all of the rows into a buffer
+            let mut rows = Vec::with_capacity(1024);
+            while let Some(row_ref) = rows_iter.next()? {
+                let mut row = Vec::with_capacity(column_count);
+                for col_index in 0..column_count {
+                    let value = row_ref.get::<_, Value>(col_index).unwrap();
+                    row.push(value);
+                }
+                rows.push(row);
+            }
+            rows
         };
-        let batches = collect_rows_to_arrow(schema.clone(), &mut rows, 1024)?;
+
+        // infer schema
+        let schema = infer_schema(&self.stmt, &rows, column_count)?;
+
+        // iterate over rows and convert into arrow
+        let row_count = rows.len();
+        let mut rows = SQLiteRowsReader {
+            rows: rows.into_iter(),
+        };
+        let batches = collect_rows_to_arrow(schema.clone(), &mut rows, row_count)?;
 
         Ok(ArrowReader::new(schema, batches))
     }
 }
 
-pub struct SQLiteRowsReader<'task> {
-    rows: Rows<'task>,
-    advanced_but_not_consumed: bool,
-    column_count: usize,
+pub struct SQLiteRowsReader {
+    rows: std::vec::IntoIter<Vec<Value>>,
 }
 
-impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader<'stmt> {
-    type CellReader<'rows> = SQLiteCellReader<'rows>
+impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader {
+    type CellReader<'rows> = SQLiteCellReader
     where
         Self: 'rows;
 
     #[throws(ConnectorError)]
     fn next_row(&mut self) -> Option<Self::CellReader<'_>> {
-        let column_count = self.column_count;
-        let row = if self.advanced_but_not_consumed {
-            self.advanced_but_not_consumed = false;
-            self.rows.get()
-        } else {
-            self.rows.next()?
-        };
-        row.map(|row| SQLiteCellReader {
-            row,
-            next_col: 0,
-            column_count,
+        self.rows.next().map(|row| SQLiteCellReader {
+            row: row.into_iter(),
         })
     }
 }
 
-pub struct SQLiteCellReader<'rows> {
-    row: &'rows Row<'rows>,
-    next_col: usize,
-    column_count: usize,
+pub struct SQLiteCellReader {
+    row: std::vec::IntoIter<Value>,
 }
 
-impl<'rows> CellReader<'rows> for SQLiteCellReader<'rows> {
-    type CellRef<'row> = SQLCellRef<'row>
+impl<'rows> CellReader<'rows> for SQLiteCellReader {
+    type CellRef<'row> = Value
     where
         Self: 'row;
 
     fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
-        if self.next_col == self.column_count {
-            None
-        } else {
-            let col = self.next_col;
-            self.next_col += 1;
-            Some((self.row, col))
+        self.row.next()
+    }
+}
+
+impl<'r> Produce<'r> for Value {}
+
+impl<'r> ProduceTy<'r, i64> for Value {
+    fn produce(self) -> Result<i64, ConnectorError> {
+        unimplemented!()
+    }
+    #[throws(ConnectorError)]
+    fn produce_opt(self) -> Option<i64> {
+        match self {
+            Self::Null => None,
+            Self::Integer(v) => Some(v),
+            _ => panic!("SQLite schema not inferred correctly"),
         }
     }
 }
 
-type SQLCellRef<'row> = (&'row Row<'row>, usize);
-
-impl<'r> Produce<'r> for SQLCellRef<'r> {}
-
-impl<'r, T: FromSql> ProduceTy<'r, T> for SQLCellRef<'r> {
-    #[throws(ConnectorError)]
-    fn produce(&self) -> T {
-        self.0.get_unwrap::<usize, T>(self.1)
+impl<'r> ProduceTy<'r, f64> for Value {
+    fn produce(self) -> Result<f64, ConnectorError> {
+        unimplemented!()
     }
     #[throws(ConnectorError)]
-    fn produce_opt(&self) -> Option<T> {
-        self.0.get_unwrap::<usize, Option<T>>(self.1)
+    fn produce_opt(self) -> Option<f64> {
+        match self {
+            Self::Null => None,
+            Self::Real(v) => Some(v),
+            _ => panic!("SQLite schema not inferred correctly"),
+        }
     }
 }
 
-fn read_schema(
-    rows: &mut Rows,
+impl<'r> ProduceTy<'r, String> for Value {
+    fn produce(self) -> Result<String, ConnectorError> {
+        unimplemented!()
+    }
+    #[throws(ConnectorError)]
+    fn produce_opt(self) -> Option<String> {
+        match self {
+            Self::Null => None,
+            Self::Text(v) => Some(v),
+            _ => panic!("SQLite schema not inferred correctly"),
+        }
+    }
+}
+
+impl<'r> ProduceTy<'r, Vec<u8>> for Value {
+    fn produce(self) -> Result<Vec<u8>, ConnectorError> {
+        unimplemented!()
+    }
+    #[throws(ConnectorError)]
+    fn produce_opt(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Null => None,
+            Self::Blob(v) => Some(v),
+            _ => panic!("SQLite schema not inferred correctly"),
+        }
+    }
+}
+
+macro_rules! impl_produce_unimplemented {
+    ($($t: ty,)+) => {
+        $(
+            impl<'r> ProduceTy<'r, $t> for Value {
+                fn produce(self) -> Result<$t, ConnectorError> {
+                   unimplemented!();
+                }
+
+                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
+                   unimplemented!();
+                }
+            }
+        )+
+    };
+}
+
+impl_produce_unimplemented!(bool, i8, i16, i32, u8, u16, u32, u64, f32,);
+
+fn infer_schema(
+    stmt: &rusqlite::Statement,
+    rows: &Vec<Vec<Value>>,
     column_count: usize,
 ) -> Result<Arc<arrow::datatypes::Schema>, ConnectorError> {
-    rows.advance()?;
-    let first_row: Option<&Row<'_>> = rows.get();
+    let mut types = vec![None; column_count];
 
-    let stmt = rows.as_ref();
-    let Some(stmt) = stmt else {
-        return Err(ConnectorError::CannotConvertSchema);
-    };
+    for row in rows {
+        let mut all_known = true;
+
+        for (col_index, cell) in row.iter().enumerate() {
+            let ty = &mut types[col_index];
+            if ty.is_none() {
+                *ty = convert_datatype(cell.data_type());
+            }
+            if ty.is_none() {
+                all_known = false;
+            }
+        }
+
+        if all_known {
+            break;
+        }
+    }
 
     let mut fields = Vec::with_capacity(column_count);
-
-    for (i, col) in stmt.columns().iter().enumerate() {
-        let ty_of_first_val = first_row.map(|r| r.get_ref(i).unwrap().data_type());
-
-        let ty = convert_type_with_name(col.decl_type(), ty_of_first_val);
-
+    for (name, ty) in zip_eq(stmt.column_names(), types) {
         let Some(ty) = ty else {
             return Err(ConnectorError::CannotConvertSchema);
         };
 
         let nullable = true; // dynamic type system FTW
-
-        fields.push(arrow::datatypes::Field::new(col.name(), ty, nullable));
+        fields.push(arrow::datatypes::Field::new(name, ty, nullable));
     }
 
     Ok(Arc::new(arrow::datatypes::Schema::new(fields)))
 }
 
-fn convert_type_with_name(
-    decl_name: Option<&str>,
-    ty_of_first_val: Option<Type>,
-) -> Option<arrow::datatypes::DataType> {
-    if let Some(ty) = decl_name.and_then(convert_decl_name) {
-        return Some(ty);
-    }
-
-    if let Some(ty) = ty_of_first_val.and_then(convert_datatype) {
-        return Some(ty);
-    }
-
-    None
-}
-
-fn convert_decl_name(name_hint: &str) -> Option<arrow::datatypes::DataType> {
-    // derive from column's declare type, some rules refer to:
-    // https://www.sqlite.org/datatype3.html#affname
-    let decl_type = name_hint.to_lowercase();
-
-    Some(match decl_type.as_str() {
-        "int4" => arrow::datatypes::DataType::Int32,
-        "int2" => arrow::datatypes::DataType::Int16,
-        "boolean" | "bool" => arrow::datatypes::DataType::Boolean,
-        _ if decl_type.contains("int") => arrow::datatypes::DataType::Int64,
-        _ if decl_type.contains("char")
-            || decl_type.contains("clob")
-            || decl_type.contains("text") =>
-        {
-            arrow::datatypes::DataType::LargeUtf8
-        }
-        _ if decl_type.contains("real")
-            || decl_type.contains("floa")
-            || decl_type.contains("doub") =>
-        {
-            arrow::datatypes::DataType::Float64
-        }
-        _ if decl_type.contains("blob") => arrow::datatypes::DataType::LargeBinary,
-        _ => return None,
-    })
-}
-
 fn convert_datatype(ty: Type) -> Option<arrow::datatypes::DataType> {
     match ty {
-        Type::Integer => Some(arrow::datatypes::DataType::Int8),
+        Type::Integer => Some(arrow::datatypes::DataType::Int64),
         Type::Real => Some(arrow::datatypes::DataType::Float64),
         Type::Text => Some(arrow::datatypes::DataType::LargeUtf8),
         Type::Blob => Some(arrow::datatypes::DataType::LargeBinary),
