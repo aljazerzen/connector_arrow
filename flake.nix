@@ -22,7 +22,6 @@
           cargo-nextest
           cargo-insta
           cargo-audit
-          cargo-release
           pkg-config
           docker-compose 
           (dontCheckPython python311Packages.yamlfix)
@@ -40,6 +39,9 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = essentials ++ dbs;
+        };
+        devShells.minimal = pkgs.mkShell {
+          buildInputs = with pkgs; [rustup];
         };
       });
 }

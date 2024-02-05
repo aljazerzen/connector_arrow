@@ -4,7 +4,7 @@ on:
   push:
     tags: [v*]
 jobs:
-  test-job:
+  publish-crates-io:
     runs-on: ubuntu-latest
     steps:
       # checkout and env setup
@@ -13,12 +13,10 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build the nix shell
-        run: nix develop --command just --version
-      - name: Install Rust toolchain with rustup
-        run: nix develop --command cargo --version
+        run: nix develop '.#minimal' --command cargo --version
 
       # publish
-      - run: cargo release publish --package connector_arrow --execute --no-confirm
+      - run: nix develop '.#minimal' --command cargo publish --package connector_arrow
           --verbose
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
