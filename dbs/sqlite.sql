@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS test_table(
     test_nullint INTEGER,
     test_str TEXT,
     test_float REAL,
-    test_bool BOOLEAN,
+    test_bool INTEGER,
     test_date DATE,
     test_time TIME,
     test_datetime DATETIME

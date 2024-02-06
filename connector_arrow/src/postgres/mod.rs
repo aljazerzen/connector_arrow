@@ -73,6 +73,10 @@ where
             _protocol: &PhantomData,
         })
     }
+
+    fn get_relation_defs(&mut self) -> Result<Vec<crate::api::RelationDef>, ConnectorError> {
+        unimplemented!()
+    }
 }
 
 pub struct PostgresStatement<'conn, P> {

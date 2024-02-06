@@ -18,6 +18,10 @@ impl Connection for duckdb::Connection {
 
         Ok(DuckDBStatement { stmt })
     }
+
+    fn get_relation_defs(&mut self) -> Result<Vec<crate::api::RelationDef>, ConnectorError> {
+        unimplemented!()
+    }
 }
 
 pub struct DuckDBStatement<'conn> {

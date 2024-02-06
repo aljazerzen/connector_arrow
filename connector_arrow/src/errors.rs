@@ -5,11 +5,18 @@ use thiserror::Error;
 /// Errors that can be raised from this library.
 #[derive(Error, Debug)]
 pub enum ConnectorError {
-    #[error("Schema of the result cannot be inferred or converted to Arrow schema.")]
+    #[error("Schema of the result cannot be inferred or converted to Arrow schema")]
     CannotConvertSchema,
 
     #[error("Result data does not match the schema")]
     DataSchemaMismatch(String),
+
+    #[error("Schema is not compatible with Arrow data types")]
+    IncompatibleSchema {
+        table_name: String,
+        message: String,
+        hint: Option<String>,
+    },
 
     #[error(transparent)]
     UrlEncoding(#[from] FromUtf8Error),
