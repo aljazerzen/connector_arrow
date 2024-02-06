@@ -17,6 +17,7 @@ To be more specific, this crate:
 
 - [x] Querying that returns `Vec<RecordBatch>`
 - [x] Record batch streaming
+- [ ] Database introspection
 - [ ] Query parameters
 - [ ] Writing to the data store
 
