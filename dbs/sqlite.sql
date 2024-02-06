@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS test_table(
     test_str TEXT,
     test_float REAL,
     test_bool INTEGER,
-    test_date DATE,
-    test_time TIME,
-    test_datetime DATETIME
+    test_date TEXT,
+    test_time TEXT,
+    test_datetime TEXT
 );
 
 INSERT INTO test_table VALUES (1, 3, 'str1', NULL, True, '1996-03-13', '08:12:40', '2007-01-01 10:00:19');
