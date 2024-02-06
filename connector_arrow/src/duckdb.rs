@@ -2,7 +2,6 @@
 
 use arrow::record_batch::RecordBatch;
 use duckdb::Arrow;
-use fehler::throws;
 
 use std::sync::Arc;
 
@@ -43,9 +42,8 @@ pub struct DuckDBReader<'stmt> {
 }
 
 impl<'stmt> ResultReader<'stmt> for DuckDBReader<'stmt> {
-    #[throws(ConnectorError)]
-    fn get_schema(&mut self) -> Arc<arrow::datatypes::Schema> {
-        self.arrow.get_schema()
+    fn get_schema(&mut self) -> Result<Arc<arrow::datatypes::Schema>, ConnectorError> {
+        Ok(self.arrow.get_schema())
     }
 }
 

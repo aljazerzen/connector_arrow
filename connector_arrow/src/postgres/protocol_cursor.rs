@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use fehler::throws;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::{Row, RowIter};
@@ -59,7 +58,7 @@ impl<'a> PostgresBatchStream<'a> {
 
         let batch_size = 1024;
 
-        let mut writer = row_writer::ArrowRowWriter::new(self.schema.clone(), batch_size)?;
+        let mut writer = row_writer::ArrowRowWriter::new(self.schema.clone(), batch_size);
 
         for _ in 0..batch_size {
             if let Some(mut cell_reader) = self.row_reader.next_row()? {
@@ -106,11 +105,10 @@ impl<'a> PostgresRowStream<'a> {
 impl<'stmt> RowsReader<'stmt> for PostgresRowStream<'stmt> {
     type CellReader<'row> = PostgresCellReader where Self: 'row;
 
-    #[throws(ConnectorError)]
-    fn next_row(&mut self) -> Option<Self::CellReader<'_>> {
+    fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
         let row = self.iter.next().map_err(PostgresError::from)?;
 
-        row.map(|row| PostgresCellReader { row, next_col: 0 })
+        Ok(row.map(|row| PostgresCellReader { row, next_col: 0 }))
     }
 }
 
@@ -140,14 +138,12 @@ macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
             impl<'c> ProduceTy<'c, $t> for CellRef<'c> {
-                #[throws(ConnectorError)]
-                fn produce(self) -> $t {
-                    self.0.get::<usize, $t>(self.1)
+                fn produce(self) -> Result<$t, ConnectorError> {
+                    Ok(self.0.get::<usize, $t>(self.1))
                 }
 
-                #[throws(ConnectorError)]
-                fn produce_opt(self) -> Option<$t> {
-                    self.0.get::<usize, Option<$t>>(self.1)
+                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
+                    Ok(self.0.get::<usize, Option<$t>>(self.1))
                 }
             }
         )+

@@ -13,7 +13,7 @@ pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
     rows_reader: &mut T,
     min_batch_size: usize,
 ) -> Result<Vec<RecordBatch>, ConnectorError> {
-    let mut writer = row_writer::ArrowRowWriter::new(schema.clone(), min_batch_size)?;
+    let mut writer = row_writer::ArrowRowWriter::new(schema.clone(), min_batch_size);
     log::debug!("reading rows");
 
     while let Some(mut row_reader) = rows_reader.next_row()? {

@@ -3,7 +3,6 @@ use std::{any::Any, sync::Arc};
 use arrow::array::{ArrayBuilder, ArrayRef};
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use fehler::throws;
 
 use super::transport::Consume;
 use crate::errors::ConnectorError;
@@ -29,7 +28,6 @@ pub struct ArrowRowWriter {
 // unsafe impl Sync for ArrowPartitionWriter {}
 
 impl ArrowRowWriter {
-    #[throws(ConnectorError)]
     pub fn new(schema: Arc<Schema>, min_batch_size: usize) -> Self {
         ArrowRowWriter {
             receiver: Organizer::new(schema.fields().len()),
@@ -44,20 +42,19 @@ impl ArrowRowWriter {
         }
     }
 
-    #[throws(ConnectorError)]
-    pub fn prepare_for_batch(&mut self, row_count: usize) {
+    pub fn prepare_for_batch(&mut self, row_count: usize) -> Result<(), ConnectorError> {
         self.receiver.reset_for_batch(row_count);
         self.allocate(row_count)?;
+        Ok(())
     }
 
     /// Make sure that there is enough memory allocated in builders for the incoming batch.
     /// Might allocate more than needed, for future row reservations.
-    #[throws(ConnectorError)]
-    fn allocate(&mut self, row_count: usize) {
+    fn allocate(&mut self, row_count: usize) -> Result<(), ConnectorError> {
         if self.rows_capacity >= row_count + self.rows_reserved {
             // there is enough capacity, no need to allocate
             self.rows_reserved += row_count;
-            return;
+            return Ok(());
         }
 
         if self.rows_reserved > 0 {
@@ -80,10 +77,10 @@ impl ArrowRowWriter {
         self.builders = Some(builders);
         self.rows_reserved = row_count;
         self.rows_capacity = to_allocate;
+        Ok(())
     }
 
-    #[throws(ConnectorError)]
-    fn flush(&mut self) {
+    fn flush(&mut self) -> Result<(), ConnectorError> {
         let Some(mut builders) = self.builders.take() else {
             return Ok(());
         };
@@ -93,12 +90,12 @@ impl ArrowRowWriter {
             .collect();
         let rb = RecordBatch::try_new(self.schema.clone(), columns)?;
         self.data.push(rb);
+        Ok(())
     }
 
-    #[throws(ConnectorError)]
-    pub fn finish(mut self) -> Vec<RecordBatch> {
+    pub fn finish(mut self) -> Result<Vec<RecordBatch>, ConnectorError> {
         self.flush()?;
-        self.data
+        Ok(self.data)
     }
 
     fn next_builder(&mut self) -> &mut dyn Any {

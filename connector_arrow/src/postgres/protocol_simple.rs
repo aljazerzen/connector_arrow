@@ -1,4 +1,3 @@
-use fehler::throws;
 use hex::decode;
 use postgres::{SimpleQueryMessage, SimpleQueryRow};
 use rust_decimal::Decimal;
@@ -46,12 +45,11 @@ struct PostgresRowsReader {
 impl<'stmt> RowsReader<'stmt> for PostgresRowsReader {
     type CellReader<'row> = PostgresCellReader where Self: 'row;
 
-    #[throws(ConnectorError)]
-    fn next_row(&mut self) -> Option<Self::CellReader<'_>> {
-        self.rows.next().and_then(|message| match message {
+    fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
+        Ok(self.rows.next().and_then(|message| match message {
             SimpleQueryMessage::Row(row) => Some(PostgresCellReader { row, next_col: 0 }),
             _ => None,
-        })
+        }))
     }
 }
 
@@ -126,15 +124,13 @@ impl_simple_produce_unimplemented!(
 );
 
 impl<'r> ProduceTy<'r, String> for CellRef<'r> {
-    #[throws(ConnectorError)]
-    fn produce(self) -> String {
+    fn produce(self) -> Result<String, ConnectorError> {
         let val = self.0.get(self.1).unwrap().to_string();
-        val
+        Ok(val)
     }
 
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<String> {
-        self.0.get(self.1).map(|x| x.to_string())
+    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
+        Ok(self.0.get(self.1).map(|x| x.to_string()))
     }
 }
 
@@ -164,11 +160,10 @@ impl<'r> ProduceTy<'r, Vec<u8>> for CellRef<'r> {
         self.produce_opt()?.ok_or_else(err_null)
     }
 
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<Vec<u8>> {
+    fn produce_opt(self) -> Result<Option<Vec<u8>>, ConnectorError> {
         let s = self.0.get(self.1);
 
-        match s {
+        Ok(match s {
             Some(s) => {
                 let mut res = s.chars();
                 res.next();
@@ -182,7 +177,7 @@ impl<'r> ProduceTy<'r, Vec<u8>> for CellRef<'r> {
                 Some(decode(bytes).map_err(PostgresError::from)?)
             }
             None => None,
-        }
+        })
     }
 }
 

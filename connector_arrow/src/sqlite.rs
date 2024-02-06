@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use fehler::throws;
 use itertools::zip_eq;
 use rusqlite::types::{Type, Value};
 
@@ -13,10 +12,9 @@ use super::util::{collect_rows_to_arrow, CellReader, RowsReader};
 impl Connection for rusqlite::Connection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
-    #[throws(ConnectorError)]
-    fn prepare(&mut self, query: &str) -> SQLiteStatement {
+    fn prepare(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
         let stmt = rusqlite::Connection::prepare(self, query)?;
-        SQLiteStatement { stmt }
+        Ok(SQLiteStatement { stmt })
     }
 }
 
@@ -70,11 +68,10 @@ impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader {
     where
         Self: 'rows;
 
-    #[throws(ConnectorError)]
-    fn next_row(&mut self) -> Option<Self::CellReader<'_>> {
-        self.rows.next().map(|row| SQLiteCellReader {
+    fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
+        Ok(self.rows.next().map(|row| SQLiteCellReader {
             row: row.into_iter(),
-        })
+        }))
     }
 }
 
@@ -98,13 +95,12 @@ impl<'r> ProduceTy<'r, i64> for Value {
     fn produce(self) -> Result<i64, ConnectorError> {
         unimplemented!()
     }
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<i64> {
-        match self {
+    fn produce_opt(self) -> Result<Option<i64>, ConnectorError> {
+        Ok(match self {
             Self::Null => None,
             Self::Integer(v) => Some(v),
             _ => panic!("SQLite schema not inferred correctly"),
-        }
+        })
     }
 }
 
@@ -112,13 +108,12 @@ impl<'r> ProduceTy<'r, f64> for Value {
     fn produce(self) -> Result<f64, ConnectorError> {
         unimplemented!()
     }
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<f64> {
-        match self {
+    fn produce_opt(self) -> Result<Option<f64>, ConnectorError> {
+        Ok(match self {
             Self::Null => None,
             Self::Real(v) => Some(v),
             _ => panic!("SQLite schema not inferred correctly"),
-        }
+        })
     }
 }
 
@@ -126,13 +121,12 @@ impl<'r> ProduceTy<'r, String> for Value {
     fn produce(self) -> Result<String, ConnectorError> {
         unimplemented!()
     }
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<String> {
-        match self {
+    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
+        Ok(match self {
             Self::Null => None,
             Self::Text(v) => Some(v),
             _ => panic!("SQLite schema not inferred correctly"),
-        }
+        })
     }
 }
 
@@ -140,13 +134,12 @@ impl<'r> ProduceTy<'r, Vec<u8>> for Value {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
         unimplemented!()
     }
-    #[throws(ConnectorError)]
-    fn produce_opt(self) -> Option<Vec<u8>> {
-        match self {
+    fn produce_opt(self) -> Result<Option<Vec<u8>>, ConnectorError> {
+        Ok(match self {
             Self::Null => None,
             Self::Blob(v) => Some(v),
             _ => panic!("SQLite schema not inferred correctly"),
-        }
+        })
     }
 }
 
