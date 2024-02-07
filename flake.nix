@@ -40,8 +40,5 @@
         devShells.default = pkgs.mkShell {
           buildInputs = essentials ++ dbs;
         };
-        devShells.minimal = pkgs.mkShell {
-          buildInputs = with pkgs; [rustup];
-        };
       });
 }
