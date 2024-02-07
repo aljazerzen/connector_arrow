@@ -13,29 +13,23 @@ To be more specific, this crate:
 - does not include connection pooling, but allows downstream creates to implement it themselves,
 - uses minimal dependencies (it even disables default features).
 
-## API features
+None of the sources are enabled by default, use `src_` features to enable them.
 
-- [x] Querying that returns `Vec<RecordBatch>`
-- [x] Record batch streaming
-- [ ] Database introspection
-- [ ] Query parameters
-- [ ] Writing to the data store
+## Support matrix
 
-## Sources
-
-None of the sources are enabled by default, use `src_` features to enable them:
-
-- [x] SQLite (`src_sqlite`, using [rusqlite](https://crates.io/crates/rusqlite))
-- [x] DuckDB (`src_duckdb`)
-- [x] PostgreSQL (`src_postgres`)
-- [x] Redshift (through postgres protocol, untested)
-- [ ] MySQL
-- [ ] MariaDB (through mysql protocol)
-- [ ] ClickHouse (through mysql protocol)
-- [ ] SQL Server
-- [ ] Azure SQL Database (through mssql protocol)
-- [ ] Oracle
-- [ ] Big Query
+| Source             | Feature, dependency                                           | Querying | Streaming | Introspect | Query params | Writing | Tested |
+| ------------------ | ------------------------------------------------------------- | -------- | --------- | ---------- | ------------ | ------- | ------ |
+| SQLite             | `src_sqlite` [rusqlite](https://crates.io/crates/rusqlite)    | x        |           | x          |              |         | x      |
+| DuckDB             | `src_duckdb` [duckdb](https://creates.io/crates/duckdb)       | x        |           |            |              |         | x      |
+| PostgreSQL         | `src_postgres` [postgres](https://creates.io/crates/postgres) | x        | x         |            |              |         | x      |
+| Redshift           | `src_postgres` [postgres](https://creates.io/crates/postgres) | x        | x         |            |              |         |        |
+| MySQL              |                                                               |          |           |            |              |         |        |
+| MariaDB            |                                                               |          |           |            |              |         |        |
+| ClickHouse         |                                                               |          |           |            |              |         |        |
+| SQL Server         |                                                               |          |           |            |              |         |        |
+| Azure SQL Database |                                                               |          |           |            |              |         |        |
+| Oracle             |                                                               |          |           |            |              |         |        |
+| Big Query          |                                                               |          |           |            |              |         |        |
 
 ## Types
 
