@@ -72,7 +72,7 @@ impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
     fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
         let column_count = self.stmt.column_count();
 
-        let rows = {
+        let rows: Vec<Vec<Value>> = {
             let mut rows_iter = self.stmt.query(params)?;
 
             // read all of the rows into a buffer
@@ -231,9 +231,7 @@ fn infer_schema(
 
     let mut fields = Vec::with_capacity(column_count);
     for (name, ty) in zip_eq(stmt.column_names(), types) {
-        let Some(ty) = ty else {
-            return Err(ConnectorError::CannotConvertSchema);
-        };
+        let ty = ty.unwrap_or(DataType::Null);
 
         let nullable = true; // dynamic type system FTW
         fields.push(arrow::datatypes::Field::new(name, ty, nullable));
@@ -248,9 +246,6 @@ fn convert_datatype(ty: Type) -> Option<DataType> {
         Type::Real => Some(DataType::Float64),
         Type::Text => Some(DataType::LargeUtf8),
         Type::Blob => Some(DataType::LargeBinary),
-
-        // first value was NULL, we cannot infer type of the column
-        // TODO: maybe scan more rows in this case?
         Type::Null => None,
     }
 }

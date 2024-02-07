@@ -17,6 +17,7 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(
 
     if !f.is_nullable() {
         match f.data_type() {
+            Null => {}
             Boolean => c.consume(ProduceTy::<bool>::produce(p)?),
             Int8 => c.consume(ProduceTy::<i8>::produce(p)?),
             Int16 => c.consume(ProduceTy::<i16>::produce(p)?),
@@ -34,6 +35,7 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(
         }
     } else {
         match f.data_type() {
+            Null => {}
             Boolean => c.consume_opt(ProduceTy::<bool>::produce_opt(p)?),
             Int8 => c.consume_opt(ProduceTy::<i8>::produce_opt(p)?),
             Int16 => c.consume_opt(ProduceTy::<i16>::produce_opt(p)?),

@@ -172,7 +172,7 @@ macro_rules! impl_consume_ty {
 // List of ConsumeTy implementations to generate.
 // Must match with arrow::array::make_builder
 impl_consume_ty! {
-    // {         => NullBuilder            }  // Null
+    // { ()      => NullBuilder            }  // Null - custom implementation
        { bool    => BooleanBuilder         }  // Boolean
        { i8      => Int8Builder            }  // Int8
        { i16     => Int16Builder           }  // Int16
@@ -182,16 +182,16 @@ impl_consume_ty! {
        { u16     => UInt16Builder          }  // UInt16
        { u32     => UInt32Builder          }  // UInt32
        { u64     => UInt64Builder          }  // UInt64
-    // {         => Float16Builder         }  // Float16
+    // {         => Float16Builder         }  // Float16 - no Rust native type
        { f32     => Float32Builder         }  // Float32
        { f64     => Float64Builder         }  // Float64
-    // {         => BinaryBuilder          }  // Binary
+    // {         => BinaryBuilder          }  // Binary - no Rust native type
        { Vec<u8> => LargeBinaryBuilder     }  // LargeBinary
-    // {         => FixedSizeBinaryBuilder }  // FixedSizeBinary
-    // {         => Decimal128Builder      }  // Decimal128
-    // {         => Decimal256Builder      }  // Decimal256
-    // {         => StringBuilder          }  // Utf8
+    // {         => FixedSizeBinaryBuilder }  // FixedSizeBinary - no Rust native type
+    // {         => Decimal128Builder      }  // Decimal128 - no Rust native type
+    // {         => Decimal256Builder      }  // Decimal256 - no Rust native type
+    // {         => StringBuilder          }  // Utf8 - no Rust native type
        { String  => LargeStringBuilder     }  // LargeUtf8
-    // {         => Date32Builder          }  // Date32
-    // {         => Date64Builder          }  // Date64
+    // {         => Date32Builder          }  // Date32 - no Rust native type
+    // {         => Date64Builder          }  // Date64 - no Rust native type
 }

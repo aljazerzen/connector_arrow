@@ -16,7 +16,7 @@ fn init() -> rusqlite::Connection {
 fn test_query_01() {
     let mut conn = init();
 
-    let query = "select * from test_table";
+    let query = "SELECT * FROM test_table";
     let results = connector_arrow::query_one(&mut conn, &query).unwrap();
     assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
@@ -35,7 +35,7 @@ fn test_query_01() {
 #[test]
 fn test_query_02() {
     let mut conn = init();
-    let query = "select test_int, test_nullint, test_str from test_table where test_int >= 2";
+    let query = "SELECT test_int, test_nullint, test_str FROM test_table WHERE test_int >= 2";
     let results = connector_arrow::query_one(&mut conn, &query).unwrap();
     assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +----------+--------------+------------+
@@ -52,7 +52,7 @@ fn test_query_02() {
 #[test]
 fn test_query_03() {
     let mut conn = init();
-    let query = "select 1 + test_int as a from test_table order by test_int limit 3";
+    let query = "SELECT 1 + test_int as a FROM test_table ORDER BY test_int LIMIT 3";
     let results = connector_arrow::query_one(&mut conn, &query).unwrap();
     assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
     +---+
@@ -62,6 +62,34 @@ fn test_query_03() {
     | 2 |
     | 3 |
     +---+
+    "###);
+}
+
+#[test]
+fn test_query_04() {
+    let mut conn = init();
+    let query = "SELECT 1, NULL";
+    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
+    +---+------+
+    | 1 | NULL |
+    +---+------+
+    | 1 |      |
+    +---+------+
+    "###);
+}
+
+#[test]
+#[ignore] // TODO: no columns are found
+fn test_query_05() {
+    let mut conn = init();
+    let query = "SELECT * FROM test_table WHERE FALSE";
+    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
+    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
+    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
+    | test_int | test_nullint | test_str   | test_float | test_bool | test_date  | test_time | test_datetime       |
+    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
+    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
     "###);
 }
 
