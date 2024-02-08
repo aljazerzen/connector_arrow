@@ -13,13 +13,13 @@ impl Connection for duckdb::Connection {
     where
         Self: 'conn;
 
-    fn prepare<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
+    fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = duckdb::Connection::prepare(self, query)?;
 
         Ok(DuckDBStatement { stmt })
     }
 
-    fn get_relation_defs(&mut self) -> Result<Vec<crate::api::RelationDef>, ConnectorError> {
+    fn get_table_schemas(&mut self) -> Result<Vec<crate::api::TableSchema>, ConnectorError> {
         unimplemented!()
     }
 }

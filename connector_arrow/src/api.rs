@@ -10,9 +10,9 @@ pub trait Connection {
     where
         Self: 'conn;
 
-    fn prepare<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError>;
+    fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError>;
 
-    fn get_relation_defs(&mut self) -> Result<Vec<RelationDef>, ConnectorError>;
+    fn get_table_schemas(&mut self) -> Result<Vec<TableSchema>, ConnectorError>;
 }
 
 /// A task that is to be executed in the data store, over a connection.
@@ -35,7 +35,7 @@ pub trait ResultReader<'stmt>: Iterator<Item = Result<RecordBatch, ConnectorErro
 
 /// A definition of a relation stored in a data store. Also known as a "table".
 #[derive(Debug)]
-pub struct RelationDef {
+pub struct TableSchema {
     pub name: String,
     pub schema: Schema,
 }

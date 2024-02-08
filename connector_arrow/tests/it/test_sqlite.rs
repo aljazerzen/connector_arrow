@@ -97,10 +97,10 @@ fn test_query_05() {
 fn test_introspection_01() {
     let mut conn = init();
 
-    let refs = conn.get_relation_defs().unwrap();
+    let refs = conn.get_table_schemas().unwrap();
     assert_debug_snapshot!(refs, @r###"
     [
-        RelationDef {
+        TableSchema {
             name: "test_table",
             schema: Schema {
                 fields: [

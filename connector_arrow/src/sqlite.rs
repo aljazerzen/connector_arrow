@@ -13,12 +13,12 @@ use super::util::{collect_rows_to_arrow, CellReader, RowsReader};
 impl Connection for rusqlite::Connection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
-    fn prepare(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
+    fn query(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
         let stmt = rusqlite::Connection::prepare(self, query)?;
         Ok(SQLiteStatement { stmt })
     }
 
-    fn get_relation_defs(&mut self) -> Result<Vec<RelationDef>, ConnectorError> {
+    fn get_table_schemas(&mut self) -> Result<Vec<TableSchema>, ConnectorError> {
         // query table names
         let table_names = {
             let query_tables = "SELECT name FROM sqlite_master WHERE type = 'table';";
@@ -51,7 +51,7 @@ impl Connection for rusqlite::Connection {
                 fields.push(Field::new(name, ty, !not_null));
             }
 
-            defs.push(RelationDef {
+            defs.push(TableSchema {
                 name: table_name,
                 schema: Schema::new(fields),
             })

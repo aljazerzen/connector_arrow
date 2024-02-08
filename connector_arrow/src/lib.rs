@@ -45,7 +45,7 @@ pub fn query_one<C: Connection>(
     log::debug!("query: {query}");
 
     // prepare statement
-    let mut stmt = conn.prepare(query)?;
+    let mut stmt = conn.query(query)?;
 
     // start reading
     let reader = stmt.start(())?;
