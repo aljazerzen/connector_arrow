@@ -13,7 +13,7 @@ test:
 
 # run tests, importants things first, for development
 test-fast:
-    cargo fmt
+    just fmt
     INSTA_FORCE_PASS=1 cargo nextest run --features=all --no-fail-fast
     cargo insta review
     cargo clippy --features=all
