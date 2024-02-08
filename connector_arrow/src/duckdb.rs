@@ -5,13 +5,15 @@ use duckdb::Arrow;
 
 use std::sync::Arc;
 
-use super::api::{Connection, ResultReader, Statement};
-use super::errors::ConnectorError;
+use crate::api::{unimplemented, Connection, ResultReader, Statement};
+use crate::errors::ConnectorError;
 
 impl Connection for duckdb::Connection {
     type Stmt<'conn> = DuckDBStatement<'conn>
     where
         Self: 'conn;
+
+    type Append<'conn> = unimplemented::Appender where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = duckdb::Connection::prepare(self, query)?;
@@ -20,6 +22,9 @@ impl Connection for duckdb::Connection {
     }
 
     fn get_table_schemas(&mut self) -> Result<Vec<crate::api::TableSchema>, ConnectorError> {
+        unimplemented!()
+    }
+    fn append<'a>(&'a mut self, _: &str) -> Result<Self::Append<'a>, ConnectorError> {
         unimplemented!()
     }
 }

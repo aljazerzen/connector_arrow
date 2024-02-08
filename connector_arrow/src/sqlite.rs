@@ -13,6 +13,8 @@ use super::util::{collect_rows_to_arrow, CellReader, RowsReader};
 impl Connection for rusqlite::Connection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
+    type Append<'conn> = unimplemented::Appender where Self: 'conn;
+
     fn query(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
         let stmt = rusqlite::Connection::prepare(self, query)?;
         Ok(SQLiteStatement { stmt })
@@ -58,6 +60,10 @@ impl Connection for rusqlite::Connection {
         }
 
         Ok(defs)
+    }
+
+    fn append<'a>(&'a mut self, _: &str) -> Result<Self::Append<'a>, ConnectorError> {
+        unimplemented!()
     }
 }
 

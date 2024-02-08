@@ -6,10 +6,8 @@ use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
 
-use super::{
-    api::{Connection, Statement},
-    errors::ConnectorError,
-};
+use crate::api::{unimplemented, Connection, Statement};
+use crate::errors::ConnectorError;
 
 pub struct PostgresConnection<'a, P> {
     client: &'a mut Client,
@@ -60,9 +58,9 @@ impl<'c, P> Connection for PostgresConnection<'c, P>
 where
     for<'conn> PostgresStatement<'conn, P>: Statement<'conn>,
 {
-    type Stmt<'conn> = PostgresStatement<'conn, P>
-    where
-        Self: 'conn;
+    type Stmt<'conn> = PostgresStatement<'conn, P> where Self: 'conn;
+
+    type Append<'conn> = unimplemented::Appender where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self.client.prepare(query).map_err(PostgresError::from)?;
@@ -75,6 +73,9 @@ where
     }
 
     fn get_table_schemas(&mut self) -> Result<Vec<crate::api::TableSchema>, ConnectorError> {
+        unimplemented!()
+    }
+    fn append<'a>(&'a mut self, _: &str) -> Result<Self::Append<'a>, ConnectorError> {
         unimplemented!()
     }
 }

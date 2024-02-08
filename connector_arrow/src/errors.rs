@@ -36,3 +36,21 @@ pub enum ConnectorError {
     #[error(transparent)]
     Postgres(#[from] super::postgres::PostgresError),
 }
+
+#[derive(Error, Debug)]
+pub enum TableCreateError {
+    #[error(transparent)]
+    Connector(ConnectorError),
+
+    #[error("Table already exists")]
+    TableExists,
+}
+
+#[derive(Error, Debug)]
+pub enum TableDropError {
+    #[error(transparent)]
+    Connector(ConnectorError),
+
+    #[error("Table does not exist")]
+    TableExists,
+}
