@@ -12,8 +12,7 @@ use crate::util::transport::{self, Produce, ProduceTy};
 use crate::util::CellReader;
 use crate::{errors::ConnectorError, util::RowsReader};
 
-use super::{types, CursorProtocol, PostgresStatement};
-pub use super::{PostgresError, SimpleProtocol};
+use super::{types, CursorProtocol, PostgresError, PostgresStatement};
 
 impl<'conn> Statement<'conn> for PostgresStatement<'conn, CursorProtocol> {
     type Params = ();

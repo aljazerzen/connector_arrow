@@ -2,7 +2,7 @@
 name: Test
 on:
   push:
-    branches: [main]
+    branches: [main, ci]
   pull_request:
     branches: [main]
 jobs:
@@ -15,9 +15,6 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Build the nix shell
         run: nix develop --command just --version
-      - name: Install Rust toolchain with rustup
-        run: nix develop --command cargo --version
-      - uses: Swatinem/rust-cache@v2
 
       # setup databases
       - name: Start databases
