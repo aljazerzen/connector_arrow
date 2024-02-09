@@ -1,5 +1,5 @@
 use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::postgres::{CursorProtocol, PostgresConnection, SimpleProtocol};
+use connector_arrow::postgres::{PostgresConnection, ProtocolCursor, ProtocolSimple};
 use insta::assert_display_snapshot;
 use postgres::{Client, NoTls};
 
@@ -15,7 +15,7 @@ fn init() -> Client {
 #[test]
 fn test_protocol_simple() {
     let mut conn = init();
-    let mut conn = PostgresConnection::<SimpleProtocol>::new(&mut conn);
+    let mut conn = PostgresConnection::<ProtocolSimple>::new(&mut conn);
 
     let query = "select * from test_table";
     let results = connector_arrow::query_one(&mut conn, query).unwrap();
@@ -37,7 +37,7 @@ fn test_protocol_simple() {
 #[test]
 fn test_protocol_cursor() {
     let mut conn = init();
-    let mut conn = PostgresConnection::<CursorProtocol>::new(&mut conn);
+    let mut conn = PostgresConnection::<ProtocolCursor>::new(&mut conn);
 
     let query = "select * from test_table";
     let results = connector_arrow::query_one(&mut conn, query).unwrap();

@@ -5,8 +5,8 @@ use itertools::zip_eq;
 use rusqlite::types::Value;
 
 use crate::api::Statement;
-use crate::util::arrow_reader::ArrowReader;
 use crate::util::transport::{Produce, ProduceTy};
+use crate::util::ArrowReader;
 use crate::util::{collect_rows_to_arrow, CellReader, RowsReader};
 use crate::ConnectorError;
 

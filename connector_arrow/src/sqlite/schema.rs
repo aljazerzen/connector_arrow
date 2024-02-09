@@ -57,7 +57,7 @@ impl SchemaEdit for rusqlite::Connection {
 pub(crate) fn table_create(
     conn: &mut rusqlite::Connection,
     name: &str,
-    schema: std::sync::Arc<Schema>,
+    schema: SchemaRef,
 ) -> Result<(), TableCreateError> {
     let column_defs = schema
         .fields()

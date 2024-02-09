@@ -7,12 +7,12 @@ use uuid::Uuid;
 
 use crate::api::Statement;
 use crate::util::transport::{Produce, ProduceTy};
-use crate::util::{arrow_reader::ArrowReader, collect_rows_to_arrow, CellReader};
+use crate::util::{collect_rows_to_arrow, ArrowReader, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
 
-use super::{types, PostgresError, PostgresStatement, SimpleProtocol};
+use super::{types, PostgresError, PostgresStatement, ProtocolSimple};
 
-impl<'conn> Statement<'conn> for PostgresStatement<'conn, SimpleProtocol> {
+impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolSimple> {
     type Params = ();
 
     type Reader<'stmt> = ArrowReader where Self: 'stmt;

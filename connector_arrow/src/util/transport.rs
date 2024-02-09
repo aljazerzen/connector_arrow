@@ -1,3 +1,4 @@
+/// Moving of typed values from a producer into a consumer
 use arrow::datatypes::{DataType, Field};
 
 use crate::errors::ConnectorError;

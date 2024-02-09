@@ -1,3 +1,15 @@
+//! Provides `connector_arrow` traits for [postgres crate](https://docs.rs/postgres).
+//!
+//! ```no_run
+//! use postgres::{Client, NoTls};
+//!
+//! let client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
+//!
+//! let mut conn = PostgresConnection::<ProtocolCursor>::new(client);
+//!
+//! let stmt = conn.query("SELECT * FROM my_table").unwrap();
+//! ````
+
 mod protocol_cursor;
 mod protocol_simple;
 mod types;
@@ -11,7 +23,6 @@ use crate::errors::ConnectorError;
 
 pub struct PostgresConnection<'a, P> {
     client: &'a mut Client,
-    // conn_downcast_mut: Arc<FnConnDowncastMut>,
     _protocol: PhantomData<P>,
 }
 
@@ -24,20 +35,17 @@ impl<'a, P> PostgresConnection<'a, P> {
     }
 }
 
-/// Protocol - use Simple Query
-pub struct SimpleProtocol;
-
 /// Protocol - use Cursor
-#[allow(dead_code)]
-pub struct CursorProtocol;
+pub struct ProtocolCursor;
 
-/// Protocol - Binary based bulk load
-#[allow(dead_code)]
-pub struct BinaryProtocol;
+/// Protocol - use Simple Query
+pub struct ProtocolSimple;
 
-/// Protocol - CSV based bulk load
-#[allow(dead_code)]
-pub struct CSVProtocol;
+// /// Protocol - Binary based bulk load
+// pub struct BinaryProtocol;
+
+// /// Protocol - CSV based bulk load
+// pub struct CSVProtocol;
 
 #[derive(Error, Debug)]
 pub enum PostgresError {

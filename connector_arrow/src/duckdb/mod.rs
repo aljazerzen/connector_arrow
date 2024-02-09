@@ -1,4 +1,5 @@
-//! Source implementation for DuckDB embedded database.
+//! Provides `connector_arrow` traits for [duckdb crate](https://docs.rs/duckdb).
+
 mod append;
 mod schema;
 
@@ -27,6 +28,7 @@ impl Connection for duckdb::Connection {
     }
 }
 
+#[doc(hidden)]
 pub struct DuckDBStatement<'conn> {
     stmt: duckdb::Statement<'conn>,
 }
@@ -44,6 +46,7 @@ impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
     }
 }
 
+#[doc(hidden)]
 pub struct DuckDBReader<'stmt> {
     arrow: Arrow<'stmt>,
 }

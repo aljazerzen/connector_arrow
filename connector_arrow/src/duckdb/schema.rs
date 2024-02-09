@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::{DataType, SchemaRef};
 use duckdb::types::Type;
 use itertools::Itertools;
 
@@ -31,7 +29,7 @@ impl SchemaGet for duckdb::Connection {
 }
 
 impl SchemaEdit for duckdb::Connection {
-    fn table_create(&mut self, name: &str, schema: Arc<Schema>) -> Result<(), TableCreateError> {
+    fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()
             .iter()

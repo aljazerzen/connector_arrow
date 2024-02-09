@@ -1,20 +1,17 @@
-use std::sync::Arc;
-
-use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::{Row, RowIter};
 
 use crate::api::{ResultReader, Statement};
-use crate::util::row_writer;
 use crate::util::transport::{self, Produce, ProduceTy};
-use crate::util::CellReader;
+use crate::util::{ArrowRowWriter, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
 
-use super::{types, CursorProtocol, PostgresError, PostgresStatement};
+use super::{types, PostgresError, PostgresStatement, ProtocolCursor};
 
-impl<'conn> Statement<'conn> for PostgresStatement<'conn, CursorProtocol> {
+impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolCursor> {
     type Params = ();
 
     type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;
@@ -38,7 +35,7 @@ impl<'conn> Statement<'conn> for PostgresStatement<'conn, CursorProtocol> {
 }
 
 pub struct PostgresBatchStream<'a> {
-    schema: Arc<Schema>,
+    schema: SchemaRef,
     row_reader: PostgresRowStream<'a>,
     is_finished: bool,
 }
@@ -57,7 +54,7 @@ impl<'a> PostgresBatchStream<'a> {
 
         let batch_size = 1024;
 
-        let mut writer = row_writer::ArrowRowWriter::new(self.schema.clone(), batch_size);
+        let mut writer = ArrowRowWriter::new(self.schema.clone(), batch_size);
 
         for _ in 0..batch_size {
             if let Some(mut cell_reader) = self.row_reader.next_row()? {

@@ -1,13 +1,14 @@
-use std::sync::Arc;
+//! Database client interface that uses Apache Arrow as data-transfer format and schema definition format.
+//!
+//! The important traits are:
+//! - [Connection], providing [Connection::query] and [Connection::append] functions,
+//! - [SchemaGet], for schema introspection,
+//! - [SchemaEdit], for basic schema migration commands,
 
-use arrow::{
-    datatypes::{Schema, SchemaRef},
-    record_batch::RecordBatch,
-};
+use arrow::datatypes::SchemaRef;
+use arrow::record_batch::RecordBatch;
 
-use crate::errors::{TableCreateError, TableDropError};
-
-use super::errors::ConnectorError;
+use crate::errors::{ConnectorError, TableCreateError, TableDropError};
 
 /// A connection to a data store.
 pub trait Connection {
@@ -19,8 +20,10 @@ pub trait Connection {
     where
         Self: 'conn;
 
+    /// Prepare a query to the data store, using data store's preferred query language.
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError>;
 
+    /// Prepare an appender for the given table.
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
 }
 
@@ -33,22 +36,17 @@ pub trait Statement<'conn> {
         Self: 'stmt;
 
     /// Start executing.
-    /// This will create a reader that can retrieve schema and then the data.
+    /// This will create a reader that can retrieve the result schema and data.
     fn start(&mut self, params: ()) -> Result<Self::Reader<'_>, ConnectorError>;
 }
 
 /// Reads result of the query, starting with the schema.
 pub trait ResultReader<'stmt>: Iterator<Item = Result<RecordBatch, ConnectorError>> {
-    fn get_schema(&mut self) -> Result<Arc<Schema>, ConnectorError>;
+    /// Return the schema of the result.
+    fn get_schema(&mut self) -> Result<SchemaRef, ConnectorError>;
 }
 
-/// A definition of a relation stored in a data store. Also known as a "table".
-#[derive(Debug)]
-pub struct TableSchema {
-    pub name: String,
-    pub schema: Schema,
-}
-
+/// Receive [RecordBatch]es that have to be written to a table in the data store.
 pub trait Append<'conn> {
     // TODO: add ON CONFLICT parameter
 
@@ -57,18 +55,22 @@ pub trait Append<'conn> {
     fn finish(self) -> Result<(), ConnectorError>;
 }
 
+/// Schema introspection
 pub trait SchemaGet {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError>;
 
     fn table_get(&mut self, name: &str) -> Result<SchemaRef, ConnectorError>;
 }
 
+/// Schema migration
 pub trait SchemaEdit {
-    fn table_create(&mut self, name: &str, schema: Arc<Schema>) -> Result<(), TableCreateError>;
+    fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError>;
 
     fn table_drop(&mut self, name: &str) -> Result<(), TableDropError>;
 }
 
+/// Stub types that can be used to signal that certain capability is not implemented
+/// for a data source.
 pub mod unimplemented {
     pub struct Appender;
 

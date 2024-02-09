@@ -108,7 +108,7 @@ where
     arrow_file
 }
 
-pub fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> Arc<Schema>
+pub fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> SchemaRef
 where
     F: Fn(&DataType) -> Option<DataType>,
 {

@@ -1,20 +1,21 @@
 use std::sync::Arc;
 
-use arrow::{datatypes::Schema, record_batch::RecordBatch};
+use arrow::datatypes::SchemaRef;
+use arrow::record_batch::RecordBatch;
 
 use crate::api::ResultReader;
 use crate::errors::ConnectorError;
 
-/// Reader that contain all of the batches preloaded and just returns them one by one.
+/// Reader that already contains all of the batches preloaded and just returns them one by one.
 ///
 /// Useful for date store implementations that don't support streaming.
 pub struct ArrowReader {
-    schema: Arc<Schema>,
+    schema: SchemaRef,
     inner: std::vec::IntoIter<RecordBatch>,
 }
 
 impl ArrowReader {
-    pub fn new(schema: Arc<Schema>, batches: Vec<RecordBatch>) -> Self {
+    pub fn new(schema: SchemaRef, batches: Vec<RecordBatch>) -> Self {
         ArrowReader {
             schema,
             inner: batches.into_iter(),

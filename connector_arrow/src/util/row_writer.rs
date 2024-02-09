@@ -1,7 +1,7 @@
-use std::{any::Any, sync::Arc};
+use std::any::Any;
 
 use arrow::array::{ArrayBuilder, ArrayRef};
-use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 
 use super::transport::Consume;
@@ -10,7 +10,7 @@ use crate::errors::ConnectorError;
 /// Receives values row-by-row and passes them to [ArrayBuilder]s,
 /// which construct [RecordBatch]es.
 pub struct ArrowRowWriter {
-    schema: Arc<Schema>,
+    schema: SchemaRef,
     min_batch_size: usize,
     data: Vec<RecordBatch>,
 
@@ -25,10 +25,8 @@ pub struct ArrowRowWriter {
     rows_capacity: usize,
 }
 
-// unsafe impl Sync for ArrowPartitionWriter {}
-
 impl ArrowRowWriter {
-    pub fn new(schema: Arc<Schema>, min_batch_size: usize) -> Self {
+    pub fn new(schema: SchemaRef, min_batch_size: usize) -> Self {
         ArrowRowWriter {
             receiver: Organizer::new(schema.fields().len()),
             data: Vec::new(),

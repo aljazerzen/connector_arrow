@@ -1,23 +1,39 @@
-//! An database client for many databases, exposing an interface that produces Apache Arrow.
+//! A flexible database client that converts data into Apache Arrow format
+//! across various databases.
 //!
 //! The API provided by each data source is described in [api] module.
 //!
+//! Capabilities:
+//! - **Query**: Query databases and retrieve results in Apache Arrow format.
+//! - **Query Parameters**: Utilize Arrow type system for query parameters.
+//! - **Streaming**: Receive results as a stream of [arrow::record_batch::RecordBatch] (WIP).
+//! - **Temporal and Container Types**: Correctly handles temporal and container types accurately (WIP).
+//! - **Schema Introspection**: Query the database for schema of specific tables.
+//! - **Schema Migration**: Basic schema migration commands.
+//! - **Append**: Write [arrow::record_batch::RecordBatch] into database tables.
+//!
 //! Example for SQLite:
 //! ```
-//! use connector_arrow::{Connection, Statement, ConnectorError, arrow};
+//! use connector_arrow::api::{Connection, Statement};
 //! use connector_arrow::arrow::record_batch::RecordBatch;
 //!
-//! let mut conn = rusqlite::Connection::open_in_memory();
+//! # fn main() -> Result<(), connector_arrow::ConnectorError> {
+//! // a regular rusqlite connection
+//! let mut conn = rusqlite::Connection::open_in_memory()?;
 //!
-//! let mut stmt = Connection::prepare(&mut conn, "SELECT 1 as a");
+//! // provided by connector_arrow::api::Connection
+//! let mut stmt = conn.query("SELECT 1 as a")?;
 //!
-//! let reader = stmt.start(());
+//! // provided by connector_arrow::api::Statement
+//! let reader = stmt.start(())?;
 //!
 //! // reader implements Iterator<Item = Result<RecordBatch, _>>
-//! let batches: Vec<RecordBatch> = reader.collect::<Result<_, ConnectorError>>().unwrap();
+//! let batches: Vec<RecordBatch> = reader.collect::<Result<_, _>>()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
-//! For a list of supported databases, refer to [creates page](https://creates.io/crate/connector_arrow).
+//! For a list of supported databases, refer to the [crates.io page](https://crates.io/crates/connector_arrow).
 
 pub mod api;
 mod errors;

@@ -1,19 +1,16 @@
-//! Destination implementation for Arrow and Polars.
-
-use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use std::sync::Arc;
 
 use crate::errors::ConnectorError;
-use crate::util::row_writer;
-use crate::util::transport;
+use crate::util::{transport, ArrowRowWriter};
 
+/// Convert row-major reader into [RecordBatch]es.
 pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
-    schema: Arc<Schema>,
+    schema: SchemaRef,
     rows_reader: &mut T,
     min_batch_size: usize,
 ) -> Result<Vec<RecordBatch>, ConnectorError> {
-    let mut writer = row_writer::ArrowRowWriter::new(schema.clone(), min_batch_size);
+    let mut writer = ArrowRowWriter::new(schema.clone(), min_batch_size);
     log::debug!("reading rows");
 
     while let Some(mut row_reader) = rows_reader.next_row()? {
