@@ -41,7 +41,7 @@ pub fn decl_ty_to_arrow(decl_ty: &str, col: &str, table: &str) -> Result<DataTyp
 
     Err(ConnectorError::IncompatibleSchema {
         table_name: table.to_string(),
-        message: format!("column `{col}` was declared as `{ty}`, which results in `NUMERIC` affinity, which is not supported."),
+        message: format!("column `{col}` was declared with type `{ty}`, which results in `NUMERIC` affinity, which is not supported."),
         hint: Some("Supported types are INTEGER, REAL, TEXT and BLOB".to_string())
     })
 }

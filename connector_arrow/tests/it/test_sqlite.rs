@@ -42,6 +42,14 @@ fn basic_small() {
 }
 
 #[test]
+#[ignore] // SQLite cannot infer schema from an empty response, as there is no rows to infer from
+fn empty() {
+    let mut conn = init();
+    let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
+}
+
+#[test]
 fn query_04() {
     let mut conn = init();
     let query = "SELECT 1, NULL";
@@ -56,23 +64,7 @@ fn query_04() {
 }
 
 #[test]
-#[ignore] // TODO: no columns are found
-fn query_05() {
-    let mut conn = init();
-    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
-
-    let query = "SELECT * FROM test_table WHERE FALSE";
-    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
-    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    | test_int | test_nullint | test_str   | test_float | test_bool | test_date  | test_time | test_datetime       |
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    "###);
-}
-
-#[test]
+#[ignore] // cannot introspect the Null column
 fn introspection_01() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();

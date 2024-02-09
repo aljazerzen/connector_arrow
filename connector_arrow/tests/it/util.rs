@@ -1,39 +1,43 @@
 use std::{fs::File, path::Path, sync::Arc};
 
-use arrow::{
-    datatypes::{DataType, Field, Schema},
-    error::ArrowError,
-    record_batch::RecordBatch,
-};
-use connector_arrow::{
-    api::{Append, Connection, EditSchema, Statement},
-    ConnectorError,
-};
+use arrow::array::Array;
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::error::ArrowError;
+use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
+use connector_arrow::api::{Append, Connection, EditSchema, ResultReader, Statement};
+use connector_arrow::ConnectorError;
+
 #[track_caller]
-pub fn load_parquet_if_not_exists<C>(conn: &mut C, file_path: &Path) -> (String, Vec<RecordBatch>)
+pub fn load_parquet_if_not_exists<C>(
+    conn: &mut C,
+    file_path: &Path,
+) -> (String, SchemaRef, Vec<RecordBatch>)
 where
     C: Connection + EditSchema,
 {
     // read from file
-    let arrow_file: Vec<RecordBatch> = {
+    let (schema, arrow_file) = {
         let file = File::open(file_path).unwrap();
 
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build().unwrap();
-        reader.collect::<Result<Vec<_>, ArrowError>>().unwrap()
-    };
+        let schema = builder.schema().clone();
 
-    let schema = arrow_file.first().unwrap().schema();
+        let reader = builder.build().unwrap();
+        let batches = reader.collect::<Result<Vec<_>, ArrowError>>().unwrap();
+        (schema, batches)
+    };
 
     // table create
     let table_name = file_path.file_name().unwrap().to_str().unwrap().to_string();
-    match conn.table_create(&table_name, schema) {
+    match conn.table_create(&table_name, schema.clone()) {
         Ok(_) => (),
-        Err(connector_arrow::TableCreateError::TableExists) => return (table_name, arrow_file),
+        Err(connector_arrow::TableCreateError::TableExists) => {
+            return (table_name, schema, arrow_file)
+        }
         Err(e) => panic!("{}", e),
     }
 
@@ -46,7 +50,7 @@ where
         appender.finish().unwrap();
     }
 
-    (table_name, arrow_file)
+    (table_name, schema, arrow_file)
 }
 
 #[track_caller]
@@ -55,23 +59,29 @@ where
     C: Connection + EditSchema,
     F: Fn(&DataType) -> Option<DataType>,
 {
-    let (table_name, arrow_file) = load_parquet_if_not_exists(conn, file_path);
+    let (table_name, schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path);
 
     // read from table
-    let arrow_table = {
+    let (schema_query, arrow_query) = {
         let mut stmt = conn
             .query(&format!("SELECT * FROM \"{table_name}\""))
             .unwrap();
-        let reader = stmt.start(()).unwrap();
+        let mut reader = stmt.start(()).unwrap();
 
-        reader.collect::<Result<Vec<_>, ConnectorError>>().unwrap()
+        let schema = reader.get_schema().unwrap();
+
+        let batches = reader.collect::<Result<Vec<_>, ConnectorError>>().unwrap();
+        (schema, batches)
     };
 
     // table drop
     conn.table_drop(&table_name).unwrap();
 
+    let schema_file_coerced = cast_schema(&schema_file, &coerce_ty);
+    similar_asserts::assert_eq!(&schema_file_coerced, &schema_query);
+
     let arrow_file_coerced = cast_batches(&arrow_file, coerce_ty);
-    similar_asserts::assert_eq!(&arrow_file_coerced, &arrow_table);
+    similar_asserts::assert_eq!(&arrow_file_coerced, &arrow_query);
 }
 
 fn cast_batches<F>(batches: &[RecordBatch], coerce_ty: F) -> Vec<RecordBatch>
@@ -81,17 +91,7 @@ where
     let arrow_file = batches
         .iter()
         .map(|batch| {
-            let new_schema = Arc::new(Schema::new(
-                batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| match coerce_ty(f.data_type()) {
-                        Some(new_ty) => Field::new(f.name(), new_ty, f.is_nullable()),
-                        None => Field::clone(f),
-                    })
-                    .collect_vec(),
-            ));
+            let new_schema = cast_schema(&batch.schema(), &coerce_ty);
 
             let new_columns = batch
                 .columns()
@@ -106,4 +106,20 @@ where
         })
         .collect_vec();
     arrow_file
+}
+
+fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> Arc<Schema>
+where
+    F: Fn(&DataType) -> Option<DataType>,
+{
+    Arc::new(Schema::new(
+        schema
+            .fields()
+            .iter()
+            .map(|f| match coerce_ty(f.data_type()) {
+                Some(new_ty) => Field::new(f.name(), new_ty, f.is_nullable()),
+                None => Field::clone(f),
+            })
+            .collect_vec(),
+    ))
 }

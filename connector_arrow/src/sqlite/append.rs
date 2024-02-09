@@ -63,7 +63,7 @@ fn insert_query(table_name: &str, cols: usize, rows: usize) -> String {
         })
         .join(",");
 
-    format!("INSERT INTO {table_name} VALUES {values}")
+    format!("INSERT INTO \"{table_name}\" VALUES {values}")
 }
 
 fn collect_args(batch: &RecordBatch, rows_range: std::ops::Range<usize>) -> Vec<Value> {
@@ -77,6 +77,10 @@ fn collect_args(batch: &RecordBatch, rows_range: std::ops::Range<usize>) -> Vec<
 }
 
 fn get_value(array: &Arc<dyn Array>, row: usize) -> Value {
+    if array.is_null(row) {
+        return Value::Null;
+    }
+
     match array.data_type() {
         DataType::Null => Value::Null,
         DataType::Boolean => Value::Integer(

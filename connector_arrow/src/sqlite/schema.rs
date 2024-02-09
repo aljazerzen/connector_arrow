@@ -65,7 +65,7 @@ pub(crate) fn table_create(
         })
         .join(",");
 
-    let ddl = format!("CREATE TABLE {name} ({column_defs});");
+    let ddl = format!("CREATE TABLE \"{name}\" ({column_defs});");
 
     let res = conn.execute(&ddl, ());
     match res {
@@ -79,7 +79,7 @@ pub(crate) fn table_drop(
     conn: &mut rusqlite::Connection,
     name: &str,
 ) -> Result<(), TableDropError> {
-    let ddl = format!("DROP TABLE {name};");
+    let ddl = format!("DROP TABLE \"{name}\";");
 
     let res = conn.execute(&ddl, ());
     match res {
