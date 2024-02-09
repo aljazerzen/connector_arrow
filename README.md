@@ -26,9 +26,9 @@ None of the sources are enabled by default, use to enable them.
 | Streaming       |                      |                  | x                    | x                    |
 | Temporal types  |                      |                  |                      |                      |
 | Container types |                      |                  |                      |                      |
-| Schema get      | x                    |                  |                      |                      |
-| Schema edit     | x                    |                  |                      |                      |
-| Append          | x                    |                  |                      |                      |
+| Schema get      | x                    | x                |                      |                      |
+| Schema edit     | x                    | x                |                      |                      |
+| Append          | x                    | x                |                      |                      |
 | Tested          | x                    | x                | x                    |                      |
 
 ## Types

@@ -1,9 +1,10 @@
 use std::{env, path::PathBuf, str::FromStr};
 
 use arrow::{datatypes::DataType, util::pretty::pretty_format_batches};
-use connector_arrow;
 use connector_arrow::api::Connection;
+use connector_arrow::{self, api::EditSchema};
 use insta::{assert_debug_snapshot, assert_display_snapshot};
+use itertools::Itertools;
 
 fn init() -> rusqlite::Connection {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -35,7 +36,7 @@ fn coerce_ty(ty: &DataType) -> Option<DataType> {
 }
 
 #[test]
-fn basic_small() {
+fn roundtrip_basic_small() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
     super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
@@ -43,7 +44,7 @@ fn basic_small() {
 
 #[test]
 #[ignore] // SQLite cannot infer schema from an empty response, as there is no rows to infer from
-fn empty() {
+fn roundtrip_empty() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
     super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
@@ -65,62 +66,33 @@ fn query_04() {
 
 #[test]
 #[ignore] // cannot introspect the Null column
-fn introspection_01() {
+fn introspection_basic_small() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+    let (_table, schema_file, _) =
+        super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+    let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
 
     let refs = conn.get_table_schemas().unwrap();
-    assert_debug_snapshot!(refs, @r###"
-    [
-        TableSchema {
-            name: "basic_small.parquet",
-            schema: Schema {
-                fields: [
-                    Field {
-                        name: "test_int",
-                        data_type: Int64,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_nullint",
-                        data_type: Int64,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_str",
-                        data_type: LargeUtf8,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_float",
-                        data_type: Float64,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_bool",
-                        data_type: Int64,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                ],
-                metadata: {},
-            },
-        },
-    ]
-    "###);
+    let schema_introspection = refs.into_iter().exactly_one().unwrap().schema;
+    similar_asserts::assert_eq!(schema_file_coerced.as_ref(), &schema_introspection);
+}
+
+#[test]
+fn schema_edit_01() {
+    let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    let (_, schema, _) = super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+
+    let _ignore = conn.table_drop("test_table2");
+
+    conn.table_create("test_table2", schema.clone()).unwrap();
+    assert_debug_snapshot!(
+        conn.table_create("test_table2", schema.clone()).unwrap_err(), @"TableExists"
+    );
+
+    conn.table_drop("test_table2").unwrap();
+    assert_debug_snapshot!(
+        conn.table_drop("test_table2").unwrap_err(), @"TableNonexistent"
+    );
 }

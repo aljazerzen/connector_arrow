@@ -1,6 +1,4 @@
 export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
-export SQLITE_URL := "../dbs/sqlite.db"
-export DUCKDB_URL := "../dbs/duckdb.db"
 
 default:
     just --list
@@ -12,9 +10,9 @@ test:
     just test-feature-gate
 
 # run tests, importants things first, for development
-test-fast:
+test-fast *ARGS:
     just fmt
-    INSTA_FORCE_PASS=1 cargo nextest run --features=all --no-fail-fast
+    INSTA_FORCE_PASS=1 cargo nextest run --features=all --no-fail-fast {{ARGS}}
     cargo insta review
     cargo clippy --features=all
 

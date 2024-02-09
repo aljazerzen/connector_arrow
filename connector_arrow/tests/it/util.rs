@@ -84,7 +84,7 @@ where
     similar_asserts::assert_eq!(&arrow_file_coerced, &arrow_query);
 }
 
-fn cast_batches<F>(batches: &[RecordBatch], coerce_ty: F) -> Vec<RecordBatch>
+pub fn cast_batches<F>(batches: &[RecordBatch], coerce_ty: F) -> Vec<RecordBatch>
 where
     F: Fn(&DataType) -> Option<DataType>,
 {
@@ -108,7 +108,7 @@ where
     arrow_file
 }
 
-fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> Arc<Schema>
+pub fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> Arc<Schema>
 where
     F: Fn(&DataType) -> Option<DataType>,
 {

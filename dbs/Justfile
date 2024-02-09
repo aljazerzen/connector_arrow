@@ -1,6 +1,4 @@
 export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
-export SQLITE_URL := "sqlite://sqlite.db"
-export DUCKDB_URL := "duckdb://duckdb.db"
 
 start:
     docker-compose up --detach --wait
@@ -8,11 +6,8 @@ start:
 stop:
     docker-compose down
 
-
 seed:
     psql $POSTGRES_URL -f postgres.sql
-    sqlite3 ${SQLITE_URL#sqlite://} < sqlite.sql
-    duckdb ${DUCKDB_URL#duckdb://} < duckdb.sql
 
 # dbs not included in ci
 seed-more:

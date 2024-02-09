@@ -1,34 +1,64 @@
-use arrow::util::pretty::pretty_format_batches;
-use connector_arrow;
-use insta::assert_display_snapshot;
-use std::env;
+use arrow::datatypes::DataType;
+use connector_arrow::api::{Connection, EditSchema};
+use insta::assert_debug_snapshot;
+use itertools::Itertools;
+use std::{path::PathBuf, str::FromStr};
 
 fn init() -> duckdb::Connection {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let url = env::var("DUCKDB_URL").unwrap();
+    duckdb::Connection::open_in_memory().unwrap()
+}
 
-    duckdb::Connection::open(url).unwrap()
+fn coerce_ty(ty: &DataType) -> Option<DataType> {
+    match ty {
+        DataType::Null => Some(DataType::Int64),
+        _ => None,
+    }
 }
 
 #[test]
-fn load_and_parse() {
+fn roundtrip_basic_small() {
     let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
+}
 
-    let query = "select * from test_table";
+#[test]
+fn roundtrip_empty() {
+    let mut conn = init();
+    let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
+}
 
-    let results = connector_arrow::query_one(&mut conn, query).unwrap();
+#[test]
+fn introspection_basic_small() {
+    let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    let (_table, schema_file, _) =
+        super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+    let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
 
-    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
-    +----------+--------------+----------+------------+-----------+
-    | test_int | test_nullint | test_str | test_float | test_bool |
-    +----------+--------------+----------+------------+-----------+
-    | 1        | 3            | str1     |            | true      |
-    | 2        |              | str2     | 2.2        | false     |
-    | 0        | 5            | a        | 3.1        |           |
-    | 3        | 7            | b        | 3.0        | false     |
-    | 4        | 9            | c        | 7.8        |           |
-    | 1314     | 2            |          | -10.0      | true      |
-    +----------+--------------+----------+------------+-----------+
-    "###);
+    let refs = conn.get_table_schemas().unwrap();
+    let schema_introspection = refs.into_iter().exactly_one().unwrap().schema;
+    similar_asserts::assert_eq!(schema_file_coerced.as_ref(), &schema_introspection);
+}
+
+#[test]
+fn schema_edit_01() {
+    let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    let (_, schema, _) = super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+
+    let _ignore = conn.table_drop("test_table2");
+
+    conn.table_create("test_table2", schema.clone()).unwrap();
+    assert_debug_snapshot!(
+        conn.table_create("test_table2", schema.clone()).unwrap_err(), @"TableExists"
+    );
+
+    conn.table_drop("test_table2").unwrap();
+    assert_debug_snapshot!(
+        conn.table_drop("test_table2").unwrap_err(), @"TableNonexistent"
+    );
 }
