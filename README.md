@@ -13,29 +13,29 @@ To be more specific, this crate:
 - does not include connection pooling, but allows downstream creates to implement it themselves,
 - uses minimal dependencies (it even disables default features).
 
-None of the sources are enabled by default, use `src_` features to enable them.
+None of the sources are enabled by default, use to enable them.
 
 ## Support matrix
 
-| Source             | Feature, dependency                                           | Querying | Streaming | Introspect | Query params | Writing | Tested |
-| ------------------ | ------------------------------------------------------------- | -------- | --------- | ---------- | ------------ | ------- | ------ |
-| SQLite             | `src_sqlite` [rusqlite](https://crates.io/crates/rusqlite)    | x        |           | x          |              |         | x      |
-| DuckDB             | `src_duckdb` [duckdb](https://creates.io/crates/duckdb)       | x        |           |            |              |         | x      |
-| PostgreSQL         | `src_postgres` [postgres](https://creates.io/crates/postgres) | x        | x         |            |              |         | x      |
-| Redshift           | `src_postgres` [postgres](https://creates.io/crates/postgres) | x        | x         |            |              |         |        |
-| MySQL              |                                                               |          |           |            |              |         |        |
-| MariaDB            |                                                               |          |           |            |              |         |        |
-| ClickHouse         |                                                               |          |           |            |              |         |        |
-| SQL Server         |                                                               |          |           |            |              |         |        |
-| Azure SQL Database |                                                               |          |           |            |              |         |        |
-| Oracle             |                                                               |          |           |            |              |         |        |
-| Big Query          |                                                               |          |           |            |              |         |        |
+|                 | SQLite               | DuckDB           | PostgreSQL           | Redshift             |
+| --------------- | -------------------- | ---------------- | -------------------- | -------------------- |
+| Feature         | `src_sqlite`         | `src_duckdb`     | `src_postgres`       | `src_postgres`       |
+| Dependency      | [rusqlite][rusqlite] | [duckdb][duckdb] | [postgres][postgres] | [postgres][postgres] |
+| Query           | x                    | x                | x                    | x                    |
+| Query params    |                      |                  |                      |                      |
+| Streaming       |                      |                  | x                    | x                    |
+| Temporal types  |                      |                  |                      |                      |
+| Container types |                      |                  |                      |                      |
+| Schema get      | x                    |                  |                      |                      |
+| Schema edit     | x                    |                  |                      |                      |
+| Append          | x                    |                  |                      |                      |
+| Tested          | x                    | x                | x                    |                      |
 
 ## Types
 
 When converting non-arrow data sources (everything except DuckDB), only a subset of all possible arrows types is produced. Here is a list of what it is currently possible to produce:
 
-- [ ] Null
+- [x] Null
 - [x] Boolean
 - [x] Int8
 - [x] Int16
@@ -72,3 +72,7 @@ When converting non-arrow data sources (everything except DuckDB), only a subset
 - [ ] RunEndEncoded
 
 This restriction mostly has to do with non-trivial mapping of Arrow type into Rust native types.
+
+[rusqlite]: https://crates.io/crates/rusqlite
+[duckdb]: https://creates.io/crates/duckdb
+[postgres]: https://creates.io/crates/postgres

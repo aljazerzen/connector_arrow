@@ -39,18 +39,18 @@ pub enum ConnectorError {
 
 #[derive(Error, Debug)]
 pub enum TableCreateError {
-    #[error(transparent)]
-    Connector(ConnectorError),
-
     #[error("Table already exists")]
     TableExists,
+
+    #[error(transparent)]
+    Connector(#[from] ConnectorError),
 }
 
 #[derive(Error, Debug)]
 pub enum TableDropError {
-    #[error(transparent)]
-    Connector(ConnectorError),
-
     #[error("Table does not exist")]
-    TableExists,
+    TableNonexistent,
+
+    #[error(transparent)]
+    Connector(#[from] ConnectorError),
 }

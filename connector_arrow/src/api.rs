@@ -53,7 +53,7 @@ pub trait Append<'conn> {
 
     fn append(&mut self, batch: RecordBatch) -> Result<(), ConnectorError>;
 
-    fn finish(&mut self, params: ()) -> Result<(), ConnectorError>;
+    fn finish(self) -> Result<(), ConnectorError>;
 }
 
 pub trait EditSchema {
@@ -73,7 +73,7 @@ pub mod unimplemented {
             unimplemented!()
         }
 
-        fn finish(&mut self, _: ()) -> Result<(), crate::ConnectorError> {
+        fn finish(self) -> Result<(), crate::ConnectorError> {
             unimplemented!()
         }
     }

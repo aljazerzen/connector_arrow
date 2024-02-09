@@ -1,7 +1,10 @@
 use std::env;
 
 use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::{self, api::Connection};
+use connector_arrow::{
+    self,
+    api::{Append, Connection, EditSchema},
+};
 use insta::{assert_debug_snapshot, assert_display_snapshot};
 
 fn init() -> rusqlite::Connection {
@@ -174,4 +177,29 @@ fn test_introspection_01() {
         },
     ]
     "###);
+}
+
+#[test]
+fn test_schema_edit_01() {
+    let mut conn = init();
+
+    let query = "SELECT * FROM test_table";
+    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
+    let batch = results.first().unwrap();
+
+    let _ignore = conn.table_drop("test_table2");
+
+    conn.table_create("test_table2", batch.schema()).unwrap();
+    assert_debug_snapshot!(
+        conn.table_create("test_table2", batch.schema()).unwrap_err(), @"TableExists"
+    );
+
+    let mut appender = conn.append("test_table2").unwrap();
+    appender.append(batch.clone()).unwrap();
+    appender.finish().unwrap();
+
+    conn.table_drop("test_table2").unwrap();
+    assert_debug_snapshot!(
+        conn.table_drop("test_table2").unwrap_err(), @"TableNonexistent"
+    );
 }
