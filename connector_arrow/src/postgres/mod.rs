@@ -72,9 +72,6 @@ where
         })
     }
 
-    fn get_table_schemas(&mut self) -> Result<Vec<crate::api::TableSchema>, ConnectorError> {
-        unimplemented!()
-    }
     fn append<'a>(&'a mut self, _: &str) -> Result<Self::Append<'a>, ConnectorError> {
         unimplemented!()
     }

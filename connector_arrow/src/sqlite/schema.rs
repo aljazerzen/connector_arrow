@@ -1,16 +1,16 @@
-use arrow::datatypes::{Field, Schema};
+use arrow::datatypes::{Field, Schema, SchemaRef};
 use itertools::Itertools;
+use std::sync::Arc;
 
-use crate::errors::{ConnectorError, TableDropError};
-use crate::{api::TableSchema, errors::TableCreateError};
+use crate::api::{SchemaEdit, SchemaGet};
+use crate::errors::{ConnectorError, TableCreateError, TableDropError};
 
 use super::types::{self, ty_from_arrow};
 
-pub fn table_list(conn: &mut rusqlite::Connection) -> Result<Vec<TableSchema>, ConnectorError> {
-    // query table names
-    let table_names = {
+impl SchemaGet for rusqlite::Connection {
+    fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query_tables = "SELECT name FROM sqlite_master WHERE type = 'table';";
-        let mut statement = conn.prepare(query_tables)?;
+        let mut statement = self.prepare(query_tables)?;
         let mut tables_res = statement.query(())?;
 
         let mut table_names = Vec::new();
@@ -18,14 +18,15 @@ pub fn table_list(conn: &mut rusqlite::Connection) -> Result<Vec<TableSchema>, C
             let table_name: String = row.get(0)?;
             table_names.push(table_name);
         }
-        table_names
-    };
+        Ok(table_names)
+    }
 
-    // for each table
-    let mut defs = Vec::with_capacity(table_names.len());
-    for table_name in table_names {
+    fn table_get(
+        &mut self,
+        table_name: &str,
+    ) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
         let query_columns = format!("PRAGMA table_info(\"{}\");", table_name);
-        let mut statement = conn.prepare(&query_columns)?;
+        let mut statement = self.prepare(&query_columns)?;
         let mut columns_res = statement.query(())?;
         // contains columns: cid, name, type, notnull, dflt_value, pk
 
@@ -35,17 +36,22 @@ pub fn table_list(conn: &mut rusqlite::Connection) -> Result<Vec<TableSchema>, C
             let ty: String = row.get(2)?;
             let not_null: bool = row.get(3)?;
 
-            let ty = types::decl_ty_to_arrow(&ty, &name, &table_name)?;
+            let ty = types::decl_ty_to_arrow(&ty, &name, table_name)?;
             fields.push(Field::new(name, ty, !not_null));
         }
 
-        defs.push(TableSchema {
-            name: table_name,
-            schema: Schema::new(fields),
-        })
+        Ok(Arc::new(Schema::new(fields)))
+    }
+}
+
+impl SchemaEdit for rusqlite::Connection {
+    fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
+        table_create(self, name, schema)
     }
 
-    Ok(defs)
+    fn table_drop(&mut self, name: &str) -> Result<(), TableDropError> {
+        table_drop(self, name)
+    }
 }
 
 pub(crate) fn table_create(

@@ -4,10 +4,33 @@ use arrow::datatypes::{DataType, Schema};
 use duckdb::types::Type;
 use itertools::Itertools;
 
-use crate::api::EditSchema;
+use crate::api::{SchemaEdit, SchemaGet};
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
-impl EditSchema for duckdb::Connection {
+impl SchemaGet for duckdb::Connection {
+    fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
+        let query_tables = "SHOW TABLES;";
+        let mut statement = self.prepare(query_tables)?;
+        let mut tables_res = statement.query([])?;
+
+        let mut table_names = Vec::new();
+        while let Some(row) = tables_res.next()? {
+            let table_name: String = row.get(0)?;
+            table_names.push(table_name);
+        }
+        Ok(table_names)
+    }
+
+    fn table_get(&mut self, name: &str) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
+        let query_schema = format!("SELECT * FROM \"{name}\" WHERE FALSE;");
+        let mut statement = self.prepare(&query_schema)?;
+        let results = statement.query_arrow([])?;
+
+        Ok(results.get_schema())
+    }
+}
+
+impl SchemaEdit for duckdb::Connection {
     fn table_create(&mut self, name: &str, schema: Arc<Schema>) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()

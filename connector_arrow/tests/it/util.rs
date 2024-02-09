@@ -7,7 +7,7 @@ use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
-use connector_arrow::api::{Append, Connection, EditSchema, ResultReader, Statement};
+use connector_arrow::api::{Append, Connection, ResultReader, SchemaEdit, Statement};
 use connector_arrow::ConnectorError;
 
 #[track_caller]
@@ -16,7 +16,7 @@ pub fn load_parquet_if_not_exists<C>(
     file_path: &Path,
 ) -> (String, SchemaRef, Vec<RecordBatch>)
 where
-    C: Connection + EditSchema,
+    C: Connection + SchemaEdit,
 {
     // read from file
     let (schema, arrow_file) = {
@@ -56,7 +56,7 @@ where
 #[track_caller]
 pub fn roundtrip_of_parquet<C, F>(conn: &mut C, file_path: &Path, coerce_ty: F)
 where
-    C: Connection + EditSchema,
+    C: Connection + SchemaEdit,
     F: Fn(&DataType) -> Option<DataType>,
 {
     let (table_name, schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path);

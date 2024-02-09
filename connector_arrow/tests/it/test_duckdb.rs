@@ -1,7 +1,6 @@
 use arrow::datatypes::DataType;
-use connector_arrow::api::{Connection, EditSchema};
+use connector_arrow::api::{SchemaEdit, SchemaGet};
 use insta::assert_debug_snapshot;
-use itertools::Itertools;
 use std::{path::PathBuf, str::FromStr};
 
 fn init() -> duckdb::Connection {
@@ -35,13 +34,12 @@ fn roundtrip_empty() {
 fn introspection_basic_small() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    let (_table, schema_file, _) =
+    let (table, schema_file, _) =
         super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
     let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
 
-    let refs = conn.get_table_schemas().unwrap();
-    let schema_introspection = refs.into_iter().exactly_one().unwrap().schema;
-    similar_asserts::assert_eq!(schema_file_coerced.as_ref(), &schema_introspection);
+    let schema_introspection = conn.table_get(&table).unwrap();
+    similar_asserts::assert_eq!(schema_file_coerced, schema_introspection);
 }
 
 #[test]

@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use arrow::{datatypes::Schema, record_batch::RecordBatch};
+use arrow::{
+    datatypes::{Schema, SchemaRef},
+    record_batch::RecordBatch,
+};
 
 use crate::errors::{TableCreateError, TableDropError};
 
@@ -17,8 +20,6 @@ pub trait Connection {
         Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError>;
-
-    fn get_table_schemas(&mut self) -> Result<Vec<TableSchema>, ConnectorError>;
 
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
 }
@@ -56,7 +57,13 @@ pub trait Append<'conn> {
     fn finish(self) -> Result<(), ConnectorError>;
 }
 
-pub trait EditSchema {
+pub trait SchemaGet {
+    fn table_list(&mut self) -> Result<Vec<String>, ConnectorError>;
+
+    fn table_get(&mut self, name: &str) -> Result<SchemaRef, ConnectorError>;
+}
+
+pub trait SchemaEdit {
     fn table_create(&mut self, name: &str, schema: Arc<Schema>) -> Result<(), TableCreateError>;
 
     fn table_drop(&mut self, name: &str) -> Result<(), TableDropError>;

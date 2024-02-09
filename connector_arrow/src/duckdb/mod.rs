@@ -2,13 +2,12 @@
 mod append;
 mod schema;
 
-use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use duckdb::{Appender, Arrow};
 
 use std::sync::Arc;
 
-use crate::api::{Connection, ResultReader, Statement, TableSchema};
+use crate::api::{Connection, ResultReader, Statement};
 use crate::errors::ConnectorError;
 
 impl Connection for duckdb::Connection {
@@ -22,37 +21,6 @@ impl Connection for duckdb::Connection {
         let stmt = duckdb::Connection::prepare(self, query)?;
 
         Ok(DuckDBStatement { stmt })
-    }
-
-    fn get_table_schemas(&mut self) -> Result<Vec<TableSchema>, ConnectorError> {
-        // query table names
-        let table_names = {
-            let query_tables = "SHOW TABLES;";
-            let mut statement = self.prepare(query_tables)?;
-            let mut tables_res = statement.query([])?;
-
-            let mut table_names = Vec::new();
-            while let Some(row) = tables_res.next()? {
-                let table_name: String = row.get(0)?;
-                table_names.push(table_name);
-            }
-            table_names
-        };
-
-        // for each table
-        let mut defs = Vec::with_capacity(table_names.len());
-        for table_name in table_names {
-            let query_schema = format!("SELECT * FROM \"{table_name}\" WHERE FALSE;");
-            let mut statement = self.prepare(&query_schema)?;
-            let results = statement.query_arrow([])?;
-
-            defs.push(TableSchema {
-                name: table_name,
-                schema: Schema::clone(&results.get_schema()),
-            });
-        }
-
-        Ok(defs)
     }
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
         Ok(self.appender(table_name)?)

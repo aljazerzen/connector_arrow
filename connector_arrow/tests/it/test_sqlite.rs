@@ -1,10 +1,9 @@
 use std::{env, path::PathBuf, str::FromStr};
 
 use arrow::{datatypes::DataType, util::pretty::pretty_format_batches};
-use connector_arrow::api::Connection;
-use connector_arrow::{self, api::EditSchema};
+use connector_arrow::api::SchemaGet;
+use connector_arrow::{self, api::SchemaEdit};
 use insta::{assert_debug_snapshot, assert_display_snapshot};
-use itertools::Itertools;
 
 fn init() -> rusqlite::Connection {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -69,13 +68,12 @@ fn query_04() {
 fn introspection_basic_small() {
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    let (_table, schema_file, _) =
+    let (table, schema_file, _) =
         super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
     let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
 
-    let refs = conn.get_table_schemas().unwrap();
-    let schema_introspection = refs.into_iter().exactly_one().unwrap().schema;
-    similar_asserts::assert_eq!(schema_file_coerced.as_ref(), &schema_introspection);
+    let schema_introspection = conn.table_get(&table).unwrap();
+    similar_asserts::assert_eq!(schema_file_coerced, schema_introspection);
 }
 
 #[test]
