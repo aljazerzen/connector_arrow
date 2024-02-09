@@ -1,3 +1,5 @@
+mod util;
+
 #[cfg(feature = "src_duckdb")]
 mod test_duckdb;
 #[cfg(feature = "src_postgres")]

@@ -1,75 +1,48 @@
-use std::env;
+use std::{env, path::PathBuf, str::FromStr};
 
-use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::{
-    self,
-    api::{Append, Connection, EditSchema},
-};
+use arrow::{datatypes::DataType, util::pretty::pretty_format_batches};
+use connector_arrow;
+use connector_arrow::api::Connection;
 use insta::{assert_debug_snapshot, assert_display_snapshot};
 
 fn init() -> rusqlite::Connection {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let url = "../dbs/".to_string() + env::var("SQLITE_URL").unwrap().as_str();
+    rusqlite::Connection::open_in_memory().unwrap()
+}
 
-    rusqlite::Connection::open(url).unwrap()
+fn coerce_ty(ty: &DataType) -> Option<DataType> {
+    match ty {
+        DataType::Boolean => Some(DataType::Int64),
+        DataType::Int8 => Some(DataType::Int64),
+        DataType::Int16 => Some(DataType::Int64),
+        DataType::Int32 => Some(DataType::Int64),
+        DataType::Int64 => Some(DataType::Int64),
+        DataType::UInt8 => Some(DataType::Int64),
+        DataType::UInt16 => Some(DataType::Int64),
+        DataType::UInt32 => Some(DataType::Int64),
+        DataType::UInt64 => Some(DataType::Int64),
+        DataType::Float16 => Some(DataType::Float64),
+        DataType::Float32 => Some(DataType::Float64),
+        DataType::Float64 => Some(DataType::Float64),
+        DataType::Binary => Some(DataType::LargeBinary),
+        DataType::FixedSizeBinary(_) => Some(DataType::LargeBinary),
+        DataType::LargeBinary => Some(DataType::LargeBinary),
+        DataType::Utf8 => Some(DataType::LargeUtf8),
+        DataType::LargeUtf8 => Some(DataType::LargeUtf8),
+        _ => None,
+    }
 }
 
 #[test]
-fn test_query_01() {
+fn basic_small() {
     let mut conn = init();
-
-    let query = "SELECT * FROM test_table";
-    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
-    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    | test_int | test_nullint | test_str   | test_float | test_bool | test_date  | test_time | test_datetime       |
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    | 1        | 3            | str1       |            | 1         | 1996-03-13 | 08:12:40  | 2007-01-01 10:00:19 |
-    | 2        |              | str2       | 2.2        | 0         | 1996-01-30 | 10:03:00  | 2005-01-01 22:03:00 |
-    | 0        | 5            | こんにちは | 3.1        |           | 1996-02-28 | 23:00:10  |                     |
-    | 3        | 7            | b          | 3.0        | 0         | 2020-01-12 | 23:00:10  | 1987-01-01 11:00:00 |
-    | 4        | 9            | Ha好ち😁ðy̆ | 7.8        |           | 1996-04-20 | 18:30:00  |                     |
-    | 1314     | 2            |            | -10.0      | 1         |            | 18:30:00  | 2007-10-01 10:32:00 |
-    +----------+--------------+------------+------------+-----------+------------+-----------+---------------------+
-    "###);
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
 }
 
 #[test]
-fn test_query_02() {
-    let mut conn = init();
-    let query = "SELECT test_int, test_nullint, test_str FROM test_table WHERE test_int >= 2";
-    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
-    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
-    +----------+--------------+------------+
-    | test_int | test_nullint | test_str   |
-    +----------+--------------+------------+
-    | 2        |              | str2       |
-    | 3        | 7            | b          |
-    | 4        | 9            | Ha好ち😁ðy̆ |
-    | 1314     | 2            |            |
-    +----------+--------------+------------+
-    "###);
-}
-
-#[test]
-fn test_query_03() {
-    let mut conn = init();
-    let query = "SELECT 1 + test_int as a FROM test_table ORDER BY test_int LIMIT 3";
-    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
-    assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
-    +---+
-    | a |
-    +---+
-    | 1 |
-    | 2 |
-    | 3 |
-    +---+
-    "###);
-}
-
-#[test]
-fn test_query_04() {
+fn query_04() {
     let mut conn = init();
     let query = "SELECT 1, NULL";
     let results = connector_arrow::query_one(&mut conn, &query).unwrap();
@@ -84,8 +57,11 @@ fn test_query_04() {
 
 #[test]
 #[ignore] // TODO: no columns are found
-fn test_query_05() {
+fn query_05() {
     let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+
     let query = "SELECT * FROM test_table WHERE FALSE";
     let results = connector_arrow::query_one(&mut conn, &query).unwrap();
     assert_display_snapshot!(pretty_format_batches(&results).unwrap(), @r###"
@@ -97,20 +73,22 @@ fn test_query_05() {
 }
 
 #[test]
-fn test_introspection_01() {
+fn introspection_01() {
     let mut conn = init();
+    let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
+    super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
 
     let refs = conn.get_table_schemas().unwrap();
     assert_debug_snapshot!(refs, @r###"
     [
         TableSchema {
-            name: "test_table",
+            name: "basic_small.parquet",
             schema: Schema {
                 fields: [
                     Field {
                         name: "test_int",
                         data_type: Int64,
-                        nullable: false,
+                        nullable: true,
                         dict_id: 0,
                         dict_is_ordered: false,
                         metadata: {},
@@ -147,59 +125,10 @@ fn test_introspection_01() {
                         dict_is_ordered: false,
                         metadata: {},
                     },
-                    Field {
-                        name: "test_date",
-                        data_type: LargeUtf8,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_time",
-                        data_type: LargeUtf8,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
-                    Field {
-                        name: "test_datetime",
-                        data_type: LargeUtf8,
-                        nullable: true,
-                        dict_id: 0,
-                        dict_is_ordered: false,
-                        metadata: {},
-                    },
                 ],
                 metadata: {},
             },
         },
     ]
     "###);
-}
-
-#[test]
-fn test_schema_edit_01() {
-    let mut conn = init();
-
-    let query = "SELECT * FROM test_table";
-    let results = connector_arrow::query_one(&mut conn, &query).unwrap();
-    let batch = results.first().unwrap();
-
-    let _ignore = conn.table_drop("test_table2");
-
-    conn.table_create("test_table2", batch.schema()).unwrap();
-    assert_debug_snapshot!(
-        conn.table_create("test_table2", batch.schema()).unwrap_err(), @"TableExists"
-    );
-
-    let mut appender = conn.append("test_table2").unwrap();
-    appender.append(batch.clone()).unwrap();
-    appender.finish().unwrap();
-
-    conn.table_drop("test_table2").unwrap();
-    assert_debug_snapshot!(
-        conn.table_drop("test_table2").unwrap_err(), @"TableNonexistent"
-    );
 }

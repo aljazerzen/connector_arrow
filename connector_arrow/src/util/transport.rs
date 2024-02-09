@@ -17,7 +17,7 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(
 
     if !f.is_nullable() {
         match f.data_type() {
-            Null => {}
+            Null => c.consume(()),
             Boolean => c.consume(ProduceTy::<bool>::produce(p)?),
             Int8 => c.consume(ProduceTy::<i8>::produce(p)?),
             Int16 => c.consume(ProduceTy::<i16>::produce(p)?),
@@ -35,7 +35,7 @@ pub fn transport<'r, P: Produce<'r>, C: Consume>(
         }
     } else {
         match f.data_type() {
-            Null => {}
+            Null => c.consume_opt(Some(())),
             Boolean => c.consume_opt(ProduceTy::<bool>::produce_opt(p)?),
             Int8 => c.consume_opt(ProduceTy::<i8>::produce_opt(p)?),
             Int16 => c.consume_opt(ProduceTy::<i16>::produce_opt(p)?),
@@ -79,7 +79,8 @@ pub trait ProduceTy<'r, T> {
 }
 
 pub trait Consume:
-    ConsumeTy<bool>
+    ConsumeTy<()>
+    + ConsumeTy<bool>
     + ConsumeTy<i8>
     + ConsumeTy<i16>
     + ConsumeTy<i32>
@@ -109,10 +110,10 @@ pub mod print {
 
     impl<T: std::fmt::Debug> ConsumeTy<T> for PrintConsumer {
         fn consume(&mut self, value: T) {
-            println!("bool: {value:?}");
+            println!("{}: {value:?}", std::any::type_name::<T>());
         }
         fn consume_opt(&mut self, value: Option<T>) {
-            println!("bool: {value:?}");
+            println!("{}: {value:?}", std::any::type_name::<T>());
         }
     }
 }

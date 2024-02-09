@@ -31,7 +31,7 @@ pub mod postgres;
 pub mod sqlite;
 
 pub use arrow;
-pub use errors::ConnectorError;
+pub use errors::*;
 
 use arrow::record_batch::RecordBatch;
 

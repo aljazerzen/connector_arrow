@@ -23,8 +23,8 @@ pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
         for field in &schema.fields {
             log::debug!("reading cell");
             let cell_ref = row_reader.next_cell();
-            log::debug!("transporting cell");
 
+            log::debug!("transporting cell: {cell_ref:?}");
             transport::transport(field, cell_ref.unwrap(), &mut writer)?;
         }
     }
@@ -44,7 +44,7 @@ pub trait RowsReader<'stmt> {
 /// Iterator over cells of a row.
 // Cannot be an actual iterator, because of lifetime requirements (I think).
 pub trait CellReader<'row> {
-    type CellRef<'cell>: transport::Produce<'cell>
+    type CellRef<'cell>: transport::Produce<'cell> + std::fmt::Debug
     where
         Self: 'cell;
 

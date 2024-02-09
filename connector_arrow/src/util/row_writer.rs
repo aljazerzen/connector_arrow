@@ -156,12 +156,14 @@ macro_rules! impl_consume_ty {
             impl super::transport::ConsumeTy<$Native> for ArrowRowWriter {
                 fn consume(&mut self, value: $Native) {
                     self.next_builder()
-                        .downcast_mut::<arrow::array::builder::$Builder>().unwrap()
+                        .downcast_mut::<arrow::array::builder::$Builder>()
+                        .expect(concat!("bad cast to ", stringify!($Builder)))
                         .append_value(value);
                 }
                 fn consume_opt(&mut self, value: Option<$Native>) {
                     self.next_builder()
-                        .downcast_mut::<arrow::array::builder::$Builder>().unwrap()
+                        .downcast_mut::<arrow::array::builder::$Builder>()
+                        .expect(concat!("bad cast to ", stringify!($Builder)))
                         .append_option(value);
                 }
             }
@@ -194,4 +196,13 @@ impl_consume_ty! {
        { String  => LargeStringBuilder     }  // LargeUtf8
     // {         => Date32Builder          }  // Date32 - no Rust native type
     // {         => Date64Builder          }  // Date64 - no Rust native type
+}
+
+impl super::transport::ConsumeTy<()> for ArrowRowWriter {
+    fn consume(&mut self, _: ()) {
+        self.next_builder();
+    }
+    fn consume_opt(&mut self, _: Option<()>) {
+        self.next_builder();
+    }
 }
