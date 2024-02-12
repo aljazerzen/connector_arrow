@@ -1,13 +1,10 @@
+use arrow::datatypes::*;
 use hex::decode;
 use postgres::{SimpleQueryMessage, SimpleQueryRow};
-use rust_decimal::Decimal;
-use serde_json::Value;
-use std::collections::HashMap;
-use uuid::Uuid;
 
 use crate::api::Statement;
-use crate::util::transport::{Produce, ProduceTy};
-use crate::util::{collect_rows_to_arrow, ArrowReader, CellReader};
+use crate::types::{ArrowType, FixedSizeBinaryType};
+use crate::util::{collect_rows_to_arrow, transport, ArrowReader, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
 
 use super::{types, PostgresError, PostgresStatement, ProtocolSimple};
@@ -72,42 +69,27 @@ impl<'row> CellReader<'row> for PostgresCellReader {
 
 type CellRef<'a> = (&'a SimpleQueryRow, usize);
 
-impl<'c> Produce<'c> for CellRef<'c> {}
+impl<'c> transport::Produce<'c> for CellRef<'c> {}
 
 fn err_null() -> ConnectorError {
     ConnectorError::DataSchemaMismatch("NULL in non-nullable column".into())
 }
 
-macro_rules! impl_simple_produce_unimplemented {
-    ($($t: ty,)+) => {
-        $(
-            impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(self) -> Result<$t, ConnectorError> {
-                   unimplemented!();
-                }
-
-                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
-                   unimplemented!();
-                }
-            }
-        )+
-    };
-}
-
 macro_rules! impl_simple_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(self) -> Result<$t, ConnectorError> {
-                    self.produce_opt()?.ok_or_else(err_null)
+            impl<'r> transport::ProduceTy<'r, $t> for CellRef<'r> {
+                fn produce(self) -> Result<<$t as ArrowType>::Native, ConnectorError> {
+                    transport::ProduceTy::<$t>::produce_opt(self)?.ok_or_else(err_null)
                 }
 
-                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
+                fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
                     let s = self.0.get(self.1);
 
                     Ok(match s {
                         Some(s) => Some(
-                            s.parse::<$t>().map_err(|e| ConnectorError::DataSchemaMismatch(e.to_string()))?,
+                            s.parse::<<$t as ArrowType>::Native>()
+                                .map_err(|e| ConnectorError::DataSchemaMismatch(e.to_string()))?,
                         ),
                         None => None,
                     })
@@ -117,12 +99,49 @@ macro_rules! impl_simple_produce {
     };
 }
 
-impl_simple_produce!(i8, i16, i32, i64, f32, f64, Decimal, Uuid,);
-impl_simple_produce_unimplemented!(
-    u64, u32, u16, u8, Value, HashMap<String, Option<String>>,
+impl_simple_produce!(
+    Int8Type,
+    Int16Type,
+    Int32Type,
+    Int64Type,
+    Float32Type,
+    Float64Type,
+    Decimal256Type,
 );
 
-impl<'r> ProduceTy<'r, String> for CellRef<'r> {
+crate::impl_produce_unused!(
+    CellRef<'r>,
+    (
+        UInt8Type,
+        UInt16Type,
+        UInt32Type,
+        UInt64Type,
+        Float16Type,
+        TimestampSecondType,
+        TimestampMillisecondType,
+        TimestampMicrosecondType,
+        TimestampNanosecondType,
+        Date32Type,
+        Date64Type,
+        Time32SecondType,
+        Time32MillisecondType,
+        Time64MicrosecondType,
+        Time64NanosecondType,
+        IntervalYearMonthType,
+        IntervalDayTimeType,
+        IntervalMonthDayNanoType,
+        DurationSecondType,
+        DurationMillisecondType,
+        DurationMicrosecondType,
+        DurationNanosecondType,
+        BinaryType,
+        FixedSizeBinaryType,
+        Utf8Type,
+        Decimal128Type,
+    )
+);
+
+impl<'r> transport::ProduceTy<'r, LargeUtf8Type> for CellRef<'r> {
     fn produce(self) -> Result<String, ConnectorError> {
         let val = self.0.get(self.1).unwrap().to_string();
         Ok(val)
@@ -143,9 +162,9 @@ fn parse_bool(token: &str) -> Result<bool, ConnectorError> {
     }
 }
 
-impl<'r> ProduceTy<'r, bool> for CellRef<'r> {
+impl<'r> transport::ProduceTy<'r, BooleanType> for CellRef<'r> {
     fn produce(self) -> Result<bool, ConnectorError> {
-        self.produce_opt()?.ok_or_else(err_null)
+        transport::ProduceTy::<BooleanType>::produce_opt(self)?.ok_or_else(err_null)
     }
 
     fn produce_opt(self) -> Result<Option<bool>, ConnectorError> {
@@ -154,9 +173,9 @@ impl<'r> ProduceTy<'r, bool> for CellRef<'r> {
     }
 }
 
-impl<'r> ProduceTy<'r, Vec<u8>> for CellRef<'r> {
+impl<'r> transport::ProduceTy<'r, LargeBinaryType> for CellRef<'r> {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
-        self.produce_opt()?.ok_or_else(err_null)
+        transport::ProduceTy::<LargeBinaryType>::produce_opt(self)?.ok_or_else(err_null)
     }
 
     fn produce_opt(self) -> Result<Option<Vec<u8>>, ConnectorError> {
@@ -180,62 +199,62 @@ impl<'r> ProduceTy<'r, Vec<u8>> for CellRef<'r> {
     }
 }
 
-fn rem_first_and_last(value: &str) -> &str {
-    let mut chars = value.chars();
-    chars.next();
-    chars.next_back();
-    chars.as_str()
-}
+// fn rem_first_and_last(value: &str) -> &str {
+//     let mut chars = value.chars();
+//     chars.next();
+//     chars.next_back();
+//     chars.as_str()
+// }
 
-fn parse_array<F, T>(val: Option<&str>, item_parser: F) -> Result<Option<Vec<T>>, ConnectorError>
-where
-    F: Fn(&str) -> Result<T, ConnectorError>,
-{
-    Ok(match val {
-        None | Some("") => None,
-        Some("{}") => Some(vec![]),
-        Some(s) => Some(
-            rem_first_and_last(s)
-                .split(',')
-                .map(item_parser)
-                .collect::<Result<Vec<T>, ConnectorError>>()?,
-        ),
-    })
-}
+// fn parse_array<F, T>(val: Option<&str>, item_parser: F) -> Result<Option<Vec<T>>, ConnectorError>
+// where
+//     F: Fn(&str) -> Result<T, ConnectorError>,
+// {
+//     Ok(match val {
+//         None | Some("") => None,
+//         Some("{}") => Some(vec![]),
+//         Some(s) => Some(
+//             rem_first_and_last(s)
+//                 .split(',')
+//                 .map(item_parser)
+//                 .collect::<Result<Vec<T>, ConnectorError>>()?,
+//         ),
+//     })
+// }
 
-macro_rules! impl_simple_vec_produce {
-    ($($t: ty,)+) => {
-        $(
-            impl<'r> ProduceTy<'r, Vec<$t>> for CellRef<'r> {
-                fn produce(self) -> Result<Vec<$t>, ConnectorError> {
-                    self.produce_opt()?.ok_or_else(err_null)
-                }
+// macro_rules! impl_simple_vec_produce {
+//     ($($t: ty,)+) => {
+//         $(
+//             impl<'r> ProduceTy<'r, Vec<$t>> for CellRef<'r> {
+//                 fn produce(self) -> Result<Vec<$t>, ConnectorError> {
+//                     self.produce_opt()?.ok_or_else(err_null)
+//                 }
 
-                fn produce_opt(self) -> Result<Option<Vec<$t>>, ConnectorError> {
-                    let s = self.0.get(self.1);
+//                 fn produce_opt(self) -> Result<Option<Vec<$t>>, ConnectorError> {
+//                     let s = self.0.get(self.1);
 
-                    parse_array(
-                        s,
-                        |token| token.parse::<$t>().map_err(|e| ConnectorError::DataSchemaMismatch(e.to_string()))
-                    )
-                }
-            }
-        )+
-    };
-}
-impl_simple_vec_produce!(i16, i32, i64, f32, f64, Decimal, String,);
+//                     parse_array(
+//                         s,
+//                         |token| token.parse::<$t>().map_err(|e| ConnectorError::DataSchemaMismatch(e.to_string()))
+//                     )
+//                 }
+//             }
+//         )+
+//     };
+// }
+// impl_simple_vec_produce!(i16, i32, i64, f32, f64, Decimal, String,);
 
-impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
-    fn produce(self) -> Result<Vec<bool>, ConnectorError> {
-        self.produce_opt()?.ok_or_else(err_null)
-    }
+// impl<'r> ProduceTy<'r, Vec<bool>> for CellRef<'r> {
+//     fn produce(self) -> Result<Vec<bool>, ConnectorError> {
+//         self.produce_opt()?.ok_or_else(err_null)
+//     }
 
-    fn produce_opt(self) -> Result<Option<Vec<bool>>, ConnectorError> {
-        let s = self.0.get(self.1);
+//     fn produce_opt(self) -> Result<Option<Vec<bool>>, ConnectorError> {
+//         let s = self.0.get(self.1);
 
-        parse_array(s, parse_bool)
-    }
-}
+//         parse_array(s, parse_bool)
+//     }
+// }
 
 // impl<'r> ProduceTy<'r, NaiveDate> for CellRef<'r> {
 //     fn produce(self) -> NaiveDate {

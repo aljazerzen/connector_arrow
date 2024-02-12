@@ -44,7 +44,7 @@ None of the sources are enabled by default, use features to enable them.
 
 ## Types
 
-When converting non-arrow data sources (everything except DuckDB), only a subset of all possible arrows types is produced. Here is a list of what it is currently possible to produce:
+When converting from non-arrow data sources (everything except DuckDB), only a subset of all arrows types is produced. Here is a list of supported types:
 
 - [x] Null
 - [x] Boolean
@@ -56,20 +56,20 @@ When converting non-arrow data sources (everything except DuckDB), only a subset
 - [x] UInt16
 - [x] UInt32
 - [x] UInt64
-- [ ] Float16
+- [x] Float16
 - [x] Float32
 - [x] Float64
-- [ ] Timestamp
-- [ ] Date32
-- [ ] Date64
-- [ ] Time32
-- [ ] Time64
-- [ ] Duration
-- [ ] Interval
-- [ ] Binary
-- [ ] FixedSizeBinary
+- [x] Timestamp
+- [x] Date32
+- [x] Date64
+- [x] Time32
+- [x] Time64
+- [x] Duration
+- [x] Interval
+- [x] Binary
+- [x] FixedSizeBinary
 - [x] LargeBinary
-- [ ] Utf8
+- [x] Utf8
 - [x] LargeUtf8
 - [ ] List
 - [ ] FixedSizeList

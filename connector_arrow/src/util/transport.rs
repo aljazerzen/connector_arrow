@@ -1,120 +1,215 @@
-/// Moving of typed values from a producer into a consumer
-use arrow::datatypes::{DataType, Field};
+use arrow::datatypes::*;
 
+/// Moving of typed values from a producer into a consumer
 use crate::errors::ConnectorError;
+use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
+
+macro_rules! impl_transport_match {
+    ($f: expr, $c: expr, $p: expr, $({ $Pat: pat => $ArrTy: ty })*) => {
+        if !$f.is_nullable() {
+            match $f.data_type() {
+                Null => ConsumeTy::<NullType>::consume($c, ()),
+                $(
+                    $Pat => ConsumeTy::<$ArrTy>::consume($c, ProduceTy::<$ArrTy>::produce($p)?),
+                )*
+                _ => todo!("unimplemented transport of {:?}", $f.data_type()),
+            }
+        } else {
+            match $f.data_type() {
+                Null => ConsumeTy::<NullType>::consume_opt($c, Some(())),
+                $(
+                    $Pat => ConsumeTy::<$ArrTy>::consume_opt($c, ProduceTy::<$ArrTy>::produce_opt($p)?),
+                )*
+                _ => todo!("unimplemented transport of {:?}", $f.data_type()),
+            }
+        }
+    };
+}
 
 /// Take a value of type `ty` from [Produce] and insert it into [Consume].
 pub fn transport<'r, P: Produce<'r>, C: Consume>(
-    f: &Field,
-    p: P,
-    c: &mut C,
+    field: &Field,
+    producer: P,
+    consumer: &mut C,
 ) -> Result<(), ConnectorError> {
-    log::debug!("transporting value of type {f:?}");
+    log::debug!("transporting value of type {field:?}");
 
     // TODO: connector-x goes a step further here: instead of having this match in the hot path,
     // this function returns a transporter function that is stored in a vec, for faster lookup.
 
     use DataType::*;
-
-    if !f.is_nullable() {
-        match f.data_type() {
-            Null => c.consume(()),
-            Boolean => c.consume(ProduceTy::<bool>::produce(p)?),
-            Int8 => c.consume(ProduceTy::<i8>::produce(p)?),
-            Int16 => c.consume(ProduceTy::<i16>::produce(p)?),
-            Int32 => c.consume(ProduceTy::<i32>::produce(p)?),
-            Int64 => c.consume(ProduceTy::<i64>::produce(p)?),
-            UInt8 => c.consume(ProduceTy::<u8>::produce(p)?),
-            UInt16 => c.consume(ProduceTy::<u16>::produce(p)?),
-            UInt32 => c.consume(ProduceTy::<u32>::produce(p)?),
-            UInt64 => c.consume(ProduceTy::<u64>::produce(p)?),
-            Float32 => c.consume(ProduceTy::<f32>::produce(p)?),
-            Float64 => c.consume(ProduceTy::<f64>::produce(p)?),
-            Binary | LargeBinary => c.consume(ProduceTy::<Vec<u8>>::produce(p)?),
-            Utf8 | LargeUtf8 => c.consume(ProduceTy::<String>::produce(p)?),
-            _ => todo!("unimplemented transport of {:?}", f.data_type()),
-        }
-    } else {
-        match f.data_type() {
-            Null => c.consume_opt(Some(())),
-            Boolean => c.consume_opt(ProduceTy::<bool>::produce_opt(p)?),
-            Int8 => c.consume_opt(ProduceTy::<i8>::produce_opt(p)?),
-            Int16 => c.consume_opt(ProduceTy::<i16>::produce_opt(p)?),
-            Int32 => c.consume_opt(ProduceTy::<i32>::produce_opt(p)?),
-            Int64 => c.consume_opt(ProduceTy::<i64>::produce_opt(p)?),
-            UInt8 => c.consume_opt(ProduceTy::<u8>::produce_opt(p)?),
-            UInt16 => c.consume_opt(ProduceTy::<u16>::produce_opt(p)?),
-            UInt32 => c.consume_opt(ProduceTy::<u32>::produce_opt(p)?),
-            UInt64 => c.consume_opt(ProduceTy::<u64>::produce_opt(p)?),
-            Float32 => c.consume_opt(ProduceTy::<f32>::produce_opt(p)?),
-            Float64 => c.consume_opt(ProduceTy::<f64>::produce_opt(p)?),
-            Binary | LargeBinary => c.consume_opt(ProduceTy::<Vec<u8>>::produce_opt(p)?),
-            Utf8 | LargeUtf8 => c.consume_opt(ProduceTy::<String>::produce_opt(p)?),
-            _ => todo!("unimplemented transport of {:?}", f.data_type()),
-        }
-    }
+    impl_transport_match!(
+        field,
+        consumer,
+        producer,
+        { Boolean => BooleanType }
+        { Int8 => Int8Type }
+        { Int16 => Int16Type }
+        { Int32 => Int32Type }
+        { Int64 => Int64Type }
+        { UInt8 => UInt8Type }
+        { UInt16 => UInt16Type }
+        { UInt32 => UInt32Type }
+        { UInt64 => UInt64Type }
+        { Float16 => Float16Type }
+        { Float32 => Float32Type }
+        { Float64 => Float64Type }
+        { Timestamp(TimeUnit::Second, _) => TimestampSecondType }
+        { Timestamp(TimeUnit::Millisecond, _) => TimestampMillisecondType }
+        { Timestamp(TimeUnit::Microsecond, _) => TimestampMicrosecondType }
+        { Timestamp(TimeUnit::Nanosecond, _) => TimestampNanosecondType }
+        { Date32 => Date32Type }
+        { Date64 => Date64Type }
+        { Time32(TimeUnit::Second) => Time32SecondType }
+        { Time32(TimeUnit::Millisecond) => Time32MillisecondType }
+        { Time64(TimeUnit::Microsecond) => Time64MicrosecondType }
+        { Time64(TimeUnit::Nanosecond) => Time64NanosecondType }
+        { Interval(IntervalUnit::YearMonth) => IntervalYearMonthType }
+        { Interval(IntervalUnit::DayTime) => IntervalDayTimeType }
+        { Interval(IntervalUnit::MonthDayNano) => IntervalMonthDayNanoType }
+        { Duration(TimeUnit::Second) => DurationSecondType }
+        { Duration(TimeUnit::Millisecond) => DurationMillisecondType }
+        { Duration(TimeUnit::Microsecond) => DurationMicrosecondType }
+        { Duration(TimeUnit::Nanosecond) => DurationNanosecondType }
+        { Binary => BinaryType }
+        { LargeBinary => LargeBinaryType }
+        { FixedSizeBinary(_) => FixedSizeBinaryType }
+        { Utf8 => Utf8Type }
+        { LargeUtf8 => LargeUtf8Type }
+        { Decimal128(_, _) => Decimal128Type }
+        { Decimal256(_, _) => Decimal256Type }
+    );
     Ok(())
 }
 
+/// Ability to produce values of all arrow types.
 pub trait Produce<'r>:
-    ProduceTy<'r, bool>
-    + ProduceTy<'r, i8>
-    + ProduceTy<'r, i16>
-    + ProduceTy<'r, i32>
-    + ProduceTy<'r, i64>
-    + ProduceTy<'r, u8>
-    + ProduceTy<'r, u16>
-    + ProduceTy<'r, u32>
-    + ProduceTy<'r, u64>
-    + ProduceTy<'r, f32>
-    + ProduceTy<'r, f64>
-    + ProduceTy<'r, Vec<u8>>
-    + ProduceTy<'r, String>
+    ProduceTy<'r, BooleanType>
+    + ProduceTy<'r, Int8Type>
+    + ProduceTy<'r, Int16Type>
+    + ProduceTy<'r, Int32Type>
+    + ProduceTy<'r, Int64Type>
+    + ProduceTy<'r, UInt8Type>
+    + ProduceTy<'r, UInt16Type>
+    + ProduceTy<'r, UInt32Type>
+    + ProduceTy<'r, UInt64Type>
+    + ProduceTy<'r, Float16Type>
+    + ProduceTy<'r, Float32Type>
+    + ProduceTy<'r, Float64Type>
+    + ProduceTy<'r, TimestampSecondType>
+    + ProduceTy<'r, TimestampMillisecondType>
+    + ProduceTy<'r, TimestampMicrosecondType>
+    + ProduceTy<'r, TimestampNanosecondType>
+    + ProduceTy<'r, Date32Type>
+    + ProduceTy<'r, Date64Type>
+    + ProduceTy<'r, Time32SecondType>
+    + ProduceTy<'r, Time32MillisecondType>
+    + ProduceTy<'r, Time64MicrosecondType>
+    + ProduceTy<'r, Time64NanosecondType>
+    + ProduceTy<'r, IntervalYearMonthType>
+    + ProduceTy<'r, IntervalDayTimeType>
+    + ProduceTy<'r, IntervalMonthDayNanoType>
+    + ProduceTy<'r, DurationSecondType>
+    + ProduceTy<'r, DurationMillisecondType>
+    + ProduceTy<'r, DurationMicrosecondType>
+    + ProduceTy<'r, DurationNanosecondType>
+    + ProduceTy<'r, BinaryType>
+    + ProduceTy<'r, LargeBinaryType>
+    + ProduceTy<'r, FixedSizeBinaryType>
+    + ProduceTy<'r, Utf8Type>
+    + ProduceTy<'r, LargeUtf8Type>
+    + ProduceTy<'r, Decimal128Type>
+    + ProduceTy<'r, Decimal256Type>
 {
 }
 
-pub trait ProduceTy<'r, T> {
-    fn produce(self) -> Result<T, ConnectorError>;
+/// Ability to produce a value of an arrow type
+pub trait ProduceTy<'r, T: ArrowType> {
+    fn produce(self) -> Result<T::Native, ConnectorError>;
 
-    fn produce_opt(self) -> Result<Option<T>, ConnectorError>;
+    fn produce_opt(self) -> Result<Option<T::Native>, ConnectorError>;
 }
 
+/// Ability to consume values of all arrow types.
 pub trait Consume:
-    ConsumeTy<()>
-    + ConsumeTy<bool>
-    + ConsumeTy<i8>
-    + ConsumeTy<i16>
-    + ConsumeTy<i32>
-    + ConsumeTy<i64>
-    + ConsumeTy<u8>
-    + ConsumeTy<u16>
-    + ConsumeTy<u32>
-    + ConsumeTy<u64>
-    + ConsumeTy<f32>
-    + ConsumeTy<f64>
-    + ConsumeTy<Vec<u8>>
-    + ConsumeTy<String>
+    ConsumeTy<NullType>
+    + ConsumeTy<BooleanType>
+    + ConsumeTy<Int8Type>
+    + ConsumeTy<Int16Type>
+    + ConsumeTy<Int32Type>
+    + ConsumeTy<Int64Type>
+    + ConsumeTy<UInt8Type>
+    + ConsumeTy<UInt16Type>
+    + ConsumeTy<UInt32Type>
+    + ConsumeTy<UInt64Type>
+    + ConsumeTy<Float16Type>
+    + ConsumeTy<Float32Type>
+    + ConsumeTy<Float64Type>
+    + ConsumeTy<TimestampSecondType>
+    + ConsumeTy<TimestampMillisecondType>
+    + ConsumeTy<TimestampMicrosecondType>
+    + ConsumeTy<TimestampNanosecondType>
+    + ConsumeTy<Date32Type>
+    + ConsumeTy<Date64Type>
+    + ConsumeTy<Time32SecondType>
+    + ConsumeTy<Time32MillisecondType>
+    + ConsumeTy<Time64MicrosecondType>
+    + ConsumeTy<Time64NanosecondType>
+    + ConsumeTy<IntervalYearMonthType>
+    + ConsumeTy<IntervalDayTimeType>
+    + ConsumeTy<IntervalMonthDayNanoType>
+    + ConsumeTy<DurationSecondType>
+    + ConsumeTy<DurationMillisecondType>
+    + ConsumeTy<DurationMicrosecondType>
+    + ConsumeTy<DurationNanosecondType>
+    + ConsumeTy<BinaryType>
+    + ConsumeTy<LargeBinaryType>
+    + ConsumeTy<FixedSizeBinaryType>
+    + ConsumeTy<Utf8Type>
+    + ConsumeTy<LargeUtf8Type>
+    + ConsumeTy<Decimal128Type>
+    + ConsumeTy<Decimal256Type>
 {
 }
 
-pub trait ConsumeTy<T> {
-    fn consume(&mut self, value: T);
-    fn consume_opt(&mut self, value: Option<T>);
+/// Ability to consume a value of an an arrow type
+pub trait ConsumeTy<T: ArrowType> {
+    fn consume(&mut self, value: T::Native);
+    fn consume_opt(&mut self, value: Option<T::Native>);
 }
 
 pub mod print {
-    use super::{Consume, ConsumeTy};
+    use super::{ArrowType, Consume, ConsumeTy};
 
     pub struct PrintConsumer();
 
     impl Consume for PrintConsumer {}
 
-    impl<T: std::fmt::Debug> ConsumeTy<T> for PrintConsumer {
-        fn consume(&mut self, value: T) {
+    impl<T: ArrowType> ConsumeTy<T> for PrintConsumer
+    where
+        T::Native: std::fmt::Debug,
+    {
+        fn consume(&mut self, value: T::Native) {
             println!("{}: {value:?}", std::any::type_name::<T>());
         }
-        fn consume_opt(&mut self, value: Option<T>) {
+        fn consume_opt(&mut self, value: Option<T::Native>) {
             println!("{}: {value:?}", std::any::type_name::<T>());
         }
     }
+}
+
+#[macro_export]
+macro_rules! impl_produce_unused {
+    ($p: ty, ($($t: ty,)+)) => {
+        $(
+            impl<'r> $crate::util::transport::ProduceTy<'r, $t> for $p {
+                fn produce(self) -> Result<<$t as $crate::types::ArrowType>::Native, ConnectorError> {
+                   unimplemented!();
+                }
+                fn produce_opt(self) -> Result<Option<<$t as $crate::types::ArrowType>::Native>, ConnectorError> {
+                   unimplemented!();
+                }
+            }
+        )+
+    };
 }

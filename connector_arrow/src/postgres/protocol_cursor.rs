@@ -1,11 +1,12 @@
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::{Row, RowIter};
 
 use crate::api::{ResultReader, Statement};
-use crate::util::transport::{self, Produce, ProduceTy};
+use crate::types::{ArrowType, FixedSizeBinaryType};
+use crate::util::transport;
 use crate::util::{ArrowRowWriter, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
 
@@ -128,39 +129,64 @@ impl<'row> CellReader<'row> for PostgresCellReader {
 
 type CellRef<'a> = (&'a Row, usize);
 
-impl<'c> Produce<'c> for CellRef<'c> {}
+impl<'c> transport::Produce<'c> for CellRef<'c> {}
 
 macro_rules! impl_produce {
     ($($t: ty,)+) => {
         $(
-            impl<'c> ProduceTy<'c, $t> for CellRef<'c> {
-                fn produce(self) -> Result<$t, ConnectorError> {
-                    Ok(self.0.get::<usize, $t>(self.1))
+            impl<'c> transport::ProduceTy<'c, $t> for CellRef<'c> {
+                fn produce(self) -> Result<<$t as ArrowType>::Native, ConnectorError> {
+                    Ok(self.0.get(self.1))
                 }
 
-                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
-                    Ok(self.0.get::<usize, Option<$t>>(self.1))
-                }
-            }
-        )+
-    };
-}
-
-macro_rules! impl_produce_unimplemented {
-    ($($t: ty,)+) => {
-        $(
-            impl<'r> ProduceTy<'r, $t> for CellRef<'r> {
-                fn produce(self) -> Result<$t, ConnectorError> {
-                   unimplemented!();
-                }
-
-                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
-                   unimplemented!();
+                fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
+                    Ok(self.0.get(self.1))
                 }
             }
         )+
     };
 }
+impl_produce!(
+    BooleanType,
+    Int8Type,
+    Int16Type,
+    Int32Type,
+    Int64Type,
+    Float32Type,
+    Float64Type,
+    LargeBinaryType,
+    LargeUtf8Type,
+);
 
-impl_produce!(bool, i8, i16, i32, i64, f32, f64, Vec<u8>, String,);
-impl_produce_unimplemented!(u8, u16, u32, u64,);
+crate::impl_produce_unused!(
+    CellRef<'r>,
+    (
+        UInt8Type,
+        UInt16Type,
+        UInt32Type,
+        UInt64Type,
+        Float16Type,
+        TimestampSecondType,
+        TimestampMillisecondType,
+        TimestampMicrosecondType,
+        TimestampNanosecondType,
+        Date32Type,
+        Date64Type,
+        Time32SecondType,
+        Time32MillisecondType,
+        Time64MicrosecondType,
+        Time64NanosecondType,
+        IntervalYearMonthType,
+        IntervalDayTimeType,
+        IntervalMonthDayNanoType,
+        DurationSecondType,
+        DurationMillisecondType,
+        DurationMicrosecondType,
+        DurationNanosecondType,
+        BinaryType,
+        FixedSizeBinaryType,
+        Utf8Type,
+        Decimal128Type,
+        Decimal256Type,
+    )
+);

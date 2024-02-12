@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
+use arrow::datatypes::*;
 use itertools::zip_eq;
 use rusqlite::types::Value;
 
 use crate::api::Statement;
+use crate::types::FixedSizeBinaryType;
 use crate::util::transport::{Produce, ProduceTy};
 use crate::util::ArrowReader;
 use crate::util::{collect_rows_to_arrow, CellReader, RowsReader};
@@ -121,7 +122,7 @@ impl<'rows> CellReader<'rows> for SQLiteCellReader {
 
 impl<'r> Produce<'r> for Value {}
 
-impl<'r> ProduceTy<'r, i64> for Value {
+impl<'r> ProduceTy<'r, Int64Type> for Value {
     fn produce(self) -> Result<i64, ConnectorError> {
         unimplemented!()
     }
@@ -134,7 +135,7 @@ impl<'r> ProduceTy<'r, i64> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, f64> for Value {
+impl<'r> ProduceTy<'r, Float64Type> for Value {
     fn produce(self) -> Result<f64, ConnectorError> {
         unimplemented!()
     }
@@ -147,7 +148,7 @@ impl<'r> ProduceTy<'r, f64> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, String> for Value {
+impl<'r> ProduceTy<'r, LargeUtf8Type> for Value {
     fn produce(self) -> Result<String, ConnectorError> {
         unimplemented!()
     }
@@ -160,7 +161,7 @@ impl<'r> ProduceTy<'r, String> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, Vec<u8>> for Value {
+impl<'r> ProduceTy<'r, LargeBinaryType> for Value {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
         unimplemented!()
     }
@@ -173,20 +174,40 @@ impl<'r> ProduceTy<'r, Vec<u8>> for Value {
     }
 }
 
-macro_rules! impl_produce_unimplemented {
-    ($($t: ty,)+) => {
-        $(
-            impl<'r> ProduceTy<'r, $t> for Value {
-                fn produce(self) -> Result<$t, ConnectorError> {
-                   unimplemented!();
-                }
-
-                fn produce_opt(self) -> Result<Option<$t>, ConnectorError> {
-                   unimplemented!();
-                }
-            }
-        )+
-    };
-}
-
-impl_produce_unimplemented!(bool, i8, i16, i32, u8, u16, u32, u64, f32,);
+crate::impl_produce_unused!(
+    Value,
+    (
+        BooleanType,
+        Int8Type,
+        Int16Type,
+        Int32Type,
+        UInt8Type,
+        UInt16Type,
+        UInt32Type,
+        UInt64Type,
+        Float16Type,
+        Float32Type,
+        TimestampSecondType,
+        TimestampMillisecondType,
+        TimestampMicrosecondType,
+        TimestampNanosecondType,
+        Date32Type,
+        Date64Type,
+        Time32SecondType,
+        Time32MillisecondType,
+        Time64MicrosecondType,
+        Time64NanosecondType,
+        IntervalYearMonthType,
+        IntervalDayTimeType,
+        IntervalMonthDayNanoType,
+        DurationSecondType,
+        DurationMillisecondType,
+        DurationMicrosecondType,
+        DurationNanosecondType,
+        BinaryType,
+        FixedSizeBinaryType,
+        Utf8Type,
+        Decimal128Type,
+        Decimal256Type,
+    )
+);

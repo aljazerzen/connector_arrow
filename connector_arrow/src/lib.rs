@@ -37,6 +37,7 @@
 
 pub mod api;
 mod errors;
+pub mod types;
 pub mod util;
 
 #[cfg(feature = "src_duckdb")]

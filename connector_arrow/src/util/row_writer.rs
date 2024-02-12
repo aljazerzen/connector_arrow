@@ -1,11 +1,12 @@
 use std::any::Any;
 
 use arrow::array::{ArrayBuilder, ArrayRef};
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 
-use super::transport::Consume;
 use crate::errors::ConnectorError;
+use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
+use crate::util::transport::{Consume, ConsumeTy};
 
 /// Receives values row-by-row and passes them to [ArrayBuilder]s,
 /// which construct [RecordBatch]es.
@@ -145,20 +146,16 @@ impl Organizer {
 }
 
 macro_rules! impl_consume_ty {
-    (
+    ($({ $ArrTy:ty => $Builder:tt } )*) => {
         $(
-            { $Native:ty => $Builder:tt }
-        )*
-    ) => {
-        $(
-            impl super::transport::ConsumeTy<$Native> for ArrowRowWriter {
-                fn consume(&mut self, value: $Native) {
+            impl ConsumeTy<$ArrTy> for ArrowRowWriter {
+                fn consume(&mut self, value: <$ArrTy as ArrowType>::Native) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
                         .append_value(value);
                 }
-                fn consume_opt(&mut self, value: Option<$Native>) {
+                fn consume_opt(&mut self, value: Option<<$ArrTy as ArrowType>::Native>) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
@@ -172,35 +169,97 @@ macro_rules! impl_consume_ty {
 // List of ConsumeTy implementations to generate.
 // Must match with arrow::array::make_builder
 impl_consume_ty! {
-    // { ()      => NullBuilder            }  // Null - custom implementation
-       { bool    => BooleanBuilder         }  // Boolean
-       { i8      => Int8Builder            }  // Int8
-       { i16     => Int16Builder           }  // Int16
-       { i32     => Int32Builder           }  // Int32
-       { i64     => Int64Builder           }  // Int64
-       { u8      => UInt8Builder           }  // UInt8
-       { u16     => UInt16Builder          }  // UInt16
-       { u32     => UInt32Builder          }  // UInt32
-       { u64     => UInt64Builder          }  // UInt64
-    // {         => Float16Builder         }  // Float16 - no Rust native type
-       { f32     => Float32Builder         }  // Float32
-       { f64     => Float64Builder         }  // Float64
-    // {         => BinaryBuilder          }  // Binary - no Rust native type
-       { Vec<u8> => LargeBinaryBuilder     }  // LargeBinary
-    // {         => FixedSizeBinaryBuilder }  // FixedSizeBinary - no Rust native type
-    // {         => Decimal128Builder      }  // Decimal128 - no Rust native type
-    // {         => Decimal256Builder      }  // Decimal256 - no Rust native type
-    // {         => StringBuilder          }  // Utf8 - no Rust native type
-       { String  => LargeStringBuilder     }  // LargeUtf8
-    // {         => Date32Builder          }  // Date32 - no Rust native type
-    // {         => Date64Builder          }  // Date64 - no Rust native type
+//  { Null                => NullBuilder            } custom implementation
+    { BooleanType         => BooleanBuilder         }
+    { Int8Type            => Int8Builder            }
+    { Int16Type           => Int16Builder           }
+    { Int32Type           => Int32Builder           }
+    { Int64Type           => Int64Builder           }
+    { UInt8Type           => UInt8Builder           }
+    { UInt16Type          => UInt16Builder          }
+    { UInt32Type          => UInt32Builder          }
+    { UInt64Type          => UInt64Builder          }
+    { Float16Type         => Float16Builder         }
+    { Float32Type         => Float32Builder         }
+    { Float64Type         => Float64Builder         }
+
+    { TimestampSecondType       =>  TimestampSecondBuilder      }
+    { TimestampMillisecondType  =>  TimestampMillisecondBuilder }
+    { TimestampMicrosecondType  =>  TimestampMicrosecondBuilder }
+    { TimestampNanosecondType   =>  TimestampNanosecondBuilder  }
+    { Date32Type                =>  Date32Builder               }
+    { Date64Type                =>  Date64Builder               }
+    { Time32SecondType          =>  Time32SecondBuilder         }
+    { Time32MillisecondType     =>  Time32MillisecondBuilder    }
+    { Time64MicrosecondType     =>  Time64MicrosecondBuilder    }
+    { Time64NanosecondType      =>  Time64NanosecondBuilder     }
+    { IntervalYearMonthType     =>  IntervalYearMonthBuilder    }
+    { IntervalDayTimeType       =>  IntervalDayTimeBuilder      }
+    { IntervalMonthDayNanoType  =>  IntervalMonthDayNanoBuilder }
+    { DurationSecondType        =>  DurationSecondBuilder       }
+    { DurationMillisecondType   =>  DurationMillisecondBuilder  }
+    { DurationMicrosecondType   =>  DurationMicrosecondBuilder  }
+    { DurationNanosecondType    =>  DurationNanosecondBuilder   }
+
+    { Decimal128Type      => Decimal128Builder      }
+    { Decimal256Type      => Decimal256Builder      }
+
 }
 
-impl super::transport::ConsumeTy<()> for ArrowRowWriter {
+impl ConsumeTy<NullType> for ArrowRowWriter {
     fn consume(&mut self, _: ()) {
         self.next_builder();
     }
     fn consume_opt(&mut self, _: Option<()>) {
         self.next_builder();
+    }
+}
+
+macro_rules! impl_consume_ref_ty {
+    ($({ $ArrTy:ty => $Builder:tt })*) => {
+        $(
+            impl ConsumeTy<$ArrTy> for ArrowRowWriter {
+                fn consume(&mut self, value: <$ArrTy as ArrowType>::Native) {
+                    self.next_builder()
+                        .downcast_mut::<arrow::array::builder::$Builder>()
+                        .expect(concat!("bad cast to ", stringify!($Builder)))
+                        .append_value(&value);
+                }
+                fn consume_opt(&mut self, value: Option<<$ArrTy as ArrowType>::Native>) {
+                    self.next_builder()
+                        .downcast_mut::<arrow::array::builder::$Builder>()
+                        .expect(concat!("bad cast to ", stringify!($Builder)))
+                        .append_option(value);
+                }
+            }
+        )+
+    };
+}
+impl_consume_ref_ty! {
+    { BinaryType          => BinaryBuilder          }
+    { LargeBinaryType     => LargeBinaryBuilder     }
+//  { FixedSizeBinaryType => FixedSizeBinaryBuilder } custom impl
+    { Utf8Type            => StringBuilder          }
+    { LargeUtf8Type       => LargeStringBuilder     }
+}
+
+impl ConsumeTy<FixedSizeBinaryType> for ArrowRowWriter {
+    fn consume(&mut self, value: <FixedSizeBinaryType as ArrowType>::Native) {
+        self.next_builder()
+            .downcast_mut::<arrow::array::builder::FixedSizeBinaryBuilder>()
+            .expect(concat!("bad cast to ", stringify!(FixedSizeBinaryBuilder)))
+            .append_value(&value)
+            .unwrap();
+    }
+    fn consume_opt(&mut self, value: Option<<FixedSizeBinaryType as ArrowType>::Native>) {
+        let builder = self
+            .next_builder()
+            .downcast_mut::<arrow::array::builder::FixedSizeBinaryBuilder>()
+            .expect(concat!("bad cast to ", stringify!(FixedSizeBinaryBuilder)));
+        if let Some(value) = value {
+            builder.append_value(value).unwrap();
+        } else {
+            builder.append_null();
+        }
     }
 }
