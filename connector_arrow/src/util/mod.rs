@@ -2,6 +2,7 @@
 //! Used by database client implementations.
 
 mod arrow_reader;
+pub mod coerce;
 mod row_collect;
 mod row_reader;
 mod row_writer;

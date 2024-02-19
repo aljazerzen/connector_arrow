@@ -1,122 +1,77 @@
-use std::{fs::File, path::Path, sync::Arc};
+use std::{fs::File, path::Path};
 
-use arrow::array::Array;
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
-use itertools::Itertools;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 use connector_arrow::api::{Append, Connection, ResultReader, SchemaEdit, Statement};
-use connector_arrow::ConnectorError;
+use connector_arrow::util::coerce;
+use connector_arrow::{ConnectorError, TableCreateError, TableDropError};
 
-#[track_caller]
-pub fn load_parquet_if_not_exists<C>(
+pub fn read_parquet(file_path: &Path) -> Result<(SchemaRef, Vec<RecordBatch>), ArrowError> {
+    // read from file
+    let file = File::open(file_path)?;
+
+    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
+
+    let schema = builder.schema().clone();
+
+    let reader = builder.build()?;
+    let batches = reader.collect::<Result<Vec<_>, ArrowError>>()?;
+    Ok((schema, batches))
+}
+
+pub fn load_parquet_into_table<C>(
     conn: &mut C,
     file_path: &Path,
     table_name: &str,
-) -> (SchemaRef, Vec<RecordBatch>)
+) -> Result<(SchemaRef, Vec<RecordBatch>), ConnectorError>
 where
     C: Connection + SchemaEdit,
 {
-    // read from file
-    let (schema, arrow_file) = {
-        let file = File::open(file_path).unwrap();
+    let (schema_file, batches_file) = read_parquet(file_path)?;
 
-        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
-
-        let schema = builder.schema().clone();
-
-        let reader = builder.build().unwrap();
-        let batches = reader.collect::<Result<Vec<_>, ArrowError>>().unwrap();
-        (schema, batches)
-    };
+    // table drop
+    match conn.table_drop(table_name) {
+        Ok(_) | Err(TableDropError::TableNonexistent) => (),
+        Err(TableDropError::Connector(e)) => return Err(e),
+    }
 
     // table create
-    match conn.table_create(table_name, schema.clone()) {
+    match conn.table_create(table_name, schema_file.clone()) {
         Ok(_) => (),
-        Err(connector_arrow::TableCreateError::TableExists) => return (schema, arrow_file),
-        Err(e) => panic!("{}", e),
+        Err(TableCreateError::TableExists) => {
+            panic!("table was just deleted, how can it exist now?")
+        }
+        Err(TableCreateError::Connector(e)) => return Err(e),
     }
 
     // write into table
     {
         let mut appender = conn.append(&table_name).unwrap();
-        for batch in arrow_file.clone() {
+        for batch in batches_file.clone() {
             appender.append(batch).unwrap();
         }
         appender.finish().unwrap();
     }
 
-    (schema, arrow_file)
+    let schema_coerced = coerce::coerce_schema(schema_file, &C::coerce_type);
+    let batches_coerced = coerce::coerce_batches(&batches_file, C::coerce_type).unwrap();
+    Ok((schema_coerced, batches_coerced))
 }
 
-// #[track_caller]
-pub fn roundtrip_of_parquet<C>(conn: &mut C, file_path: &Path, table_name: &str)
-where
-    C: Connection + SchemaEdit,
-{
-    let (schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path, table_name);
+pub fn query_table<C: Connection>(
+    conn: &mut C,
+    table_name: &str,
+) -> Result<(SchemaRef, Vec<RecordBatch>), ConnectorError> {
+    let mut stmt = conn
+        .query(&format!("SELECT * FROM \"{table_name}\""))
+        .unwrap();
+    let mut reader = stmt.start(())?;
 
-    // read from table
-    let (schema_query, arrow_query) = {
-        let mut stmt = conn
-            .query(&format!("SELECT * FROM \"{table_name}\""))
-            .unwrap();
-        let mut reader = stmt.start(()).unwrap();
+    let schema = reader.get_schema()?;
 
-        let schema = reader.get_schema().unwrap();
-
-        let batches = reader.collect::<Result<Vec<_>, ConnectorError>>().unwrap();
-        (schema, batches)
-    };
-
-    // table drop
-    conn.table_drop(&table_name).unwrap();
-
-    let schema_file_coerced = cast_schema(&schema_file, &C::coerce_type);
-    similar_asserts::assert_eq!(&schema_file_coerced, &schema_query);
-
-    let arrow_file_coerced = cast_batches(&arrow_file, C::coerce_type);
-    similar_asserts::assert_eq!(&arrow_file_coerced, &arrow_query);
-}
-
-pub fn cast_batches<F>(batches: &[RecordBatch], coerce_ty: F) -> Vec<RecordBatch>
-where
-    F: Fn(&DataType) -> Option<DataType>,
-{
-    let arrow_file = batches
-        .iter()
-        .map(|batch| {
-            let new_schema = cast_schema(&batch.schema(), &coerce_ty);
-
-            let new_columns = batch
-                .columns()
-                .iter()
-                .map(|col_array| match coerce_ty(col_array.data_type()) {
-                    Some(new_ty) => arrow::compute::cast(&col_array, &new_ty).unwrap(),
-                    None => col_array.clone(),
-                })
-                .collect_vec();
-
-            RecordBatch::try_new(new_schema, new_columns).unwrap()
-        })
-        .collect_vec();
-    arrow_file
-}
-
-pub fn cast_schema<F>(schema: &Schema, coerce_ty: &F) -> SchemaRef
-where
-    F: Fn(&DataType) -> Option<DataType>,
-{
-    Arc::new(Schema::new(
-        schema
-            .fields()
-            .iter()
-            .map(|f| match coerce_ty(f.data_type()) {
-                Some(new_ty) => Field::new(f.name(), new_ty, f.is_nullable()),
-                None => Field::clone(f),
-            })
-            .collect_vec(),
-    ))
+    let batches = reader.collect::<Result<Vec<_>, ConnectorError>>()?;
+    Ok((schema, batches))
 }

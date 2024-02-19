@@ -12,7 +12,6 @@ databases as "data stores for Arrow format," aligning with the philosophy of dat
 
 - **Query**: Query databases and retrieve results in Apache Arrow format.
 - **Query Parameters**: Utilize Arrow type system for query parameters (WIP).
-- **Streaming**: Receive results as a stream of `arrow::record_batch::RecordBatch`.
 - **Temporal and Container Types**: Correctly handles temporal and container types (WIP).
 - **Schema Introspection**: Query the database for schema of specific tables.
 - **Schema Migration**: Basic schema migration commands.
@@ -37,7 +36,6 @@ without need for dynamic linking of C libraries.
 | Dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) |
 | Query | x | x | x |
 | Query params |  |  |  |
-| Streaming |  |  | x |
 | Temporal types |  | x |  |
 | Container types |  | x |  |
 | Schema get | x | x | x |

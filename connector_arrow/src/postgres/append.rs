@@ -90,7 +90,6 @@ impl<'conn> Append<'conn> for PostgresAppender<'conn> {
             .collect_vec();
 
         for row_number in 0..batch.num_rows() {
-            dbg!(row_number);
             for cell in &mut row {
                 cell.row_number = row_number;
             }

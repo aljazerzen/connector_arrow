@@ -1,13 +1,8 @@
-export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
-
 start:
     docker-compose up --detach --wait
 
 stop:
     docker-compose down
-
-seed:
-    psql $POSTGRES_URL -f postgres.sql
 
 # dbs not included in ci
 seed-more:
