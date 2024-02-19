@@ -16,9 +16,15 @@ macro_rules! impl_transport_match {
             }
         } else {
             match $f.data_type() {
-                Null => ConsumeTy::<NullType>::consume_opt($c, Some(())),
+                Null => ConsumeTy::<NullType>::consume($c, ()),
                 $(
-                    $Pat => ConsumeTy::<$ArrTy>::consume_opt($c, ProduceTy::<$ArrTy>::produce_opt($p)?),
+                    $Pat => {
+                        if let Some(v) = ProduceTy::<$ArrTy>::produce_opt($p)? {
+                            ConsumeTy::<$ArrTy>::consume($c, v)
+                        } else {
+                            ConsumeTy::<$ArrTy>::consume_null($c)
+                        }
+                    },
                 )*
                 _ => todo!("unimplemented transport of {:?}", $f.data_type()),
             }
@@ -175,7 +181,8 @@ pub trait Consume:
 /// Ability to consume a value of an an arrow type
 pub trait ConsumeTy<T: ArrowType> {
     fn consume(&mut self, value: T::Native);
-    fn consume_opt(&mut self, value: Option<T::Native>);
+
+    fn consume_null(&mut self);
 }
 
 pub mod print {
@@ -192,8 +199,9 @@ pub mod print {
         fn consume(&mut self, value: T::Native) {
             println!("{}: {value:?}", std::any::type_name::<T>());
         }
-        fn consume_opt(&mut self, value: Option<T::Native>) {
-            println!("{}: {value:?}", std::any::type_name::<T>());
+
+        fn consume_null(&mut self) {
+            println!("{}: null", std::any::type_name::<T>());
         }
     }
 }

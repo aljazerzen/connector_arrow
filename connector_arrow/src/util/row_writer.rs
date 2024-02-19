@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use arrow::array::{ArrayBuilder, ArrayRef};
+use arrow::array::{ArrayBuilder, ArrayRef, FixedSizeBinaryBuilder};
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 
@@ -155,11 +155,12 @@ macro_rules! impl_consume_ty {
                         .expect(concat!("bad cast to ", stringify!($Builder)))
                         .append_value(value);
                 }
-                fn consume_opt(&mut self, value: Option<<$ArrTy as ArrowType>::Native>) {
+
+                fn consume_null(&mut self) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
-                        .append_option(value);
+                        .append_null();
                 }
             }
         )+
@@ -210,7 +211,8 @@ impl ConsumeTy<NullType> for ArrowRowWriter {
     fn consume(&mut self, _: ()) {
         self.next_builder();
     }
-    fn consume_opt(&mut self, _: Option<()>) {
+
+    fn consume_null(&mut self) {
         self.next_builder();
     }
 }
@@ -225,11 +227,12 @@ macro_rules! impl_consume_ref_ty {
                         .expect(concat!("bad cast to ", stringify!($Builder)))
                         .append_value(&value);
                 }
-                fn consume_opt(&mut self, value: Option<<$ArrTy as ArrowType>::Native>) {
+
+                fn consume_null(&mut self) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
-                        .append_option(value);
+                        .append_null();
                 }
             }
         )+
@@ -251,15 +254,11 @@ impl ConsumeTy<FixedSizeBinaryType> for ArrowRowWriter {
             .append_value(&value)
             .unwrap();
     }
-    fn consume_opt(&mut self, value: Option<<FixedSizeBinaryType as ArrowType>::Native>) {
-        let builder = self
-            .next_builder()
-            .downcast_mut::<arrow::array::builder::FixedSizeBinaryBuilder>()
-            .expect(concat!("bad cast to ", stringify!(FixedSizeBinaryBuilder)));
-        if let Some(value) = value {
-            builder.append_value(value).unwrap();
-        } else {
-            builder.append_null();
-        }
+
+    fn consume_null(&mut self) {
+        self.next_builder()
+            .downcast_mut::<FixedSizeBinaryBuilder>()
+            .expect(concat!("bad cast to ", stringify!($Builder)))
+            .append_null();
     }
 }
