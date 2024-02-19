@@ -34,8 +34,8 @@ Similar to [ADBC](https://arrow.apache.org/docs/format/ADBC.html), but written i
 | Query           | x                    | x                | x                    |
 | Query params    |                      |                  |                      |
 | Streaming       |                      |                  | x                    |
-| Temporal types  |                      |                  |                      |
-| Container types |                      |                  |                      |
+| Temporal types  |                      | x                |                      |
+| Container types |                      | x                |                      |
 | Schema get      | x                    | x                |                      |
 | Schema edit     | x                    | x                |                      |
 | Append          | x                    | x                |                      |

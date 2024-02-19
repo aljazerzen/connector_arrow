@@ -10,9 +10,9 @@ use crate::util::transport;
 use crate::util::{ArrowRowWriter, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
 
-use super::{types, PostgresError, PostgresStatement, ProtocolCursor};
+use super::{types, PostgresError, PostgresStatement, ProtocolExtended};
 
-impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolCursor> {
+impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolExtended> {
     type Params = ();
 
     type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;

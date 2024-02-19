@@ -10,7 +10,7 @@
 //! let stmt = conn.query("SELECT * FROM my_table").unwrap();
 //! ````
 
-mod protocol_cursor;
+mod protocol_extended;
 mod protocol_simple;
 mod types;
 
@@ -36,7 +36,7 @@ impl<'a, P> PostgresConnection<'a, P> {
 }
 
 /// Protocol - use Cursor
-pub struct ProtocolCursor;
+pub struct ProtocolExtended;
 
 /// Protocol - use Simple Query
 pub struct ProtocolSimple;
