@@ -3,6 +3,7 @@
 mod append;
 mod schema;
 
+use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use duckdb::{Appender, Arrow};
 
@@ -25,6 +26,13 @@ impl Connection for duckdb::Connection {
     }
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
         Ok(self.appender(table_name)?)
+    }
+
+    fn coerce_type(ty: &DataType) -> Option<DataType> {
+        match ty {
+            DataType::Null => Some(DataType::Int64),
+            _ => None,
+        }
     }
 }
 

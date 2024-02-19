@@ -48,6 +48,27 @@ None of the sources are enabled by default, use features to enable them.
 
 ## Types
 
+Converting relational data from and to Apache Arrow comes with an inherent problem: type system of
+any database does not map to arrow type system with a one-to-one relation. In practice this means
+that:
+
+- when querying data, multiple database types might be mapped into a single arrow type (for example,
+  in PostgreSQL, both `VARCHAR` and `TEXT` will be mapped into `LargeUtf8`),
+- when pushing data, multiple arrow types might be mapped into a single database type (for example,
+  in PostgreSQL, both `Utf8` and `LargeUtf8` will be mapped into `TEXT`).
+
+As a consequence, a roundtrip of pushing data to a database and querying it back will convert some
+types. We call this process "type coercion" and is documented by `Connection::coerce_type`.
+
+Note that this process will never lose information and will prioritize correctness and
+predictability over efficiency.
+
+For example, `UInt8` could be coerced into `Int8` by subtracting 128 (i.e. reinterpreting the bytes
+as `Int8`). This coercion would be efficient, as the new type would not be larger than the initial,
+but it would be confusing as value 0 would be converted to -128 and value 255 to 127. Instead,
+databases that don't support unsigned integers, coerce `UInt8` to `Int16`, `UInt16` to `Int32`,
+`UInt32` to `Int64` and `UInt64` to `Decimal128(20, 0)`
+
 When converting from non-arrow data sources (everything except DuckDB), only a subset of all arrows
 types is produced. Here is a list of supported types:
 

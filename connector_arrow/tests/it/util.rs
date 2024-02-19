@@ -52,10 +52,9 @@ where
 }
 
 // #[track_caller]
-pub fn roundtrip_of_parquet<C, F>(conn: &mut C, file_path: &Path, table_name: &str, coerce_ty: F)
+pub fn roundtrip_of_parquet<C>(conn: &mut C, file_path: &Path, table_name: &str)
 where
     C: Connection + SchemaEdit,
-    F: Fn(&DataType) -> Option<DataType>,
 {
     let (schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path, table_name);
 
@@ -75,10 +74,10 @@ where
     // table drop
     conn.table_drop(&table_name).unwrap();
 
-    let schema_file_coerced = cast_schema(&schema_file, &coerce_ty);
+    let schema_file_coerced = cast_schema(&schema_file, &C::coerce_type);
     similar_asserts::assert_eq!(&schema_file_coerced, &schema_query);
 
-    let arrow_file_coerced = cast_batches(&arrow_file, coerce_ty);
+    let arrow_file_coerced = cast_batches(&arrow_file, C::coerce_type);
     similar_asserts::assert_eq!(&arrow_file_coerced, &arrow_query);
 }
 

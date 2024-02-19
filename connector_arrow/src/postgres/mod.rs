@@ -19,6 +19,7 @@ mod protocol_simple;
 mod schema;
 mod types;
 
+use arrow::datatypes::DataType;
 use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -100,6 +101,14 @@ where
 
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
         append::PostgresAppender::new(self.client, table_name)
+    }
+
+    fn coerce_type(ty: &DataType) -> Option<DataType> {
+        match ty {
+            DataType::Null => Some(DataType::Int16),
+            DataType::Utf8 => Some(DataType::LargeUtf8),
+            _ => None,
+        }
     }
 }
 

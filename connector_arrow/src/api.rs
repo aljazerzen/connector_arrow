@@ -5,7 +5,7 @@
 //! - [SchemaGet], for schema introspection,
 //! - [SchemaEdit], for basic schema migration commands,
 
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 
 use crate::errors::{ConnectorError, TableCreateError, TableDropError};
@@ -25,6 +25,10 @@ pub trait Connection {
 
     /// Prepare an appender for the given table.
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
+
+    /// Describes how a given type will change during a roundtrip to the database.
+    /// None means that type will not change at all.
+    fn coerce_type(ty: &DataType) -> Option<DataType>;
 }
 
 /// A task that is to be executed in the data store, over a connection.

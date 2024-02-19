@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, str::FromStr};
 
-use arrow::{datatypes::DataType, util::pretty::pretty_format_batches};
-use connector_arrow::api::SchemaGet;
+use arrow::util::pretty::pretty_format_batches;
+use connector_arrow::api::{Connection, SchemaGet};
 use connector_arrow::{self, api::SchemaEdit};
 use insta::{assert_debug_snapshot, assert_display_snapshot};
 
@@ -11,36 +11,13 @@ fn init() -> rusqlite::Connection {
     rusqlite::Connection::open_in_memory().unwrap()
 }
 
-fn coerce_ty(ty: &DataType) -> Option<DataType> {
-    match ty {
-        DataType::Boolean => Some(DataType::Int64),
-        DataType::Int8 => Some(DataType::Int64),
-        DataType::Int16 => Some(DataType::Int64),
-        DataType::Int32 => Some(DataType::Int64),
-        DataType::Int64 => Some(DataType::Int64),
-        DataType::UInt8 => Some(DataType::Int64),
-        DataType::UInt16 => Some(DataType::Int64),
-        DataType::UInt32 => Some(DataType::Int64),
-        DataType::UInt64 => Some(DataType::Int64),
-        DataType::Float16 => Some(DataType::Float64),
-        DataType::Float32 => Some(DataType::Float64),
-        DataType::Float64 => Some(DataType::Float64),
-        DataType::Binary => Some(DataType::LargeBinary),
-        DataType::FixedSizeBinary(_) => Some(DataType::LargeBinary),
-        DataType::LargeBinary => Some(DataType::LargeBinary),
-        DataType::Utf8 => Some(DataType::LargeUtf8),
-        DataType::LargeUtf8 => Some(DataType::LargeUtf8),
-        _ => None,
-    }
-}
-
 #[test]
 fn roundtrip_basic_small() {
     let table_name = "roundtrip_basic_small";
 
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name);
 }
 
 #[test]
@@ -50,7 +27,7 @@ fn roundtrip_empty() {
 
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name);
 }
 
 #[test]
@@ -76,7 +53,8 @@ fn introspection_basic_small() {
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
     let (schema_file, _) =
         super::util::load_parquet_if_not_exists(&mut conn, path.as_path(), table_name);
-    let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
+    let schema_file_coerced =
+        super::util::cast_schema(&schema_file, &rusqlite::Connection::coerce_type);
 
     let schema_introspection = conn.table_get(table_name).unwrap();
     similar_asserts::assert_eq!(schema_file_coerced, schema_introspection);

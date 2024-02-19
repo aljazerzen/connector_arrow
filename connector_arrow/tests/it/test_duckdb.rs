@@ -1,5 +1,4 @@
-use arrow::datatypes::DataType;
-use connector_arrow::api::{SchemaEdit, SchemaGet};
+use connector_arrow::api::{Connection, SchemaEdit, SchemaGet};
 use insta::assert_debug_snapshot;
 use std::{path::PathBuf, str::FromStr};
 
@@ -9,20 +8,13 @@ fn init() -> duckdb::Connection {
     duckdb::Connection::open_in_memory().unwrap()
 }
 
-fn coerce_ty(ty: &DataType) -> Option<DataType> {
-    match ty {
-        DataType::Null => Some(DataType::Int64),
-        _ => None,
-    }
-}
-
 #[test]
 fn roundtrip_basic_small() {
     let table_name = "roundtrip_basic_small";
 
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name);
 }
 
 #[test]
@@ -31,7 +23,7 @@ fn roundtrip_empty() {
 
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name);
 }
 
 #[test]
@@ -42,7 +34,8 @@ fn introspection_basic_small() {
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
     let (schema_file, _) =
         super::util::load_parquet_if_not_exists(&mut conn, path.as_path(), table_name);
-    let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
+    let schema_file_coerced =
+        super::util::cast_schema(&schema_file, &duckdb::Connection::coerce_type);
 
     let schema_introspection = conn.table_get(table_name).unwrap();
     similar_asserts::assert_eq!(schema_file_coerced, schema_introspection);
