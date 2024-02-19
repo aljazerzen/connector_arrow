@@ -18,35 +18,44 @@ fn coerce_ty(ty: &DataType) -> Option<DataType> {
 
 #[test]
 fn roundtrip_basic_small() {
+    let table_name = "roundtrip_basic_small";
+
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
 }
 
 #[test]
 fn roundtrip_empty() {
+    let table_name = "roundtrip_empty";
+
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/empty.parquet").unwrap();
-    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), coerce_ty);
+    super::util::roundtrip_of_parquet(&mut conn, path.as_path(), table_name, coerce_ty);
 }
 
 #[test]
 fn introspection_basic_small() {
+    let table_name = "introspection_basic_small";
+
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    let (table, schema_file, _) =
-        super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+    let (schema_file, _) =
+        super::util::load_parquet_if_not_exists(&mut conn, path.as_path(), table_name);
     let schema_file_coerced = super::util::cast_schema(&schema_file, &coerce_ty);
 
-    let schema_introspection = conn.table_get(&table).unwrap();
+    let schema_introspection = conn.table_get(table_name).unwrap();
     similar_asserts::assert_eq!(schema_file_coerced, schema_introspection);
 }
 
 #[test]
 fn schema_edit_01() {
+    let table_name = "schema_edit_01";
+
     let mut conn = init();
     let path = PathBuf::from_str("tests/data/basic_small.parquet").unwrap();
-    let (_, schema, _) = super::util::load_parquet_if_not_exists(&mut conn, path.as_path());
+    let (schema, _) =
+        super::util::load_parquet_if_not_exists(&mut conn, path.as_path(), table_name);
 
     let _ignore = conn.table_drop("test_table2");
 

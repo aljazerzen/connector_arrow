@@ -174,7 +174,7 @@ impl<'r> ProduceTy<'r, LargeBinaryType> for Value {
     }
 }
 
-crate::impl_produce_unused!(
+crate::impl_produce_unsupported!(
     Value,
     (
         BooleanType,

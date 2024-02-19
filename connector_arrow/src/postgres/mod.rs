@@ -10,15 +10,17 @@
 //! let stmt = conn.query("SELECT * FROM my_table").unwrap();
 //! ````
 
+mod append;
 mod protocol_extended;
 mod protocol_simple;
+mod schema;
 mod types;
 
 use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
 
-use crate::api::{unimplemented, Connection, Statement};
+use crate::api::{Connection, Statement};
 use crate::errors::ConnectorError;
 
 pub struct PostgresConnection<'a, P> {
@@ -68,10 +70,13 @@ where
 {
     type Stmt<'conn> = PostgresStatement<'conn, P> where Self: 'conn;
 
-    type Append<'conn> = unimplemented::Appender where Self: 'conn;
+    type Append<'conn> = append::PostgresAppender<'conn> where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        let stmt = self.client.prepare(query).map_err(PostgresError::from)?;
+        let stmt = self
+            .client
+            .prepare(query)
+            .map_err(PostgresError::Postgres)?;
         Ok(PostgresStatement {
             client: self.client,
             query: query.to_string(),
@@ -80,8 +85,8 @@ where
         })
     }
 
-    fn append<'a>(&'a mut self, _: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        unimplemented!()
+    fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
+        append::PostgresAppender::new(self.client, table_name)
     }
 }
 

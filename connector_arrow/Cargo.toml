@@ -31,12 +31,19 @@ urlencoding = { version = "2.1", optional = true }
 uuid = { version = "0.8", optional = true }
 fallible-streaming-iterator = { version = "0.1", optional = true }
 csv = { version = "1", optional = true }
+bytes = { version = "1", optional = true }
+byteorder = { version = "1", optional = true }
 
 [dependencies.postgres]
 version = "0.19"
 default-features = false
 optional = true
 features = ["with-chrono-0_4", "with-uuid-0_8", "with-serde_json-1"]
+
+[dependencies.postgres-protocol]
+version = "0.6.6"
+default-features = false
+optional = true
 
 [dependencies.rusqlite]
 version = "0.30.0"
@@ -50,8 +57,8 @@ optional = true
 
 [dev-dependencies]
 env_logger = "0.11"
-arrow = { version = "49", features = ["prettyprint"] }
-parquet = { version = "49" }
+arrow = { version = "49", features = ["prettyprint"], default-features = false }
+parquet = { version = "49", features = ["arrow"], default-features = false }
 insta = { version = "1.34.0" }
 similar-asserts = { version = "1.5.0" }
 
@@ -59,11 +66,14 @@ similar-asserts = { version = "1.5.0" }
 all = ["src_sqlite", "src_duckdb", "src_postgres"]
 src_postgres = [
     "postgres",
+    "postgres-protocol",
     "csv",
     "hex",
     "uuid",
     "rust_decimal",
     "rust_decimal_macros",
+    "bytes",
+    "byteorder"
 ]
 src_sqlite = ["rusqlite", "fallible-streaming-iterator", "urlencoding"]
 src_duckdb = [

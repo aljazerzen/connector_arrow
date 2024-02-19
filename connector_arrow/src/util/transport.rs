@@ -207,15 +207,31 @@ pub mod print {
 }
 
 #[macro_export]
-macro_rules! impl_produce_unused {
+macro_rules! impl_produce_unsupported {
     ($p: ty, ($($t: ty,)+)) => {
         $(
             impl<'r> $crate::util::transport::ProduceTy<'r, $t> for $p {
                 fn produce(self) -> Result<<$t as $crate::types::ArrowType>::Native, ConnectorError> {
-                   unimplemented!();
+                   unimplemented!("unsupported");
                 }
                 fn produce_opt(self) -> Result<Option<<$t as $crate::types::ArrowType>::Native>, ConnectorError> {
-                   unimplemented!();
+                   unimplemented!("unsupported");
+                }
+            }
+        )+
+    };
+}
+
+#[macro_export]
+macro_rules! impl_consume_unsupported {
+    ($c: ty, ($($t: ty,)+)) => {
+        $(
+            impl $crate::util::transport::ConsumeTy<$t> for $c {
+                fn consume(&mut self, _val: <$t as $crate::types::ArrowType>::Native) {
+                    unimplemented!("unsupported");
+                }
+                fn consume_null(&mut self) {
+                    unimplemented!("unsupported");
                 }
             }
         )+

@@ -36,9 +36,9 @@ Similar to [ADBC](https://arrow.apache.org/docs/format/ADBC.html), but written i
 | Streaming       |                      |                  | x                    |
 | Temporal types  |                      | x                |                      |
 | Container types |                      | x                |                      |
-| Schema get      | x                    | x                |                      |
-| Schema edit     | x                    | x                |                      |
-| Append          | x                    | x                |                      |
+| Schema get      | x                    | x                | x                    |
+| Schema edit     | x                    | x                | x                    |
+| Append          | x                    | x                | x                    |
 
 None of the sources are enabled by default, use features to enable them.
 

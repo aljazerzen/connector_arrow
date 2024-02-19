@@ -14,7 +14,8 @@ use connector_arrow::ConnectorError;
 pub fn load_parquet_if_not_exists<C>(
     conn: &mut C,
     file_path: &Path,
-) -> (String, SchemaRef, Vec<RecordBatch>)
+    table_name: &str,
+) -> (SchemaRef, Vec<RecordBatch>)
 where
     C: Connection + SchemaEdit,
 {
@@ -32,12 +33,9 @@ where
     };
 
     // table create
-    let table_name = file_path.file_name().unwrap().to_str().unwrap().to_string();
-    match conn.table_create(&table_name, schema.clone()) {
+    match conn.table_create(table_name, schema.clone()) {
         Ok(_) => (),
-        Err(connector_arrow::TableCreateError::TableExists) => {
-            return (table_name, schema, arrow_file)
-        }
+        Err(connector_arrow::TableCreateError::TableExists) => return (schema, arrow_file),
         Err(e) => panic!("{}", e),
     }
 
@@ -50,16 +48,16 @@ where
         appender.finish().unwrap();
     }
 
-    (table_name, schema, arrow_file)
+    (schema, arrow_file)
 }
 
-#[track_caller]
-pub fn roundtrip_of_parquet<C, F>(conn: &mut C, file_path: &Path, coerce_ty: F)
+// #[track_caller]
+pub fn roundtrip_of_parquet<C, F>(conn: &mut C, file_path: &Path, table_name: &str, coerce_ty: F)
 where
     C: Connection + SchemaEdit,
     F: Fn(&DataType) -> Option<DataType>,
 {
-    let (table_name, schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path);
+    let (schema_file, arrow_file) = load_parquet_if_not_exists(conn, file_path, table_name);
 
     // read from table
     let (schema_query, arrow_query) = {

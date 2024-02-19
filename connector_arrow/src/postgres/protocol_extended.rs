@@ -19,7 +19,7 @@ impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolExtended> {
 
     fn start(&mut self, _params: ()) -> Result<Self::Reader<'_>, ConnectorError> {
         let stmt = &self.stmt;
-        let schema = types::convert_schema(stmt)?;
+        let schema = types::pg_stmt_to_arrow(stmt)?;
 
         let rows = self
             .client
@@ -158,7 +158,7 @@ impl_produce!(
     LargeUtf8Type,
 );
 
-crate::impl_produce_unused!(
+crate::impl_produce_unsupported!(
     CellRef<'r>,
     (
         UInt8Type,
