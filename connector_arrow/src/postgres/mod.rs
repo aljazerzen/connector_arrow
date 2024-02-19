@@ -2,11 +2,14 @@
 //!
 //! ```no_run
 //! use postgres::{Client, NoTls};
+//! use connector_arrow::postgres::{PostgresConnection, ProtocolExtended};
+//! use connector_arrow::api::Connection;
 //!
-//! let client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
+//! let mut client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
 //!
-//! let mut conn = PostgresConnection::<ProtocolCursor>::new(client);
+//! let mut conn = PostgresConnection::<ProtocolExtended>::new(&mut client);
 //!
+//! // provided by api::Connection
 //! let stmt = conn.query("SELECT * FROM my_table").unwrap();
 //! ````
 
@@ -23,12 +26,17 @@ use thiserror::Error;
 use crate::api::{Connection, Statement};
 use crate::errors::ConnectorError;
 
-pub struct PostgresConnection<'a, P> {
+/// Connection to PostgreSQL that implements [Connection], [crate::api::SchemaGet] and [crate::api::SchemaEdit].
+///
+/// Requires generic argument `Protocol`, which can be one of the following types:
+/// - [ProtocolExtended]
+/// - [ProtocolSimple]
+pub struct PostgresConnection<'a, Protocol> {
     client: &'a mut Client,
-    _protocol: PhantomData<P>,
+    _protocol: PhantomData<Protocol>,
 }
 
-impl<'a, P> PostgresConnection<'a, P> {
+impl<'a, Protocol> PostgresConnection<'a, Protocol> {
     pub fn new(client: &'a mut Client) -> Self {
         PostgresConnection {
             client,
@@ -37,10 +45,15 @@ impl<'a, P> PostgresConnection<'a, P> {
     }
 }
 
-/// Protocol - use Cursor
+/// Extended PostgreSQL wire protocol.
+/// Supports query parameters (but they are not yet implemented).
+/// Supports streaming, with batch size of 1024.
 pub struct ProtocolExtended;
 
-/// Protocol - use Simple Query
+/// Simple PostgreSQL wire protocol.
+/// This protocol returns the values in rows as strings rather than in their binary encodings.
+/// Does not support query parameters.
+/// Does not support streaming.
 pub struct ProtocolSimple;
 
 // /// Protocol - Binary based bulk load

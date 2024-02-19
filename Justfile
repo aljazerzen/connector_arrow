@@ -8,6 +8,7 @@ test:
     cargo clippy --features=all -- -D warnings
     cargo nextest run --features=all
     just test-feature-gate
+    cargo test --doc --features=all
 
 # run tests, importants things first, for development
 test-fast *ARGS:
@@ -26,6 +27,10 @@ test-feature-gate:
 
 # format source files
 fmt:
+    comrak --extension table,tasklist \
+        --width 100 \
+        --to commonmark \
+        README.md --output README.md
     cargo fmt
     yamlfix $(fd --hidden '.yml')
 

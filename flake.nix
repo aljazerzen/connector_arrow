@@ -35,6 +35,7 @@
           pkg-config
           docker-compose 
           (dontCheckPython python311Packages.yamlfix)
+          comrak
           fd
         ];
 
