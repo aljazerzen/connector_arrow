@@ -20,8 +20,6 @@ jobs:
       # setup databases
       - name: Start databases
         run: nix develop --command just dbs/start
-      - name: Seed databases
-        run: nix develop --command just dbs/seed
 
       # run tests
       - name: Run tests
