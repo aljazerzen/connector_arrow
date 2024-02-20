@@ -1,5 +1,5 @@
 use arrow::array::*;
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, IntervalUnit, Schema, TimeUnit};
 use half::f16;
 use rand::{Rng, SeedableRng};
 use std::fs::File;
@@ -156,13 +156,91 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesDesc], rng: &mut
                 rng.gen::<f64>() // TODO: this is standard instead of uniform
             ]
         }
-        DataType::Timestamp(_, _) => todo!(),
-        DataType::Date32 => todo!(),
-        DataType::Date64 => todo!(),
-        DataType::Time32(_) => todo!(),
-        DataType::Time64(_) => todo!(),
-        DataType::Duration(_) => todo!(),
-        DataType::Interval(_) => todo!(),
+        DataType::Timestamp(_, _) => {
+            let array = gen_array![
+                values,
+                TimestampMicrosecondBuilder,
+                i64::MIN,
+                i64::MAX,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
+        }
+        DataType::Date32 => {
+            gen_array![
+                values,
+                Date32Builder,
+                i32::MIN,
+                i32::MAX,
+                rng.gen_range(i32::MIN..=i32::MAX)
+            ]
+        }
+        DataType::Date64 => {
+            gen_array![
+                values,
+                Date64Builder,
+                i64::MIN,
+                i64::MAX,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ]
+        }
+        DataType::Time32(_) => {
+            let array = gen_array![
+                values,
+                PrimitiveBuilder<Int32Type>,
+                i32::MIN,
+                i32::MAX,
+                rng.gen_range(i32::MIN..=i32::MAX)
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
+        }
+        DataType::Time64(_) => {
+            let array = gen_array![
+                values,
+                PrimitiveBuilder<Int64Type>,
+                i64::MIN,
+                i64::MAX,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
+        }
+        DataType::Duration(_) => {
+            let array = gen_array![
+                values,
+                PrimitiveBuilder<Int64Type>,
+                i64::MIN,
+                i64::MAX,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
+        }
+        DataType::Interval(IntervalUnit::YearMonth) => {
+            gen_array![
+                values,
+                IntervalYearMonthBuilder,
+                i32::MIN,
+                i32::MAX,
+                rng.gen_range(i32::MIN..=i32::MAX)
+            ]
+        }
+        DataType::Interval(IntervalUnit::MonthDayNano) => {
+            gen_array![
+                values,
+                IntervalMonthDayNanoBuilder,
+                i128::MIN,
+                i128::MAX,
+                rng.gen_range(i128::MIN..=i128::MAX)
+            ]
+        }
+        DataType::Interval(IntervalUnit::DayTime) => {
+            gen_array![
+                values,
+                IntervalDayTimeBuilder,
+                i64::MIN,
+                i64::MAX,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ]
+        }
         DataType::Binary => todo!(),
         DataType::FixedSizeBinary(_) => todo!(),
         DataType::LargeBinary => todo!(),
@@ -253,8 +331,74 @@ fn numeric() -> Vec<ColumnDesc> {
     columns
 }
 
+fn temporal() -> Vec<ColumnDesc> {
+    let data_types_domain = [
+        DataType::Timestamp(TimeUnit::Nanosecond, None),
+        DataType::Timestamp(TimeUnit::Microsecond, None),
+        DataType::Timestamp(TimeUnit::Millisecond, None),
+        DataType::Timestamp(TimeUnit::Second, None),
+        DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("+07:30"))),
+        DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("+07:30"))),
+        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("+07:30"))),
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
+        DataType::Date32,
+        DataType::Date64,
+        DataType::Time32(TimeUnit::Millisecond),
+        DataType::Time32(TimeUnit::Second),
+        DataType::Time64(TimeUnit::Nanosecond),
+        DataType::Time64(TimeUnit::Microsecond),
+        // DataType::Duration(TimeUnit::Nanosecond),
+        // DataType::Duration(TimeUnit::Microsecond),
+        // DataType::Duration(TimeUnit::Millisecond),
+        // DataType::Duration(TimeUnit::Second),
+        DataType::Interval(IntervalUnit::YearMonth),
+        // DataType::Interval(IntervalUnit::MonthDayNano),
+        DataType::Interval(IntervalUnit::DayTime),
+    ];
+    let is_nullable_domain = [true];
+    let value_gen_process_domain = [
+        ValueGenProcess::Low,
+        ValueGenProcess::High,
+        ValueGenProcess::Null,
+        ValueGenProcess::RandomUniform,
+    ];
+
+    let mut columns = Vec::new();
+    for data_type in &data_types_domain {
+        for is_nullable in is_nullable_domain {
+            if matches!(data_type, &DataType::Null) && !is_nullable {
+                continue;
+            }
+
+            let mut field_name = data_type.to_string();
+            if is_nullable {
+                field_name += "_null";
+            }
+            let mut col = ColumnDesc {
+                field_name,
+                data_type: data_type.clone(),
+                is_nullable,
+                values: Vec::new(),
+            };
+
+            for gen_process in value_gen_process_domain {
+                col.values.push(ValuesDesc {
+                    gen_process: if matches!(gen_process, ValueGenProcess::Null) && !is_nullable {
+                        ValueGenProcess::RandomUniform
+                    } else {
+                        gen_process
+                    },
+                    repeat: 1,
+                });
+            }
+            columns.push(col);
+        }
+    }
+    columns
+}
+
 fn write_parquet_to_file(batch: RecordBatch, file_name: &str) {
-    let path = Path::new("../connector_arrow/tests/data/file").with_file_name(file_name);
+    let path = Path::new("connector_arrow/tests/data/file").with_file_name(file_name);
 
     let mut file = File::create(path).unwrap();
 
@@ -269,4 +413,5 @@ fn main() {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
 
     write_parquet_to_file(generate_batch(numeric(), &mut rng), "numeric.parquet");
+    write_parquet_to_file(generate_batch(temporal(), &mut rng), "temporal.parquet");
 }

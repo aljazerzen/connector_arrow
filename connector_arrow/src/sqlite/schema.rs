@@ -63,7 +63,7 @@ pub(crate) fn table_create(
         .fields()
         .iter()
         .map(|field| {
-            let ty = ty_from_arrow(field.data_type()).expect("TODO: err message");
+            let ty = ty_from_arrow(field.data_type());
 
             let not_null = if field.is_nullable() { "" } else { " NOT NULL" };
 

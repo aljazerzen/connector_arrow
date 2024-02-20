@@ -39,6 +39,16 @@ fn roundtrip_numeric() {
 }
 
 #[test]
+#[ignore]
+fn roundtrip_temporal() {
+    let table_name = "roundtrip_temporal";
+    let file_name = "temporal.parquet";
+
+    let mut conn = init();
+    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+}
+
+#[test]
 #[ignore] // cannot introspect the Null column
 fn introspection_basic_small() {
     let table_name = "introspection_basic_small";
