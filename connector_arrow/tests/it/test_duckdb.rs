@@ -29,22 +29,21 @@ fn roundtrip_empty() {
 }
 
 #[test]
-fn roundtrip_numeric() {
-    let table_name = "roundtrip_number";
-    let file_name = "numeric.parquet";
+fn roundtrip_simple() {
+    let table_name = "roundtrip_simple";
 
     let mut conn = init();
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_simple();
+    super::tests::roundtrip_of_generated(&mut conn, table_name, column_spec);
 }
 
 #[test]
-#[ignore]
-fn roundtrip_temporal() {
-    let table_name = "roundtrip_temporal";
-    let file_name = "temporal.parquet";
+fn roundtrip_numeric() {
+    let table_name = "roundtrip_numeric";
 
     let mut conn = init();
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_numeric();
+    super::tests::roundtrip_of_generated(&mut conn, table_name, column_spec);
 }
 
 #[test]

@@ -22,16 +22,26 @@ pub fn read_parquet(file_path: &Path) -> Result<(SchemaRef, Vec<RecordBatch>), A
     Ok((schema, batches))
 }
 
-pub fn load_parquet_into_table<C>(
+#[allow(dead_code)]
+pub fn write_parquet(path: &Path, batch: RecordBatch) {
+    let mut file = File::create(path).unwrap();
+
+    let schema = batch.schema();
+    let mut writer =
+        parquet::arrow::arrow_writer::ArrowWriter::try_new(&mut file, schema, None).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+}
+
+pub fn load_into_table<C>(
     conn: &mut C,
-    file_path: &Path,
+    schema: SchemaRef,
+    batches: Vec<RecordBatch>,
     table_name: &str,
 ) -> Result<(SchemaRef, Vec<RecordBatch>), ConnectorError>
 where
     C: Connection + SchemaEdit,
 {
-    let (schema_file, batches_file) = read_parquet(file_path)?;
-
     // table drop
     match conn.table_drop(table_name) {
         Ok(_) | Err(TableDropError::TableNonexistent) => (),
@@ -39,7 +49,7 @@ where
     }
 
     // table create
-    match conn.table_create(table_name, schema_file.clone()) {
+    match conn.table_create(table_name, schema.clone()) {
         Ok(_) => (),
         Err(TableCreateError::TableExists) => {
             panic!("table was just deleted, how can it exist now?")
@@ -50,14 +60,14 @@ where
     // write into table
     {
         let mut appender = conn.append(&table_name).unwrap();
-        for batch in batches_file.clone() {
+        for batch in batches.clone() {
             appender.append(batch).unwrap();
         }
         appender.finish().unwrap();
     }
 
-    let schema_coerced = coerce::coerce_schema(schema_file, &C::coerce_type);
-    let batches_coerced = coerce::coerce_batches(&batches_file, C::coerce_type).unwrap();
+    let schema_coerced = coerce::coerce_schema(schema, &C::coerce_type);
+    let batches_coerced = coerce::coerce_batches(&batches, C::coerce_type).unwrap();
     Ok((schema_coerced, batches_coerced))
 }
 

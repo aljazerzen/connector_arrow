@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use arrow::array::{Array, ArrayRef};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::array::{Array, ArrayRef, AsArray, Float32Builder, Float64Builder};
+use arrow::datatypes::{DataType, Field, Float16Type, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 
@@ -38,7 +38,11 @@ where
     F: Fn(&DataType) -> Option<DataType> + Copy,
 {
     match coerce_fn(array.data_type()) {
-        Some(new_ty) => arrow::compute::cast(&array, &new_ty),
+        Some(new_ty) => match (array.data_type(), &new_ty) {
+            (DataType::Float16, DataType::Float32) => Ok(coerce_float_16_to_32(&array)),
+            (DataType::Float16, DataType::Float64) => Ok(coerce_float_16_to_64(&array)),
+            _ => arrow::compute::cast(&array, &new_ty),
+        },
         None => Ok(array),
     }
 }
@@ -57,4 +61,36 @@ where
             })
             .collect_vec(),
     ))
+}
+
+fn coerce_float_16_to_32(array: &dyn Array) -> ArrayRef {
+    // inefficient, but we don't need efficiency here
+
+    let array = array.as_primitive::<Float16Type>();
+    let mut builder = Float32Builder::with_capacity(array.len());
+
+    for i in 0..array.len() {
+        if array.is_null(i) {
+            builder.append_null();
+        } else {
+            builder.append_value(array.value(i).to_f32());
+        }
+    }
+    Arc::new(builder.finish()) as ArrayRef
+}
+
+fn coerce_float_16_to_64(array: &dyn Array) -> ArrayRef {
+    // inefficient, but we don't need efficiency here
+
+    let array = array.as_primitive::<Float16Type>();
+    let mut builder = Float64Builder::with_capacity(array.len());
+
+    for i in 0..array.len() {
+        if array.is_null(i) {
+            builder.append_null();
+        } else {
+            builder.append_value(array.value(i).to_f64());
+        }
+    }
+    Arc::new(builder.finish()) as ArrayRef
 }

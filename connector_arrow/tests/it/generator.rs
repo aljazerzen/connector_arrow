@@ -1,10 +1,142 @@
 use arrow::array::*;
-use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, IntervalUnit, Schema, TimeUnit};
+use arrow::datatypes::*;
 use half::f16;
-use rand::{Rng, SeedableRng};
-use std::fs::File;
-use std::path::Path;
+use rand::Rng;
 use std::sync::Arc;
+
+pub fn generate_batch<R: Rng>(column_specs: Vec<ColumnSpec>, rng: &mut R) -> RecordBatch {
+    let mut arrays = Vec::new();
+    let mut fields = Vec::new();
+    for column in column_specs {
+        let array = generate_array(&column.data_type, &column.values, rng);
+        arrays.push(array);
+
+        let field = Field::new(column.field_name, column.data_type, column.is_nullable);
+        fields.push(field);
+    }
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, arrays).unwrap()
+}
+
+pub fn spec_simple() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(&[DataType::Null, DataType::Boolean], &[false, true])
+}
+
+pub fn spec_numeric() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::UInt8,
+            DataType::UInt16,
+            DataType::UInt32,
+            DataType::UInt64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        &[false, true],
+    )
+}
+
+pub fn spec_timestamp() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            DataType::Timestamp(TimeUnit::Microsecond, None),
+            DataType::Timestamp(TimeUnit::Millisecond, None),
+            DataType::Timestamp(TimeUnit::Second, None),
+            DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("+07:30"))),
+            DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("+07:30"))),
+            DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("+07:30"))),
+            DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
+        ],
+        &[true],
+    )
+}
+pub fn spec_date() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(&[DataType::Date32, DataType::Date64], &[true])
+}
+pub fn spec_time() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Time32(TimeUnit::Millisecond),
+            DataType::Time32(TimeUnit::Second),
+            DataType::Time64(TimeUnit::Nanosecond),
+            DataType::Time64(TimeUnit::Microsecond),
+        ],
+        &[true],
+    )
+}
+pub fn spec_duration() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Duration(TimeUnit::Nanosecond),
+            DataType::Duration(TimeUnit::Microsecond),
+            DataType::Duration(TimeUnit::Millisecond),
+            DataType::Duration(TimeUnit::Second),
+        ],
+        &[true],
+    )
+}
+pub fn spec_interval() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Interval(IntervalUnit::YearMonth),
+            DataType::Interval(IntervalUnit::MonthDayNano),
+            DataType::Interval(IntervalUnit::DayTime),
+        ],
+        &[true],
+    )
+}
+
+pub fn domains_to_batch_spec(
+    data_types_domain: &[DataType],
+    is_nullable_domain: &[bool],
+) -> Vec<ColumnSpec> {
+    let value_gen_process_domain = [
+        ValueGenProcess::Low,
+        ValueGenProcess::High,
+        ValueGenProcess::Null,
+        ValueGenProcess::RandomUniform,
+    ];
+
+    let mut columns = Vec::new();
+    for data_type in data_types_domain {
+        for is_nullable in is_nullable_domain {
+            let is_nullable = *is_nullable;
+            if matches!(data_type, &DataType::Null) && !is_nullable {
+                continue;
+            }
+
+            let mut field_name = data_type.to_string();
+            if is_nullable {
+                field_name += "_null";
+            }
+            let mut col = ColumnSpec {
+                field_name,
+                data_type: data_type.clone(),
+                is_nullable,
+                values: Vec::new(),
+            };
+
+            for gen_process in value_gen_process_domain {
+                col.values.push(ValuesSpec {
+                    gen_process: if matches!(gen_process, ValueGenProcess::Null) && !is_nullable {
+                        ValueGenProcess::RandomUniform
+                    } else {
+                        gen_process
+                    },
+                    repeat: 1,
+                });
+            }
+            columns.push(col);
+        }
+    }
+    columns
+}
 
 #[derive(Clone, Copy)]
 enum ValueGenProcess {
@@ -14,19 +146,19 @@ enum ValueGenProcess {
     RandomUniform,
 }
 
-struct ValuesDesc {
+struct ValuesSpec {
     gen_process: ValueGenProcess,
     repeat: usize,
 }
 
-struct ColumnDesc {
+pub struct ColumnSpec {
     field_name: String,
     is_nullable: bool,
     data_type: DataType,
-    values: Vec<ValuesDesc>,
+    values: Vec<ValuesSpec>,
 }
 
-fn count_values(values: &[ValuesDesc]) -> usize {
+fn count_values(values: &[ValuesSpec]) -> usize {
     values.iter().map(|v| v.repeat).sum()
 }
 
@@ -48,7 +180,7 @@ macro_rules! gen_array {
     }};
 }
 
-fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesDesc], rng: &mut R) -> ArrayRef {
+fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut R) -> ArrayRef {
     match data_type {
         DataType::Null => {
             let mut builder = NullBuilder::with_capacity(count_values(values));
@@ -257,161 +389,4 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesDesc], rng: &mut
         DataType::Map(_, _) => todo!(),
         DataType::RunEndEncoded(_, _) => todo!(),
     }
-}
-
-fn generate_batch<R: Rng>(columns_desc: Vec<ColumnDesc>, rng: &mut R) -> RecordBatch {
-    let mut arrays = Vec::new();
-    let mut fields = Vec::new();
-    for column in columns_desc {
-        let array = generate_array(&column.data_type, &column.values, rng);
-        arrays.push(array);
-
-        let field = Field::new(column.field_name, column.data_type, column.is_nullable);
-        fields.push(field);
-    }
-    let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, arrays).unwrap()
-}
-
-fn numeric() -> Vec<ColumnDesc> {
-    let data_types_domain = [
-        DataType::Null,
-        DataType::Boolean,
-        DataType::Int8,
-        DataType::Int16,
-        DataType::Int32,
-        DataType::Int64,
-        DataType::UInt8,
-        DataType::UInt16,
-        DataType::UInt32,
-        DataType::UInt64,
-        // DataType::Float16,
-        DataType::Float32,
-        DataType::Float64,
-    ];
-    let is_nullable_domain = [false, true];
-    let value_gen_process_domain = [
-        ValueGenProcess::Low,
-        ValueGenProcess::High,
-        ValueGenProcess::Null,
-        ValueGenProcess::RandomUniform,
-    ];
-
-    let mut columns = Vec::new();
-    for data_type in &data_types_domain {
-        for is_nullable in is_nullable_domain {
-            if matches!(data_type, &DataType::Null) && !is_nullable {
-                continue;
-            }
-
-            let mut field_name = data_type.to_string();
-            if is_nullable {
-                field_name += "_null";
-            }
-            let mut col = ColumnDesc {
-                field_name,
-                data_type: data_type.clone(),
-                is_nullable,
-                values: Vec::new(),
-            };
-
-            for gen_process in value_gen_process_domain {
-                col.values.push(ValuesDesc {
-                    gen_process: if matches!(gen_process, ValueGenProcess::Null) && !is_nullable {
-                        ValueGenProcess::RandomUniform
-                    } else {
-                        gen_process
-                    },
-                    repeat: 1,
-                });
-            }
-            columns.push(col);
-        }
-    }
-    columns
-}
-
-fn temporal() -> Vec<ColumnDesc> {
-    let data_types_domain = [
-        DataType::Timestamp(TimeUnit::Nanosecond, None),
-        DataType::Timestamp(TimeUnit::Microsecond, None),
-        DataType::Timestamp(TimeUnit::Millisecond, None),
-        DataType::Timestamp(TimeUnit::Second, None),
-        DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("+07:30"))),
-        DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("+07:30"))),
-        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("+07:30"))),
-        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
-        DataType::Date32,
-        DataType::Date64,
-        DataType::Time32(TimeUnit::Millisecond),
-        DataType::Time32(TimeUnit::Second),
-        DataType::Time64(TimeUnit::Nanosecond),
-        DataType::Time64(TimeUnit::Microsecond),
-        // DataType::Duration(TimeUnit::Nanosecond),
-        // DataType::Duration(TimeUnit::Microsecond),
-        // DataType::Duration(TimeUnit::Millisecond),
-        // DataType::Duration(TimeUnit::Second),
-        DataType::Interval(IntervalUnit::YearMonth),
-        // DataType::Interval(IntervalUnit::MonthDayNano),
-        DataType::Interval(IntervalUnit::DayTime),
-    ];
-    let is_nullable_domain = [true];
-    let value_gen_process_domain = [
-        ValueGenProcess::Low,
-        ValueGenProcess::High,
-        ValueGenProcess::Null,
-        ValueGenProcess::RandomUniform,
-    ];
-
-    let mut columns = Vec::new();
-    for data_type in &data_types_domain {
-        for is_nullable in is_nullable_domain {
-            if matches!(data_type, &DataType::Null) && !is_nullable {
-                continue;
-            }
-
-            let mut field_name = data_type.to_string();
-            if is_nullable {
-                field_name += "_null";
-            }
-            let mut col = ColumnDesc {
-                field_name,
-                data_type: data_type.clone(),
-                is_nullable,
-                values: Vec::new(),
-            };
-
-            for gen_process in value_gen_process_domain {
-                col.values.push(ValuesDesc {
-                    gen_process: if matches!(gen_process, ValueGenProcess::Null) && !is_nullable {
-                        ValueGenProcess::RandomUniform
-                    } else {
-                        gen_process
-                    },
-                    repeat: 1,
-                });
-            }
-            columns.push(col);
-        }
-    }
-    columns
-}
-
-fn write_parquet_to_file(batch: RecordBatch, file_name: &str) {
-    let path = Path::new("connector_arrow/tests/data/file").with_file_name(file_name);
-
-    let mut file = File::create(path).unwrap();
-
-    let schema = batch.schema();
-    let mut writer =
-        parquet::arrow::arrow_writer::ArrowWriter::try_new(&mut file, schema, None).unwrap();
-    writer.write(&batch).unwrap();
-    writer.close().unwrap();
-}
-
-fn main() {
-    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
-
-    write_parquet_to_file(generate_batch(numeric(), &mut rng), "numeric.parquet");
-    write_parquet_to_file(generate_batch(temporal(), &mut rng), "temporal.parquet");
 }

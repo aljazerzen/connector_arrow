@@ -517,6 +517,7 @@ dependencies = [
  "duckdb",
  "env_logger",
  "fallible-streaming-iterator",
+ "half",
  "hex",
  "insta",
  "itertools",
@@ -524,6 +525,8 @@ dependencies = [
  "parquet",
  "postgres",
  "postgres-protocol",
+ "rand",
+ "rand_chacha",
  "rusqlite",
  "rust_decimal",
  "rust_decimal_macros",
@@ -1900,17 +1903,6 @@ dependencies = [
  "filetime",
  "libc",
  "xattr",
-]
-
-[[package]]
-name = "test_generator"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "half",
- "parquet",
- "rand",
- "rand_chacha",
 ]
 
 [[package]]

@@ -5,8 +5,13 @@ use connector_arrow::{
     api::{Connection, ResultReader, SchemaEdit, SchemaGet, Statement},
     TableCreateError, TableDropError,
 };
+use rand::SeedableRng;
 
-use crate::util::{load_parquet_into_table, query_table};
+use crate::util::{load_into_table, query_table};
+use crate::{
+    generator::{generate_batch, ColumnSpec},
+    util::read_parquet,
+};
 
 #[track_caller]
 pub fn query_01<C: Connection>(conn: &mut C) {
@@ -15,11 +20,11 @@ pub fn query_01<C: Connection>(conn: &mut C) {
 
     similar_asserts::assert_eq!(
         pretty_format_batches(&results).unwrap().to_string(),
-        "+---+---+
-| a | b |
-+---+---+
-| 1 |   |
-+---+---+"
+        "+---+---+\n\
+         | a | b |\n\
+         +---+---+\n\
+         | 1 |   |\n\
+         +---+---+"
     );
 }
 
@@ -29,10 +34,25 @@ where
 {
     let file_path = Path::new("./tests/data/a").with_file_name(file_name);
 
+    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
     let (schema_file, batches_file) =
-        load_parquet_into_table(conn, &file_path, table_name).unwrap();
+        load_into_table(conn, schema_file, batches_file, table_name).unwrap();
     let (schema_query, batches_query) = query_table(conn, table_name).unwrap();
     similar_asserts::assert_eq!(schema_file, schema_query);
+    similar_asserts::assert_eq!(batches_file, batches_query);
+}
+
+pub fn roundtrip_of_generated<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
+where
+    C: Connection + SchemaEdit,
+{
+    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
+    let batch = generate_batch(column_specs, &mut rng);
+
+    let (_, batches_file) = load_into_table(conn, batch.schema(), vec![batch], table_name).unwrap();
+
+    let (_, batches_query) = query_table(conn, table_name).unwrap();
+
     similar_asserts::assert_eq!(batches_file, batches_query);
 }
 
@@ -42,8 +62,8 @@ where
 {
     let file_path = Path::new("./tests/data/a").with_file_name(file_name);
 
-    let (schema_loaded, _) =
-        super::util::load_parquet_into_table(conn, &file_path, table_name).unwrap();
+    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
+    let (schema_loaded, _) = load_into_table(conn, schema_file, batches_file, table_name).unwrap();
 
     let schema_introspection = conn.table_get(table_name).unwrap();
     similar_asserts::assert_eq!(schema_loaded, schema_introspection);
@@ -55,7 +75,8 @@ where
 {
     let file_path = Path::new("./tests/data/a").with_file_name(file_name);
 
-    let (schema, _) = super::util::load_parquet_into_table(conn, &file_path, table_name).unwrap();
+    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
+    let (schema, _) = load_into_table(conn, schema_file, batches_file, table_name).unwrap();
 
     let table_name2 = table_name.to_string() + "2";
 

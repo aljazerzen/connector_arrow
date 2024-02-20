@@ -31,6 +31,7 @@ impl Connection for duckdb::Connection {
     fn coerce_type(ty: &DataType) -> Option<DataType> {
         match ty {
             DataType::Null => Some(DataType::Int64),
+            DataType::Float16 => Some(DataType::Float32),
             _ => None,
         }
     }
