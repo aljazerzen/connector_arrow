@@ -52,8 +52,8 @@ where
             .fields()
             .iter()
             .map(|f| match coerce_fn(f.data_type()) {
-                Some(new_ty) => Field::new(f.name(), new_ty, f.is_nullable()),
-                None => Field::clone(f),
+                Some(new_ty) => Field::new(f.name(), new_ty, true),
+                None => Field::clone(f).with_nullable(true),
             })
             .collect_vec(),
     ))

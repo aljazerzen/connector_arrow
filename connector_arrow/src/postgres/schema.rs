@@ -72,9 +72,9 @@ impl<'a, P> SchemaEdit for super::PostgresConnection<'a, P> {
 
                 let is_nullable =
                     field.is_nullable() || matches!(field.data_type(), DataType::Null);
-                let not_null = if is_nullable { "" } else { "NOT NULL" };
+                let not_null = if is_nullable { "" } else { " NOT NULL" };
 
-                format!("{} {}{}", field.name(), ty, not_null)
+                format!("\"{}\" {}{}", field.name(), ty, not_null)
             })
             .join(",");
 

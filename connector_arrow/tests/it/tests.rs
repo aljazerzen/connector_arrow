@@ -23,7 +23,6 @@ pub fn query_01<C: Connection>(conn: &mut C) {
     );
 }
 
-#[track_caller]
 pub fn roundtrip_of_parquet<C>(conn: &mut C, file_name: &str, table_name: &str)
 where
     C: Connection + SchemaEdit,
@@ -37,7 +36,6 @@ where
     similar_asserts::assert_eq!(batches_file, batches_query);
 }
 
-#[track_caller]
 pub fn introspection<C>(conn: &mut C, file_name: &str, table_name: &str)
 where
     C: Connection + SchemaEdit + SchemaGet,
@@ -51,7 +49,6 @@ where
     similar_asserts::assert_eq!(schema_loaded, schema_introspection);
 }
 
-#[track_caller]
 pub fn schema_edit<C>(conn: &mut C, file_name: &str, table_name: &str)
 where
     C: Connection + SchemaEdit + SchemaGet,

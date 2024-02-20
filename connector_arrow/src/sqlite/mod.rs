@@ -40,7 +40,7 @@ impl Connection for rusqlite::Connection {
             DataType::UInt8 => Some(DataType::Int64),
             DataType::UInt16 => Some(DataType::Int64),
             DataType::UInt32 => Some(DataType::Int64),
-            DataType::UInt64 => Some(DataType::Int64),
+            DataType::UInt64 => Some(DataType::LargeUtf8),
             DataType::Float16 => Some(DataType::Float64),
             DataType::Float32 => Some(DataType::Float64),
             DataType::Float64 => Some(DataType::Float64),

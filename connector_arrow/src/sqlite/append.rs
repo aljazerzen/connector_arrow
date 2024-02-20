@@ -139,7 +139,14 @@ fn get_value(array: &Arc<dyn Array>, row: usize) -> Value {
                 .unwrap()
                 .value(row) as i64,
         ),
-        DataType::UInt64 => unimplemented!(),
+        DataType::UInt64 => Value::Text(
+            array
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap()
+                .value(row)
+                .to_string(),
+        ),
         DataType::Float16 => Value::Real(
             array
                 .as_any()

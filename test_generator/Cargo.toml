@@ -1,0 +1,13 @@
+[package]
+name = "test_generator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+arrow = { version = "49", features = ["prettyprint"], default-features = false }
+half = "2.3.1"
+parquet = { version = "49", features = ["arrow"], default-features = false }
+rand = {version = "0.8.5", default-features = false}
+rand_chacha = "0.3.1"

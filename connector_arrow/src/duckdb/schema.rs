@@ -1,5 +1,4 @@
 use arrow::datatypes::{DataType, SchemaRef};
-use duckdb::types::Type;
 use itertools::Itertools;
 
 use crate::api::{SchemaEdit, SchemaGet};
@@ -38,9 +37,9 @@ impl SchemaEdit for duckdb::Connection {
 
                 let is_nullable =
                     field.is_nullable() || matches!(field.data_type(), DataType::Null);
-                let not_null = if is_nullable { "" } else { "NOT NULL" };
+                let not_null = if is_nullable { "" } else { " NOT NULL" };
 
-                format!("{} {}{}", field.name(), ty, not_null)
+                format!("\"{}\" {}{}", field.name(), ty, not_null)
             })
             .join(",");
 
@@ -78,23 +77,23 @@ impl SchemaEdit for duckdb::Connection {
     }
 }
 
-fn ty_from_arrow(data_type: &DataType) -> duckdb::types::Type {
+fn ty_from_arrow(data_type: &DataType) -> &'static str {
     match data_type {
         // there is no Null type in DuckDB, so we fallback to some other type that is nullable
-        DataType::Null => Type::BigInt,
+        DataType::Null => "int64",
 
-        DataType::Boolean => Type::Boolean,
-        DataType::Int8 => Type::TinyInt,
-        DataType::Int16 => Type::SmallInt,
-        DataType::Int32 => Type::Int,
-        DataType::Int64 => Type::BigInt,
-        DataType::UInt8 => Type::UTinyInt,
-        DataType::UInt16 => Type::USmallInt,
-        DataType::UInt32 => Type::UInt,
-        DataType::UInt64 => Type::UBigInt,
-        DataType::Float16 => Type::Float,
-        DataType::Float32 => Type::Float,
-        DataType::Float64 => Type::Double,
+        DataType::Boolean => "BOOLEAN",
+        DataType::Int8 => "TINYINT",
+        DataType::Int16 => "SMALLINT",
+        DataType::Int32 => "INTEGER",
+        DataType::Int64 => "BIGINT",
+        DataType::UInt8 => "UTINYINT",
+        DataType::UInt16 => "USMALLINT",
+        DataType::UInt32 => "UINTEGER",
+        DataType::UInt64 => "UBIGINT",
+        DataType::Float16 => "REAL",
+        DataType::Float32 => "REAL",
+        DataType::Float64 => "DOUBLE",
         DataType::Timestamp(_, _) => unimplemented!(),
         DataType::Date32 => unimplemented!(),
         DataType::Date64 => unimplemented!(),
@@ -102,11 +101,11 @@ fn ty_from_arrow(data_type: &DataType) -> duckdb::types::Type {
         DataType::Time64(_) => unimplemented!(),
         DataType::Duration(_) => unimplemented!(),
         DataType::Interval(_) => unimplemented!(),
-        DataType::Binary => Type::Blob,
-        DataType::FixedSizeBinary(_) => Type::Blob,
-        DataType::LargeBinary => Type::Blob,
-        DataType::Utf8 => Type::Text,
-        DataType::LargeUtf8 => Type::Text,
+        DataType::Binary => "blob",
+        DataType::FixedSizeBinary(_) => "blob",
+        DataType::LargeBinary => "blob",
+        DataType::Utf8 => "text",
+        DataType::LargeUtf8 => "text",
         DataType::List(_) => unimplemented!(),
         DataType::FixedSizeList(_, _) => unimplemented!(),
         DataType::LargeList(_) => unimplemented!(),
