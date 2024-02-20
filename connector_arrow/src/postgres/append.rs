@@ -136,9 +136,13 @@ impl Consume for BytesMut {}
 
 macro_rules! impl_consume_ty {
     ($ArrTy: ty, $to_sql: ident) => {
+        impl_consume_ty!($ArrTy, $to_sql, std::convert::identity);
+    };
+
+    ($ArrTy: ty, $to_sql: ident, $conversion: expr) => {
         impl ConsumeTy<$ArrTy> for BytesMut {
             fn consume(&mut self, value: <$ArrTy as crate::types::ArrowType>::Native) {
-                postgres_protocol::types::$to_sql(value, self);
+                postgres_protocol::types::$to_sql(($conversion)(value), self);
             }
 
             fn consume_null(&mut self) {}
@@ -165,15 +169,15 @@ impl ConsumeTy<NullType> for BytesMut {
 }
 
 impl_consume_ty!(BooleanType, bool_to_sql);
-impl_consume_ty!(Int8Type, char_to_sql);
+impl_consume_ty!(Int8Type, int2_to_sql, i16::from);
 impl_consume_ty!(Int16Type, int2_to_sql);
 impl_consume_ty!(Int32Type, int4_to_sql);
 impl_consume_ty!(Int64Type, int8_to_sql);
-// impl_consume_ty!(UInt8Type,  );
-// impl_consume_ty!(UInt16Type,  );
-impl_consume_ty!(UInt32Type, oid_to_sql);
+impl_consume_ty!(UInt8Type, int2_to_sql, i16::from);
+impl_consume_ty!(UInt16Type, int4_to_sql, i32::from);
+impl_consume_ty!(UInt32Type, int8_to_sql, i64::from);
 // impl_consume_ty!(UInt64Type,  );
-// impl_consume_ty!(Float16Type,  );
+impl_consume_ty!(Float16Type, float4_to_sql, f32::from);
 impl_consume_ty!(Float32Type, float4_to_sql);
 impl_consume_ty!(Float64Type, float8_to_sql);
 // impl_consume_ty!(TimestampSecondType,  );
@@ -198,16 +202,13 @@ impl_consume_ref_ty!(LargeBinaryType, bytea_to_sql);
 impl_consume_ref_ty!(FixedSizeBinaryType, bytea_to_sql);
 impl_consume_ref_ty!(Utf8Type, text_to_sql);
 impl_consume_ref_ty!(LargeUtf8Type, text_to_sql);
-// impl_consume_ty!(Decimal128Type,  );
+// impl_consume_ty!(Decimal128Type,);
 // impl_consume_ty!(Decimal256Type,  );
 
 impl_consume_unsupported!(
     BytesMut,
     (
-        UInt8Type,
-        UInt16Type,
         UInt64Type,
-        Float16Type,
         TimestampSecondType,
         TimestampMillisecondType,
         TimestampNanosecondType,

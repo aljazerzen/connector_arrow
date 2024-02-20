@@ -75,7 +75,28 @@ fn err_null() -> ConnectorError {
     ConnectorError::DataSchemaMismatch("NULL in non-nullable column".into())
 }
 
-macro_rules! impl_simple_produce {
+fn parse_bool(token: &str) -> Result<bool, ConnectorError> {
+    match token {
+        "t" => Ok(true),
+        "f" => Ok(false),
+        s => Err(ConnectorError::DataSchemaMismatch(format!(
+            "expected t or f, got {s}"
+        ))),
+    }
+}
+
+impl<'r> transport::ProduceTy<'r, BooleanType> for CellRef<'r> {
+    fn produce(self) -> Result<bool, ConnectorError> {
+        transport::ProduceTy::<BooleanType>::produce_opt(self)?.ok_or_else(err_null)
+    }
+
+    fn produce_opt(self) -> Result<Option<bool>, ConnectorError> {
+        let s = self.0.get(self.1);
+        s.map(parse_bool).transpose()
+    }
+}
+
+macro_rules! impl_produce_numeric {
     ($($t: ty,)+) => {
         $(
             impl<'r> transport::ProduceTy<'r, $t> for CellRef<'r> {
@@ -89,7 +110,7 @@ macro_rules! impl_simple_produce {
                     Ok(match s {
                         Some(s) => Some(
                             s.parse::<<$t as ArrowType>::Native>()
-                                .map_err(|e| ConnectorError::DataSchemaMismatch(e.to_string()))?,
+                                .map_err(|_| ConnectorError::DataSchemaMismatch(format!("bad numeric encoding: {s}")))?,
                         ),
                         None => None,
                     })
@@ -99,7 +120,7 @@ macro_rules! impl_simple_produce {
     };
 }
 
-impl_simple_produce!(
+impl_produce_numeric!(
     Int8Type,
     Int16Type,
     Int32Type,
@@ -149,27 +170,6 @@ impl<'r> transport::ProduceTy<'r, LargeUtf8Type> for CellRef<'r> {
 
     fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
         Ok(self.0.get(self.1).map(|x| x.to_string()))
-    }
-}
-
-fn parse_bool(token: &str) -> Result<bool, ConnectorError> {
-    match token {
-        "t" => Ok(true),
-        "f" => Ok(false),
-        s => Err(ConnectorError::DataSchemaMismatch(format!(
-            "expected t or f, got {s}"
-        ))),
-    }
-}
-
-impl<'r> transport::ProduceTy<'r, BooleanType> for CellRef<'r> {
-    fn produce(self) -> Result<bool, ConnectorError> {
-        transport::ProduceTy::<BooleanType>::produce_opt(self)?.ok_or_else(err_null)
-    }
-
-    fn produce_opt(self) -> Result<Option<bool>, ConnectorError> {
-        let s = self.0.get(self.1);
-        s.map(parse_bool).transpose()
     }
 }
 
