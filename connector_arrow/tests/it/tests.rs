@@ -6,8 +6,8 @@ use connector_arrow::{
 };
 use rand::SeedableRng;
 
-use crate::generator::{generate_batch, ColumnSpec};
 use crate::util::{load_into_table, query_table};
+use crate::{generator::generate_batch, spec::ArrowGenSpec};
 
 #[track_caller]
 pub fn query_01<C: Connection>(conn: &mut C) {
@@ -24,12 +24,12 @@ pub fn query_01<C: Connection>(conn: &mut C) {
     );
 }
 
-pub fn roundtrip<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
+pub fn roundtrip<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
     C: Connection + SchemaEdit,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
-    let (schema, batches) = generate_batch(column_specs, &mut rng);
+    let (schema, batches) = generate_batch(spec, &mut rng);
 
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
 
@@ -42,12 +42,12 @@ where
     similar_asserts::assert_eq!(batches_coerced, batches_query);
 }
 
-pub fn schema_get<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
+pub fn schema_get<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
     C: Connection + SchemaEdit + SchemaGet,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
-    let (schema, batches) = generate_batch(column_specs, &mut rng);
+    let (schema, batches) = generate_batch(spec, &mut rng);
 
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
     let schema = coerce::coerce_schema(schema, &C::coerce_type, Some(false));
@@ -57,12 +57,12 @@ where
     similar_asserts::assert_eq!(schema, schema_introspection);
 }
 
-pub fn schema_edit<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
+pub fn schema_edit<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
     C: Connection + SchemaEdit + SchemaGet,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
-    let (schema, _) = generate_batch(column_specs, &mut rng);
+    let (schema, _) = generate_batch(spec, &mut rng);
 
     let table_name2 = table_name.to_string() + "2";
 

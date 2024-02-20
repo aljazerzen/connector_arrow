@@ -1,4 +1,7 @@
 use connector_arrow::postgres::{PostgresConnection, ProtocolSimple};
+use rstest::*;
+
+use super::spec;
 
 fn init() -> postgres::Client {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -18,24 +21,14 @@ fn query_01() {
     super::tests::query_01(&mut conn);
 }
 
-#[test]
-fn roundtrip_empty() {
-    let table_name = "simple::roundtrip_empty";
-
+#[rstest]
+#[case::empty("simple::roundtrip::empty", spec::empty())]
+#[case::null_bool("simple::roundtrip::null_bool", spec::null_bool())]
+#[case::numeric("simple::roundtrip::numeric", spec::numeric())]
+fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    let column_spec = super::generator::spec_empty();
-    super::tests::roundtrip(&mut conn, table_name, column_spec);
-}
-
-#[test]
-fn roundtrip_null_bool() {
-    let table_name = "simple::roundtrip_null_bool";
-
-    let mut client = init();
-    let mut conn = wrap_conn(&mut client);
-    let column_spec = super::generator::spec_null_bool();
-    super::tests::roundtrip(&mut conn, table_name, column_spec);
+    super::tests::roundtrip(&mut conn, table_name, spec);
 }
 
 #[test]
@@ -44,7 +37,7 @@ fn schema_get() {
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    let column_spec = super::generator::spec_all_types();
+    let column_spec = super::spec::all_types();
     super::tests::schema_get(&mut conn, table_name, column_spec);
 }
 
@@ -54,6 +47,6 @@ fn schema_edit() {
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    let column_spec = super::generator::spec_all_types();
+    let column_spec = super::spec::all_types();
     super::tests::schema_edit(&mut conn, table_name, column_spec);
 }

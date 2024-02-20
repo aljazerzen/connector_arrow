@@ -1,4 +1,5 @@
 mod generator;
+mod spec;
 mod tests;
 mod util;
 
