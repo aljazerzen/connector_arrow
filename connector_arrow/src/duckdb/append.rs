@@ -5,11 +5,16 @@ use duckdb::{types::Value, Appender};
 
 use crate::{api::Append, ConnectorError};
 
-impl<'conn> Append<'conn> for Appender<'conn> {
+pub struct DuckDBAppender<'conn> {
+    pub(super) inner: Appender<'conn>,
+}
+
+impl<'conn> Append<'conn> for DuckDBAppender<'conn> {
     fn append(&mut self, batch: RecordBatch) -> Result<(), ConnectorError> {
         for row_index in 0..batch.num_rows() {
             let row = convert_row(&batch, row_index);
-            self.append_row(duckdb::appender_params_from_iter(row))?;
+            self.inner
+                .append_row(duckdb::appender_params_from_iter(row))?;
         }
 
         Ok(())

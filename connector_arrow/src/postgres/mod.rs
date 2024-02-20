@@ -5,11 +5,10 @@
 //! use connector_arrow::postgres::{PostgresConnection, ProtocolExtended};
 //! use connector_arrow::api::Connection;
 //!
-//! let mut client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
+//! let client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
 //!
-//! let mut conn = PostgresConnection::<ProtocolExtended>::new(&mut client);
+//! let mut conn = PostgresConnection::<ProtocolExtended>::new(client);
 //!
-//! // provided by api::Connection
 //! let stmt = conn.query("SELECT * FROM my_table").unwrap();
 //! ````
 
@@ -32,17 +31,21 @@ use crate::errors::ConnectorError;
 /// Requires generic argument `Protocol`, which can be one of the following types:
 /// - [ProtocolExtended]
 /// - [ProtocolSimple]
-pub struct PostgresConnection<'a, Protocol> {
-    client: &'a mut Client,
+pub struct PostgresConnection<Protocol> {
+    client: Client,
     _protocol: PhantomData<Protocol>,
 }
 
-impl<'a, Protocol> PostgresConnection<'a, Protocol> {
-    pub fn new(client: &'a mut Client) -> Self {
+impl<Protocol> PostgresConnection<Protocol> {
+    pub fn new(client: Client) -> Self {
         PostgresConnection {
             client,
             _protocol: PhantomData,
         }
+    }
+
+    pub fn unwrap(self) -> Client {
+        self.client
     }
 }
 
@@ -78,7 +81,7 @@ pub enum PostgresError {
     IO(#[from] std::io::Error),
 }
 
-impl<'c, P> Connection for PostgresConnection<'c, P>
+impl<P> Connection for PostgresConnection<P>
 where
     for<'conn> PostgresStatement<'conn, P>: Statement<'conn>,
 {
@@ -92,7 +95,7 @@ where
             .prepare(query)
             .map_err(PostgresError::Postgres)?;
         Ok(PostgresStatement {
-            client: self.client,
+            client: &mut self.client,
             query: query.to_string(),
             stmt,
             _protocol: &PhantomData,
@@ -100,7 +103,7 @@ where
     }
 
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        append::PostgresAppender::new(self.client, table_name)
+        append::PostgresAppender::new(&mut self.client, table_name)
     }
 
     fn coerce_type(ty: &DataType) -> Option<DataType> {

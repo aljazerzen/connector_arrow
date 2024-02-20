@@ -4,10 +4,12 @@ use itertools::Itertools;
 use crate::api::{SchemaEdit, SchemaGet};
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
-impl SchemaGet for duckdb::Connection {
+use super::DuckDBConnection;
+
+impl SchemaGet for DuckDBConnection {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query_tables = "SHOW TABLES;";
-        let mut statement = self.prepare(query_tables)?;
+        let mut statement = self.inner.prepare(query_tables)?;
         let mut tables_res = statement.query([])?;
 
         let mut table_names = Vec::new();
@@ -20,14 +22,14 @@ impl SchemaGet for duckdb::Connection {
 
     fn table_get(&mut self, name: &str) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
         let query_schema = format!("SELECT * FROM \"{name}\" WHERE FALSE;");
-        let mut statement = self.prepare(&query_schema)?;
+        let mut statement = self.inner.prepare(&query_schema)?;
         let results = statement.query_arrow([])?;
 
         Ok(results.get_schema())
     }
 }
 
-impl SchemaEdit for duckdb::Connection {
+impl SchemaEdit for DuckDBConnection {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()
@@ -45,7 +47,7 @@ impl SchemaEdit for duckdb::Connection {
 
         let ddl = format!("CREATE TABLE \"{name}\" ({column_defs});");
 
-        let res = self.execute(&ddl, []);
+        let res = self.inner.execute(&ddl, []);
         match res {
             Ok(_) => Ok(()),
             Err(e)
@@ -62,7 +64,7 @@ impl SchemaEdit for duckdb::Connection {
         // TODO: properly escape
         let ddl = format!("DROP TABLE \"{name}\";");
 
-        let res = self.execute(&ddl, []);
+        let res = self.inner.execute(&ddl, []);
 
         match res {
             Ok(_) => Ok(()),

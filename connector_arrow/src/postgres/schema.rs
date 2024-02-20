@@ -10,7 +10,7 @@ use crate::{ConnectorError, TableCreateError, TableDropError};
 
 use super::PostgresError;
 
-impl<'a, P> SchemaGet for super::PostgresConnection<'a, P> {
+impl<P> SchemaGet for super::PostgresConnection<P> {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query = "
             SELECT relname
@@ -62,7 +62,7 @@ impl<'a, P> SchemaGet for super::PostgresConnection<'a, P> {
     }
 }
 
-impl<'a, P> SchemaEdit for super::PostgresConnection<'a, P> {
+impl<P> SchemaEdit for super::PostgresConnection<P> {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()

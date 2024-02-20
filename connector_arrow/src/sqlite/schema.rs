@@ -6,11 +6,12 @@ use crate::api::{SchemaEdit, SchemaGet};
 use crate::errors::{ConnectorError, TableCreateError, TableDropError};
 
 use super::types::{self, ty_from_arrow};
+use super::SQLiteConnection;
 
-impl SchemaGet for rusqlite::Connection {
+impl SchemaGet for SQLiteConnection {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query_tables = "SELECT name FROM sqlite_master WHERE type = 'table';";
-        let mut statement = self.prepare(query_tables)?;
+        let mut statement = self.inner.prepare(query_tables)?;
         let mut tables_res = statement.query(())?;
 
         let mut table_names = Vec::new();
@@ -26,7 +27,7 @@ impl SchemaGet for rusqlite::Connection {
         table_name: &str,
     ) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
         let query_columns = format!("PRAGMA table_info(\"{}\");", table_name);
-        let mut statement = self.prepare(&query_columns)?;
+        let mut statement = self.inner.prepare(&query_columns)?;
         let mut columns_res = statement.query(())?;
         // contains columns: cid, name, type, notnull, dflt_value, pk
 
@@ -44,7 +45,7 @@ impl SchemaGet for rusqlite::Connection {
     }
 }
 
-impl SchemaEdit for rusqlite::Connection {
+impl SchemaEdit for SQLiteConnection {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         table_create(self, name, schema)
     }
@@ -55,7 +56,7 @@ impl SchemaEdit for rusqlite::Connection {
 }
 
 pub(crate) fn table_create(
-    conn: &mut rusqlite::Connection,
+    conn: &mut SQLiteConnection,
     name: &str,
     schema: SchemaRef,
 ) -> Result<(), TableCreateError> {
@@ -73,7 +74,7 @@ pub(crate) fn table_create(
 
     let ddl = format!("CREATE TABLE \"{name}\" ({column_defs});");
 
-    let res = conn.execute(&ddl, ());
+    let res = conn.inner.execute(&ddl, ());
     match res {
         Ok(_) => Ok(()),
         Err(e) if e.to_string().ends_with("already exists") => Err(TableCreateError::TableExists),
@@ -81,13 +82,10 @@ pub(crate) fn table_create(
     }
 }
 
-pub(crate) fn table_drop(
-    conn: &mut rusqlite::Connection,
-    name: &str,
-) -> Result<(), TableDropError> {
+pub(crate) fn table_drop(conn: &mut SQLiteConnection, name: &str) -> Result<(), TableDropError> {
     let ddl = format!("DROP TABLE \"{name}\";");
 
-    let res = conn.execute(&ddl, ());
+    let res = conn.inner.execute(&ddl, ());
     match res {
         Ok(_) => Ok(()),
         Err(e) if e.to_string().starts_with("no such table") => {

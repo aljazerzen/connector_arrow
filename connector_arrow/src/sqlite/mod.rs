@@ -5,27 +5,37 @@ mod query;
 mod schema;
 mod types;
 
-use crate::api::Connection;
-use crate::errors::ConnectorError;
-
 #[doc(hidden)]
 pub use append::SQLiteAppender;
-use arrow::datatypes::DataType;
 #[doc(hidden)]
 pub use query::SQLiteStatement;
 
-impl Connection for rusqlite::Connection {
+use crate::api::Connection;
+use crate::errors::ConnectorError;
+use arrow::datatypes::DataType;
+
+pub struct SQLiteConnection {
+    inner: rusqlite::Connection,
+}
+
+impl SQLiteConnection {
+    pub fn new(inner: rusqlite::Connection) -> Self {
+        Self { inner }
+    }
+}
+
+impl Connection for SQLiteConnection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
     type Append<'conn> = SQLiteAppender<'conn> where Self: 'conn;
 
     fn query(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
-        let stmt = rusqlite::Connection::prepare(self, query)?;
+        let stmt = self.inner.prepare(query)?;
         Ok(SQLiteStatement { stmt })
     }
 
     fn append<'a>(&'a mut self, table: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        let transaction = self.transaction()?;
+        let transaction = self.inner.transaction()?;
 
         SQLiteAppender::new(table.to_string(), transaction)
     }

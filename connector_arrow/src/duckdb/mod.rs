@@ -3,29 +3,43 @@
 mod append;
 mod schema;
 
+#[doc(hidden)]
+pub use append::DuckDBAppender;
+
 use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
-use duckdb::{Appender, Arrow};
 
 use std::sync::Arc;
 
 use crate::api::{Connection, ResultReader, Statement};
 use crate::errors::ConnectorError;
 
-impl Connection for duckdb::Connection {
+pub struct DuckDBConnection {
+    inner: duckdb::Connection,
+}
+
+impl DuckDBConnection {
+    pub fn new(inner: duckdb::Connection) -> Self {
+        Self { inner }
+    }
+}
+
+impl Connection for DuckDBConnection {
     type Stmt<'conn> = DuckDBStatement<'conn>
     where
         Self: 'conn;
 
-    type Append<'conn> = Appender<'conn> where Self: 'conn;
+    type Append<'conn> = DuckDBAppender<'conn> where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        let stmt = duckdb::Connection::prepare(self, query)?;
+        let stmt = self.inner.prepare(query)?;
 
         Ok(DuckDBStatement { stmt })
     }
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        Ok(self.appender(table_name)?)
+        Ok(DuckDBAppender {
+            inner: self.inner.appender(table_name)?,
+        })
     }
 
     fn coerce_type(ty: &DataType) -> Option<DataType> {
@@ -57,7 +71,7 @@ impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
 
 #[doc(hidden)]
 pub struct DuckDBReader<'stmt> {
-    arrow: Arrow<'stmt>,
+    arrow: duckdb::Arrow<'stmt>,
 }
 
 impl<'stmt> ResultReader<'stmt> for DuckDBReader<'stmt> {

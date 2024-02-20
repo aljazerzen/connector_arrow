@@ -14,18 +14,23 @@
 //!
 //! Example for SQLite:
 //! ```
-//! use connector_arrow::api::{Connection, Statement};
-//! use connector_arrow::arrow::record_batch::RecordBatch;
+//! # use connector_arrow::api::{Connection, Statement, ResultReader};
+//! # use connector_arrow::arrow::record_batch::RecordBatch;
+//! # use connector_arrow::arrow::datatypes::SchemaRef;
+//! # use connector_arrow::sqlite::SQLiteConnection;
 //!
 //! # fn main() -> Result<(), connector_arrow::ConnectorError> {
 //! // a regular rusqlite connection
-//! let mut conn = rusqlite::Connection::open_in_memory()?;
+//! let conn = rusqlite::Connection::open_in_memory()?;
 //!
-//! // provided by connector_arrow::api::Connection
+//! // wrap into connector_arrow connection
+//! let mut conn = SQLiteConnection::new(conn);
+//!
 //! let mut stmt = conn.query("SELECT 1 as a")?;
 //!
-//! // provided by connector_arrow::api::Statement
-//! let reader = stmt.start(())?;
+//! let mut reader = stmt.start(())?;
+//!
+//! let schema: SchemaRef = reader.get_schema()?;
 //!
 //! // reader implements Iterator<Item = Result<RecordBatch, _>>
 //! let batches: Vec<RecordBatch> = reader.collect::<Result<_, _>>()?;

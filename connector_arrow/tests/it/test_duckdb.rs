@@ -1,10 +1,11 @@
 use super::spec;
 use rstest::*;
 
-fn init() -> duckdb::Connection {
+fn init() -> connector_arrow::duckdb::DuckDBConnection {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    duckdb::Connection::open_in_memory().unwrap()
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    connector_arrow::duckdb::DuckDBConnection::new(conn)
 }
 
 #[test]

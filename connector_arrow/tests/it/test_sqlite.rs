@@ -1,10 +1,11 @@
 use super::spec;
 use rstest::*;
 
-fn init() -> rusqlite::Connection {
+fn init() -> connector_arrow::sqlite::SQLiteConnection {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    rusqlite::Connection::open_in_memory().unwrap()
+    let conn = rusqlite::Connection::open_in_memory().unwrap();
+    connector_arrow::sqlite::SQLiteConnection::new(conn)
 }
 
 #[test]
