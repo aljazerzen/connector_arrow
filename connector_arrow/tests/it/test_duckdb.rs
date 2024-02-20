@@ -11,30 +11,21 @@ fn query_01() {
 }
 
 #[test]
-fn roundtrip_basic_small() {
-    let table_name = "roundtrip_basic_small";
-    let file_name = "basic_small.parquet";
-
-    let mut conn = init();
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
-}
-
-#[test]
 fn roundtrip_empty() {
     let table_name = "roundtrip_empty";
-    let file_name = "empty.parquet";
 
     let mut conn = init();
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_empty();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn roundtrip_simple() {
-    let table_name = "roundtrip_simple";
+fn roundtrip_null_bool() {
+    let table_name = "roundtrip_null_bool";
 
     let mut conn = init();
-    let column_spec = super::generator::spec_simple();
-    super::tests::roundtrip_of_generated(&mut conn, table_name, column_spec);
+    let column_spec = super::generator::spec_null_bool();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
@@ -43,23 +34,23 @@ fn roundtrip_numeric() {
 
     let mut conn = init();
     let column_spec = super::generator::spec_numeric();
-    super::tests::roundtrip_of_generated(&mut conn, table_name, column_spec);
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn introspection_basic_small() {
-    let table_name = "introspection_basic_small";
-    let file_name = "basic_small.parquet";
+fn schema_get() {
+    let table_name = "schema_get";
 
     let mut conn = init();
-    super::tests::introspection(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_get(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn schema_edit_01() {
-    let table_name = "schema_edit_01";
-    let file_name = "basic_small.parquet";
+fn schema_edit() {
+    let table_name = "schema_edit";
 
     let mut conn = init();
-    super::tests::schema_edit(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_edit(&mut conn, table_name, column_spec);
 }

@@ -1,17 +1,13 @@
-use std::path::Path;
-
 use arrow::util::pretty::pretty_format_batches;
 use connector_arrow::{
     api::{Connection, ResultReader, SchemaEdit, SchemaGet, Statement},
+    util::coerce,
     TableCreateError, TableDropError,
 };
 use rand::SeedableRng;
 
+use crate::generator::{generate_batch, ColumnSpec};
 use crate::util::{load_into_table, query_table};
-use crate::{
-    generator::{generate_batch, ColumnSpec},
-    util::read_parquet,
-};
 
 #[track_caller]
 pub fn query_01<C: Connection>(conn: &mut C) {
@@ -28,59 +24,49 @@ pub fn query_01<C: Connection>(conn: &mut C) {
     );
 }
 
-pub fn roundtrip_of_parquet<C>(conn: &mut C, file_name: &str, table_name: &str)
-where
-    C: Connection + SchemaEdit,
-{
-    let file_path = Path::new("./tests/data/a").with_file_name(file_name);
-
-    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
-    let (schema_file, batches_file) =
-        load_into_table(conn, schema_file, batches_file, table_name).unwrap();
-    let (schema_query, batches_query) = query_table(conn, table_name).unwrap();
-    similar_asserts::assert_eq!(schema_file, schema_query);
-    similar_asserts::assert_eq!(batches_file, batches_query);
-}
-
-pub fn roundtrip_of_generated<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
+pub fn roundtrip<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
 where
     C: Connection + SchemaEdit,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
-    let batch = generate_batch(column_specs, &mut rng);
+    let (schema, batches) = generate_batch(column_specs, &mut rng);
 
-    let (_, batches_file) = load_into_table(conn, batch.schema(), vec![batch], table_name).unwrap();
+    load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
 
-    let (_, batches_query) = query_table(conn, table_name).unwrap();
+    let (schema_coerced, batches_coerced) =
+        coerce::coerce_batches(schema, &batches, C::coerce_type, Some(true)).unwrap();
 
-    similar_asserts::assert_eq!(batches_file, batches_query);
+    let (schema_query, batches_query) = query_table(conn, table_name).unwrap();
+
+    similar_asserts::assert_eq!(schema_coerced, schema_query);
+    similar_asserts::assert_eq!(batches_coerced, batches_query);
 }
 
-pub fn introspection<C>(conn: &mut C, file_name: &str, table_name: &str)
+pub fn schema_get<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
 where
     C: Connection + SchemaEdit + SchemaGet,
 {
-    let file_path = Path::new("./tests/data/a").with_file_name(file_name);
+    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
+    let (schema, batches) = generate_batch(column_specs, &mut rng);
 
-    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
-    let (schema_loaded, _) = load_into_table(conn, schema_file, batches_file, table_name).unwrap();
+    load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
+    let schema = coerce::coerce_schema(schema, &C::coerce_type, Some(false));
 
     let schema_introspection = conn.table_get(table_name).unwrap();
-    similar_asserts::assert_eq!(schema_loaded, schema_introspection);
+    let schema_introspection = coerce::coerce_schema(schema_introspection, |_| None, Some(false));
+    similar_asserts::assert_eq!(schema, schema_introspection);
 }
 
-pub fn schema_edit<C>(conn: &mut C, file_name: &str, table_name: &str)
+pub fn schema_edit<C>(conn: &mut C, table_name: &str, column_specs: Vec<ColumnSpec>)
 where
     C: Connection + SchemaEdit + SchemaGet,
 {
-    let file_path = Path::new("./tests/data/a").with_file_name(file_name);
-
-    let (schema_file, batches_file) = read_parquet(&file_path).unwrap();
-    let (schema, _) = load_into_table(conn, schema_file, batches_file, table_name).unwrap();
+    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
+    let (schema, _) = generate_batch(column_specs, &mut rng);
 
     let table_name2 = table_name.to_string() + "2";
 
-    let _ignore = conn.table_drop(&table_name2);
+    let _ = conn.table_drop(&table_name2);
 
     conn.table_create(&table_name2, schema.clone()).unwrap();
     assert!(matches!(
@@ -95,6 +81,7 @@ where
     ));
 }
 
+#[allow(dead_code)]
 pub fn streaming<C: Connection>(conn: &mut C) {
     let query = "
     WITH RECURSIVE t(n) AS (
@@ -123,4 +110,10 @@ pub fn streaming<C: Connection>(conn: &mut C) {
 
     // drop the reader and don't call next
     // this should not load anymore batches
+
+    // This should be quick and not load the full result.
+    // ... but I guess not - it takes a long time.
+    // ... I don't know why. Maybe my impl is wrong, but I cannot find a reason why.
+    // ... Maybe it is the postgres that hangs before returning the first result batch?
+    // ... Maybe it tries to return the full result and not in batches?
 }

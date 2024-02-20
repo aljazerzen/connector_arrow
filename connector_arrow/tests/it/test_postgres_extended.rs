@@ -19,56 +19,41 @@ fn query_01() {
 }
 
 #[test]
-fn roundtrip_basic_small() {
-    let table_name = "extended::roundtrip_basic_small";
-    let file_name = "basic_small.parquet";
-
-    let mut client = init();
-    let mut conn = wrap_conn(&mut client);
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
-}
-
-#[test]
 fn roundtrip_empty() {
     let table_name = "extended::roundtrip_empty";
-    let file_name = "empty.parquet";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_empty();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn introspection_basic_small() {
-    let table_name = "extended::introspection_basic_small";
-    let file_name = "basic_small.parquet";
+fn roundtrip_null_bool() {
+    let table_name = "extended::roundtrip_null_bool";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::introspection(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_null_bool();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn schema_edit_01() {
-    let table_name = "extended::schema_edit_01";
-    let file_name = "basic_small.parquet";
+fn schema_get() {
+    let table_name = "extended::schema_get";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::schema_edit(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_get(&mut conn, table_name, column_spec);
 }
 
 #[test]
-#[ignore]
-fn streaming() {
+fn schema_edit() {
+    let table_name = "extended::schema_edit";
+
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-
-    super::tests::streaming(&mut conn);
-
-    // This should be quick and not load the full result.
-    // ... but I guess not - it takes a long time.
-    // ... I don't know why. Maybe my impl is wrong, but I cannot find a reason why.
-    // ... Maybe it is the postgres that hangs before returning the first result batch?
-    // ... Maybe it tries to return the full result and not in batches?
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_edit(&mut conn, table_name, column_spec);
 }

@@ -19,41 +19,41 @@ fn query_01() {
 }
 
 #[test]
-fn roundtrip_basic_small() {
-    let table_name = "simple::roundtrip_basic_small";
-    let file_name = "basic_small.parquet";
-
-    let mut client = init();
-    let mut conn = wrap_conn(&mut client);
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
-}
-
-#[test]
 fn roundtrip_empty() {
     let table_name = "simple::roundtrip_empty";
-    let file_name = "empty.parquet";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::roundtrip_of_parquet(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_empty();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn introspection_basic_small() {
-    let table_name = "simple::introspection_basic_small";
-    let file_name = "basic_small.parquet";
+fn roundtrip_null_bool() {
+    let table_name = "simple::roundtrip_null_bool";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::introspection(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_null_bool();
+    super::tests::roundtrip(&mut conn, table_name, column_spec);
 }
 
 #[test]
-fn schema_edit_01() {
-    let table_name = "simple::schema_edit_01";
-    let file_name = "basic_small.parquet";
+fn schema_get() {
+    let table_name = "simple::schema_get";
 
     let mut client = init();
     let mut conn = wrap_conn(&mut client);
-    super::tests::schema_edit(&mut conn, file_name, table_name);
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_get(&mut conn, table_name, column_spec);
+}
+
+#[test]
+fn schema_edit() {
+    let table_name = "simple::schema_edit";
+
+    let mut client = init();
+    let mut conn = wrap_conn(&mut client);
+    let column_spec = super::generator::spec_all_types();
+    super::tests::schema_edit(&mut conn, table_name, column_spec);
 }

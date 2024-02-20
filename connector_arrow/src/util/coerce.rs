@@ -6,23 +6,32 @@ use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 
 pub fn coerce_batches<F>(
+    schema: SchemaRef,
     batches: &[RecordBatch],
     coerce_fn: F,
-) -> Result<Vec<RecordBatch>, arrow::error::ArrowError>
+    override_nullable: Option<bool>,
+) -> Result<(SchemaRef, Vec<RecordBatch>), arrow::error::ArrowError>
 where
     F: Fn(&DataType) -> Option<DataType> + Copy,
 {
-    batches.iter().map(|b| coerce_batch(b, coerce_fn)).collect()
+    let batches = batches
+        .iter()
+        .map(|b| coerce_batch(b, coerce_fn, override_nullable))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let schema = coerce_schema(schema, coerce_fn, override_nullable);
+    Ok((schema, batches))
 }
 
 pub fn coerce_batch<F>(
     batch: &RecordBatch,
     coerce_fn: F,
+    override_nullable: Option<bool>,
 ) -> Result<RecordBatch, arrow::error::ArrowError>
 where
     F: Fn(&DataType) -> Option<DataType> + Copy,
 {
-    let new_schema = coerce_schema(batch.schema(), coerce_fn);
+    let new_schema = coerce_schema(batch.schema(), coerce_fn, override_nullable);
 
     let new_columns = batch
         .columns()
@@ -47,7 +56,11 @@ where
     }
 }
 
-pub fn coerce_schema<F>(schema: SchemaRef, coerce_fn: F) -> SchemaRef
+pub fn coerce_schema<F>(
+    schema: SchemaRef,
+    coerce_fn: F,
+    override_nullable: Option<bool>,
+) -> SchemaRef
 where
     F: Fn(&DataType) -> Option<DataType> + Copy,
 {
@@ -55,9 +68,19 @@ where
         schema
             .fields()
             .iter()
-            .map(|f| match coerce_fn(f.data_type()) {
-                Some(new_ty) => Field::new(f.name(), new_ty, true),
-                None => Field::clone(f).with_nullable(true),
+            .map(|f| {
+                let field = match coerce_fn(f.data_type()) {
+                    Some(new_ty) => {
+                        let nullable = f.is_nullable() || matches!(f.data_type(), DataType::Null);
+                        Field::new(f.name(), new_ty, nullable)
+                    }
+                    None => Field::clone(f),
+                };
+                if let Some(nullable) = &override_nullable {
+                    field.with_nullable(*nullable)
+                } else {
+                    field
+                }
             })
             .collect_vec(),
     ))

@@ -4,7 +4,10 @@ use half::f16;
 use rand::Rng;
 use std::sync::Arc;
 
-pub fn generate_batch<R: Rng>(column_specs: Vec<ColumnSpec>, rng: &mut R) -> RecordBatch {
+pub fn generate_batch<R: Rng>(
+    column_specs: Vec<ColumnSpec>,
+    rng: &mut R,
+) -> (SchemaRef, Vec<RecordBatch>) {
     let mut arrays = Vec::new();
     let mut fields = Vec::new();
     for column in column_specs {
@@ -15,11 +18,70 @@ pub fn generate_batch<R: Rng>(column_specs: Vec<ColumnSpec>, rng: &mut R) -> Rec
         fields.push(field);
     }
     let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, arrays).unwrap()
+
+    let batch = RecordBatch::try_new(schema.clone(), arrays).unwrap();
+    if batch.num_rows() == 0 {
+        (schema, vec![])
+    } else {
+        (schema, vec![batch])
+    }
 }
 
-pub fn spec_simple() -> Vec<ColumnSpec> {
-    domains_to_batch_spec(&[DataType::Null, DataType::Boolean], &[false, true])
+pub fn spec_all_types() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Null,
+            DataType::Boolean,
+            // DataType::Int8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            // DataType::UInt8,
+            // DataType::UInt16,
+            // DataType::UInt32,
+            // DataType::UInt64,
+            // DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+            // DataType::Timestamp(TimeUnit::Nanosecond, None),
+            // DataType::Timestamp(TimeUnit::Microsecond, None),
+            // DataType::Timestamp(TimeUnit::Millisecond, None),
+            // DataType::Timestamp(TimeUnit::Second, None),
+            // DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("+07:30"))),
+            // DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("+07:30"))),
+            // DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("+07:30"))),
+            // DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
+            // DataType::Time32(TimeUnit::Millisecond),
+            // DataType::Time32(TimeUnit::Second),
+            // DataType::Time64(TimeUnit::Nanosecond),
+            // DataType::Time64(TimeUnit::Microsecond),
+            // DataType::Duration(TimeUnit::Nanosecond),
+            // DataType::Duration(TimeUnit::Microsecond),
+            // DataType::Duration(TimeUnit::Millisecond),
+            // DataType::Duration(TimeUnit::Second),
+            // DataType::Interval(IntervalUnit::YearMonth),
+            // DataType::Interval(IntervalUnit::MonthDayNano),
+            // DataType::Interval(IntervalUnit::DayTime),
+        ],
+        &[false, true],
+        &[ValueGenProcess::High],
+    )
+}
+
+pub fn spec_empty() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[DataType::Null, DataType::Int64, DataType::Float64],
+        &[false, true],
+        &[],
+    )
+}
+
+pub fn spec_null_bool() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[DataType::Null, DataType::Boolean],
+        &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
+    )
 }
 
 pub fn spec_numeric() -> Vec<ColumnSpec> {
@@ -38,6 +100,7 @@ pub fn spec_numeric() -> Vec<ColumnSpec> {
             DataType::Float64,
         ],
         &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 
@@ -54,10 +117,15 @@ pub fn spec_timestamp() -> Vec<ColumnSpec> {
             DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
         ],
         &[true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 pub fn spec_date() -> Vec<ColumnSpec> {
-    domains_to_batch_spec(&[DataType::Date32, DataType::Date64], &[true])
+    domains_to_batch_spec(
+        &[DataType::Date32, DataType::Date64],
+        &[true],
+        &VALUE_GEN_PROCESS_ALL,
+    )
 }
 pub fn spec_time() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
@@ -68,6 +136,7 @@ pub fn spec_time() -> Vec<ColumnSpec> {
             DataType::Time64(TimeUnit::Microsecond),
         ],
         &[true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 pub fn spec_duration() -> Vec<ColumnSpec> {
@@ -79,6 +148,7 @@ pub fn spec_duration() -> Vec<ColumnSpec> {
             DataType::Duration(TimeUnit::Second),
         ],
         &[true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 pub fn spec_interval() -> Vec<ColumnSpec> {
@@ -89,20 +159,15 @@ pub fn spec_interval() -> Vec<ColumnSpec> {
             DataType::Interval(IntervalUnit::DayTime),
         ],
         &[true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 
 pub fn domains_to_batch_spec(
     data_types_domain: &[DataType],
     is_nullable_domain: &[bool],
+    value_gen_process_domain: &[ValueGenProcess],
 ) -> Vec<ColumnSpec> {
-    let value_gen_process_domain = [
-        ValueGenProcess::Low,
-        ValueGenProcess::High,
-        ValueGenProcess::Null,
-        ValueGenProcess::RandomUniform,
-    ];
-
     let mut columns = Vec::new();
     for data_type in data_types_domain {
         for is_nullable in is_nullable_domain {
@@ -127,7 +192,7 @@ pub fn domains_to_batch_spec(
                     gen_process: if matches!(gen_process, ValueGenProcess::Null) && !is_nullable {
                         ValueGenProcess::RandomUniform
                     } else {
-                        gen_process
+                        *gen_process
                     },
                     repeat: 1,
                 });
@@ -139,12 +204,19 @@ pub fn domains_to_batch_spec(
 }
 
 #[derive(Clone, Copy)]
-enum ValueGenProcess {
+pub enum ValueGenProcess {
     Null,
     Low,
     High,
     RandomUniform,
 }
+
+const VALUE_GEN_PROCESS_ALL: [ValueGenProcess; 4] = [
+    ValueGenProcess::Low,
+    ValueGenProcess::High,
+    ValueGenProcess::Null,
+    ValueGenProcess::RandomUniform,
+];
 
 struct ValuesSpec {
     gen_process: ValueGenProcess,
