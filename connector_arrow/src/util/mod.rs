@@ -3,6 +3,7 @@
 
 mod arrow_reader;
 pub mod coerce;
+pub mod decimal;
 mod row_collect;
 mod row_reader;
 mod row_writer;

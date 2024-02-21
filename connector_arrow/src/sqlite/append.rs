@@ -126,6 +126,30 @@ impl ConsumeTy<NullType> for Vec<Value> {
     }
 }
 
+impl ConsumeTy<Decimal128Type> for Vec<Value> {
+    fn consume(&mut self, ty: &DataType, value: i128) {
+        self.push(Value::Text(crate::util::decimal::decimal128_to_string(
+            ty, value,
+        )));
+    }
+
+    fn consume_null(&mut self) {
+        self.push(Value::Null);
+    }
+}
+
+impl ConsumeTy<Decimal256Type> for Vec<Value> {
+    fn consume(&mut self, ty: &DataType, value: i256) {
+        self.push(Value::Text(crate::util::decimal::decimal256_to_string(
+            ty, value,
+        )));
+    }
+
+    fn consume_null(&mut self) {
+        self.push(Value::Null);
+    }
+}
+
 impl_consume_ty!(BooleanType, Value::Integer, i64::from);
 impl_consume_ty!(Int8Type, Value::Integer, i64::from);
 impl_consume_ty!(Int16Type, Value::Integer, i64::from);
@@ -164,8 +188,6 @@ impl_consume_unsupported!(
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        Decimal128Type,
-        Decimal256Type,
     )
 );
 

@@ -19,12 +19,14 @@
         dontCheckPython = drv: drv.overridePythonAttrs (old: { doCheck = false; });
 
         essentials = with pkgs; [
-          fenix_pkgs.stable.cargo
-          fenix_pkgs.stable.clippy
-          fenix_pkgs.stable.rust-src
-          fenix_pkgs.stable.rustc
-          fenix_pkgs.stable.rustfmt
-          fenix_pkgs.stable.rust-analyzer
+          (fenix_pkgs.complete.withComponents [
+            "cargo"
+            "clippy"
+            "rust-src"
+            "rustc"
+            "rustfmt"
+            "rust-analyzer"
+          ])
           clang
 
           # tools
@@ -50,6 +52,9 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = essentials ++ dbs;
+
+          # linking duckdb needs this
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
       });
 }

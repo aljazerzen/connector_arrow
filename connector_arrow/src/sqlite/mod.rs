@@ -59,6 +59,8 @@ impl Connection for SQLiteConnection {
             DataType::LargeBinary => Some(DataType::LargeBinary),
             DataType::Utf8 => Some(DataType::LargeUtf8),
             DataType::LargeUtf8 => Some(DataType::LargeUtf8),
+            DataType::Decimal128(_, _) => Some(DataType::LargeUtf8),
+            DataType::Decimal256(_, _) => Some(DataType::LargeUtf8),
             _ => None,
         }
     }
