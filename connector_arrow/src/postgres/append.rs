@@ -11,6 +11,7 @@ use postgres_protocol::types as postgres_proto;
 
 use crate::api::Append;
 use crate::types::{FixedSizeBinaryType, NullType};
+use crate::util::escape::escaped_ident;
 use crate::util::transport::{Consume, ConsumeTy};
 use crate::util::ArrayCellRef;
 use crate::{impl_consume_unsupported, ConnectorError};
@@ -23,7 +24,7 @@ pub struct PostgresAppender<'c> {
 
 impl<'conn> PostgresAppender<'conn> {
     pub fn new(client: &'conn mut Client, table_name: &str) -> Result<Self, ConnectorError> {
-        let query = format!("COPY BINARY \"{table_name}\" FROM stdin");
+        let query = format!("COPY BINARY {} FROM stdin", escaped_ident(table_name));
         let writer = client.copy_in(&query).map_err(PostgresError::Postgres)?;
         let writer = Writer::Uninitialized(writer);
         Ok(Self { writer })

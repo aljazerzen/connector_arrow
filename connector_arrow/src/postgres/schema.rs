@@ -6,6 +6,7 @@ use postgres::error::SqlState;
 use postgres::types::Type;
 
 use crate::api::{SchemaEdit, SchemaGet};
+use crate::util::escape::escaped_ident;
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
 use super::PostgresError;
@@ -74,11 +75,12 @@ impl<P> SchemaEdit for super::PostgresConnection<P> {
                     field.is_nullable() || matches!(field.data_type(), DataType::Null);
                 let not_null = if is_nullable { "" } else { " NOT NULL" };
 
-                format!("\"{}\" {}{}", field.name(), ty, not_null)
+                let name = escaped_ident(field.name());
+                format!("{name} {ty}{not_null}",)
             })
             .join(",");
 
-        let ddl = format!("CREATE TABLE \"{name}\" ({column_defs});");
+        let ddl = format!("CREATE TABLE {} ({column_defs});", escaped_ident(name));
 
         let res = self.client.execute(&ddl, &[]);
         match res {
@@ -93,7 +95,8 @@ impl<P> SchemaEdit for super::PostgresConnection<P> {
     }
 
     fn table_drop(&mut self, name: &str) -> Result<(), TableDropError> {
-        let res = self.client.execute(&format!("DROP TABLE \"{name}\""), &[]);
+        let ddl = format!("DROP TABLE {}", escaped_ident(name));
+        let res = self.client.execute(&ddl, &[]);
 
         match res {
             Ok(_) => Ok(()),

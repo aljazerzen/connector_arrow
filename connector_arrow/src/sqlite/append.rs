@@ -7,6 +7,7 @@ use rusqlite::{params_from_iter, Transaction};
 
 use crate::impl_consume_unsupported;
 use crate::types::{FixedSizeBinaryType, NullType};
+use crate::util::escape::escaped_ident;
 use crate::util::transport;
 use crate::util::transport::{Consume, ConsumeTy};
 use crate::util::ArrayCellRef;
@@ -67,7 +68,7 @@ fn insert_query(table_name: &str, cols: usize, rows: usize) -> String {
         })
         .join(",");
 
-    format!("INSERT INTO \"{table_name}\" VALUES {values}")
+    format!("INSERT INTO {} VALUES {values}", escaped_ident(table_name))
 }
 
 fn collect_args(batch: &RecordBatch, rows_range: std::ops::Range<usize>) -> Vec<Value> {

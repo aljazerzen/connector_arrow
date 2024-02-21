@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
+use arrow::array::{ArrayRef, Int64Builder, RecordBatch};
+use arrow::datatypes::{Field, Schema};
 use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::{
-    api::{Connection, ResultReader, SchemaEdit, SchemaGet, Statement},
-    util::coerce,
-    TableCreateError, TableDropError,
-};
+use connector_arrow::api::{Append, Connection, ResultReader, SchemaEdit, SchemaGet, Statement};
+use connector_arrow::{util::coerce, TableCreateError, TableDropError};
 use rand::SeedableRng;
 
 use crate::util::{load_into_table, query_table};
@@ -96,6 +97,39 @@ where
         conn.table_drop(&table_name2).unwrap_err(),
         TableDropError::TableNonexistent
     ));
+}
+
+pub fn ident_escaping<C>(conn: &mut C, table_name_prefix: &str)
+where
+    C: Connection + SchemaEdit + SchemaGet,
+{
+    let gibberish = r#"--"'--''!""@"""$#'''%^&*()_+?><\"\""#;
+    let table_name = table_name_prefix.to_string() + gibberish;
+    let _ = conn.table_drop(&table_name);
+
+    // table_create
+    let field = Field::new(gibberish, arrow::datatypes::DataType::Int64, false);
+    let schema = Arc::new(Schema::new(vec![field]));
+    conn.table_create(&table_name, schema.clone()).unwrap();
+
+    // table_list
+    let tables = conn.table_list().unwrap();
+    assert!(tables.contains(&table_name));
+
+    // table_get
+    let schema_introspections = conn.table_get(&table_name).unwrap();
+
+    // append
+    let mut appender = conn.append(&table_name).unwrap();
+    let batch = {
+        let mut builder = Int64Builder::new();
+        builder.append_value(1);
+        let array = Arc::new(builder.finish()) as ArrayRef;
+        RecordBatch::try_new(schema.clone(), vec![array]).unwrap()
+    };
+    appender.append(batch).unwrap();
+
+    similar_asserts::assert_eq!(schema, schema_introspections);
 }
 
 #[allow(dead_code)]

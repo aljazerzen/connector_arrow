@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::api::{SchemaEdit, SchemaGet};
 use crate::errors::{ConnectorError, TableCreateError, TableDropError};
+use crate::util::escape::escaped_ident;
 
 use super::types::{self, ty_from_arrow};
 use super::SQLiteConnection;
@@ -26,7 +27,7 @@ impl SchemaGet for SQLiteConnection {
         &mut self,
         table_name: &str,
     ) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
-        let query_columns = format!("PRAGMA table_info(\"{}\");", table_name);
+        let query_columns = format!("PRAGMA table_info({});", escaped_ident(table_name));
         let mut statement = self.inner.prepare(&query_columns)?;
         let mut columns_res = statement.query(())?;
         // contains columns: cid, name, type, notnull, dflt_value, pk
@@ -68,11 +69,12 @@ pub(crate) fn table_create(
 
             let not_null = if field.is_nullable() { "" } else { " NOT NULL" };
 
-            format!("\"{}\" {}{}", field.name(), ty, not_null)
+            let name = escaped_ident(field.name());
+            format!("{name} {ty}{not_null}")
         })
         .join(",");
 
-    let ddl = format!("CREATE TABLE \"{name}\" ({column_defs});");
+    let ddl = format!("CREATE TABLE {} ({column_defs});", escaped_ident(name));
 
     let res = conn.inner.execute(&ddl, ());
     match res {
@@ -83,7 +85,7 @@ pub(crate) fn table_create(
 }
 
 pub(crate) fn table_drop(conn: &mut SQLiteConnection, name: &str) -> Result<(), TableDropError> {
-    let ddl = format!("DROP TABLE \"{name}\";");
+    let ddl = format!("DROP TABLE {};", escaped_ident(name));
 
     let res = conn.inner.execute(&ddl, ());
     match res {
