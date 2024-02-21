@@ -82,7 +82,7 @@ impl SchemaEdit for DuckDBConnection {
 fn ty_from_arrow(data_type: &DataType) -> &'static str {
     match data_type {
         // there is no Null type in DuckDB, so we fallback to some other type that is nullable
-        DataType::Null => "int64",
+        DataType::Null => "BIGINT",
 
         DataType::Boolean => "BOOLEAN",
         DataType::Int8 => "TINYINT",
@@ -103,11 +103,11 @@ fn ty_from_arrow(data_type: &DataType) -> &'static str {
         DataType::Time64(_) => unimplemented!(),
         DataType::Duration(_) => unimplemented!(),
         DataType::Interval(_) => unimplemented!(),
-        DataType::Binary => "blob",
-        DataType::FixedSizeBinary(_) => "blob",
-        DataType::LargeBinary => "blob",
-        DataType::Utf8 => "text",
-        DataType::LargeUtf8 => "text",
+        DataType::Binary => "BLOB",
+        DataType::FixedSizeBinary(_) => "BLOB",
+        DataType::LargeBinary => "BLOB",
+        DataType::Utf8 => "VARCHAR",
+        DataType::LargeUtf8 => "VARCHAR",
         DataType::List(_) => unimplemented!(),
         DataType::FixedSizeList(_, _) => unimplemented!(),
         DataType::LargeList(_) => unimplemented!(),

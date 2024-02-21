@@ -26,7 +26,9 @@ fn query_02() {
 #[rstest]
 #[case::empty("simple::roundtrip::empty", spec::empty())]
 #[case::null_bool("simple::roundtrip::null_bool", spec::null_bool())]
-#[case::numeric("simple::roundtrip::numeric", spec::numeric())]
+#[case::int("simple::roundtrip::int", spec::int())]
+#[case::uint("simple::roundtrip::uint", spec::uint())]
+#[case::float("simple::roundtrip::float", spec::float())]
 #[case::decimal("simple::roundtrip::decimal", spec::decimal())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();

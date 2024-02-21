@@ -79,8 +79,8 @@ pub fn ty_from_arrow(ty: &DataType) -> &'static str {
         DataType::Struct(_) => unimplemented!(),
         DataType::Union(_, _) => unimplemented!(),
         DataType::Dictionary(_, _) => unimplemented!(),
-        DataType::Decimal128(_, _) => unimplemented!(),
-        DataType::Decimal256(_, _) => unimplemented!(),
+        DataType::Decimal128(_, _) => "TEXT",
+        DataType::Decimal256(_, _) => "TEXT",
         DataType::Map(_, _) => unimplemented!(),
         DataType::RunEndEncoded(_, _) => unimplemented!(),
     }
