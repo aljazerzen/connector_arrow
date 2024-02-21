@@ -162,6 +162,20 @@ impl_consume_ty!(UInt32Type, Value::Integer, i64::from);
 impl_consume_ty!(UInt64Type, Value::Text, u64_to_string);
 impl_consume_ty!(Float16Type, Value::Real, f64::from);
 impl_consume_ty!(Float32Type, Value::Real, f64::from);
+impl_consume_ty!(TimestampSecondType, Value::Integer);
+impl_consume_ty!(TimestampMillisecondType, Value::Integer);
+impl_consume_ty!(TimestampMicrosecondType, Value::Integer);
+impl_consume_ty!(TimestampNanosecondType, Value::Integer);
+impl_consume_ty!(Date32Type, Value::Integer, i64::from);
+impl_consume_ty!(Date64Type, Value::Integer);
+impl_consume_ty!(Time32SecondType, Value::Integer, i64::from);
+impl_consume_ty!(Time32MillisecondType, Value::Integer, i64::from);
+impl_consume_ty!(Time64MicrosecondType, Value::Integer);
+impl_consume_ty!(Time64NanosecondType, Value::Integer);
+impl_consume_ty!(DurationSecondType, Value::Integer);
+impl_consume_ty!(DurationMillisecondType, Value::Integer);
+impl_consume_ty!(DurationMicrosecondType, Value::Integer);
+impl_consume_ty!(DurationNanosecondType, Value::Integer);
 impl_consume_ty!(Float64Type, Value::Real);
 impl_consume_ty!(BinaryType, Value::Blob);
 impl_consume_ty!(LargeBinaryType, Value::Blob);
@@ -172,23 +186,9 @@ impl_consume_ty!(LargeUtf8Type, Value::Text);
 impl_consume_unsupported!(
     Vec<Value>,
     (
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampMicrosecondType,
-        TimestampNanosecondType,
-        Date32Type,
-        Date64Type,
-        Time32SecondType,
-        Time32MillisecondType,
-        Time64MicrosecondType,
-        Time64NanosecondType,
         IntervalYearMonthType,
         IntervalDayTimeType,
         IntervalMonthDayNanoType,
-        DurationSecondType,
-        DurationMillisecondType,
-        DurationMicrosecondType,
-        DurationNanosecondType,
     )
 );
 

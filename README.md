@@ -36,7 +36,7 @@ without need for dynamic linking of C libraries.
 | Dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) |
 | Query | x | x | x |
 | Query params |  |  |  |
-| Temporal types |  | x |  |
+| Temporal types | x | x |  |
 | Container types |  | x |  |
 | Schema get | x | x | x |
 | Schema edit | x | x | x |

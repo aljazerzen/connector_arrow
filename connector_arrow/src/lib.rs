@@ -5,9 +5,8 @@
 //!
 //! Capabilities:
 //! - **Query**: Query databases and retrieve results in Apache Arrow format.
-//! - **Query Parameters**: Utilize Arrow type system for query parameters.
-//! - **Streaming**: Receive results as a stream of [arrow::record_batch::RecordBatch] (WIP).
-//! - **Temporal and Container Types**: Correctly handles temporal and container types accurately (WIP).
+//! - **Query Parameters**: Utilize Arrow type system for query parameters (WIP).
+//! - **Temporal and Container Types**: Correctly handles temporal and container types (WIP).
 //! - **Schema Introspection**: Query the database for schema of specific tables.
 //! - **Schema Migration**: Basic schema migration commands.
 //! - **Append**: Write [arrow::record_batch::RecordBatch] into database tables.

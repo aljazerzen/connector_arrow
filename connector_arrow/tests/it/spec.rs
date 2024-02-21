@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use arrow::datatypes::*;
 use std::sync::Arc;
 
@@ -144,7 +146,6 @@ pub fn decimal() -> Vec<ColumnSpec> {
     )
 }
 
-#[allow(dead_code)]
 pub fn timestamp() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[
@@ -168,7 +169,6 @@ pub fn timestamp() -> Vec<ColumnSpec> {
     )
 }
 
-#[allow(dead_code)]
 pub fn date() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[DataType::Date32, DataType::Date64],
@@ -177,7 +177,6 @@ pub fn date() -> Vec<ColumnSpec> {
     )
 }
 
-#[allow(dead_code)]
 pub fn time() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[
@@ -191,7 +190,6 @@ pub fn time() -> Vec<ColumnSpec> {
     )
 }
 
-#[allow(dead_code)]
 pub fn duration() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[

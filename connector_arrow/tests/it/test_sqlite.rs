@@ -21,6 +21,10 @@ fn query_01() {
 #[case::uint("roundtrip::uint", spec::uint())]
 #[case::float("roundtrip::float", spec::float())]
 #[case::decimal("roundtrip::decimal", spec::decimal())]
+#[case::timestamp("roundtrip::timestamp", spec::timestamp())]
+#[case::date("roundtrip::date", spec::date())]
+#[case::time("roundtrip::time", spec::time())]
+#[case::duration("roundtrip::duration", spec::duration())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     super::tests::roundtrip(&mut conn, table_name, spec);

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use arrow::array::{Array, ArrayRef, AsArray, Float32Builder, Float64Builder};
 use arrow::datatypes::{DataType, Field, Float16Type, Schema, SchemaRef};
+use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 
@@ -50,6 +51,7 @@ where
         Some(new_ty) => match (array.data_type(), &new_ty) {
             (DataType::Float16, DataType::Float32) => Ok(coerce_float_16_to_32(&array)),
             (DataType::Float16, DataType::Float64) => Ok(coerce_float_16_to_64(&array)),
+            (DataType::Time32(_), DataType::Int64) => coerce_time32_to_int64(&array),
             _ => arrow::compute::cast(&array, &new_ty),
         },
         None => Ok(array),
@@ -116,4 +118,9 @@ fn coerce_float_16_to_64(array: &dyn Array) -> ArrayRef {
         }
     }
     Arc::new(builder.finish()) as ArrayRef
+}
+
+fn coerce_time32_to_int64(array: &dyn Array) -> Result<ArrayRef, ArrowError> {
+    let array = arrow::compute::cast(array, &DataType::Int32)?;
+    arrow::compute::cast(&array, &DataType::Int64)
 }
