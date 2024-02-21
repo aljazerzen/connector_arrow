@@ -114,7 +114,7 @@ where
             DataType::UInt8 => Some(DataType::Int16),
             DataType::UInt16 => Some(DataType::Int32),
             DataType::UInt32 => Some(DataType::Int64),
-            DataType::UInt64 => Some(DataType::Decimal128(20, 0)),
+            DataType::UInt64 => Some(DataType::Utf8),
             DataType::Float16 => Some(DataType::Float32),
             DataType::Utf8 => Some(DataType::LargeUtf8),
             DataType::Decimal128(_, _) => Some(DataType::Utf8),

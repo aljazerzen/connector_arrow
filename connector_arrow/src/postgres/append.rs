@@ -185,7 +185,6 @@ impl_consume_ty!(Int64Type, postgres_proto::int8_to_sql);
 impl_consume_ty!(UInt8Type, postgres_proto::int2_to_sql, i16::from);
 impl_consume_ty!(UInt16Type, postgres_proto::int4_to_sql, i32::from);
 impl_consume_ty!(UInt32Type, postgres_proto::int8_to_sql, i64::from);
-// impl_consume_ty!(UInt64Type,  );
 impl_consume_ty!(Float16Type, postgres_proto::float4_to_sql, f32::from);
 impl_consume_ty!(Float32Type, postgres_proto::float4_to_sql);
 impl_consume_ty!(Float64Type, postgres_proto::float8_to_sql);
@@ -211,6 +210,15 @@ impl_consume_ref_ty!(LargeBinaryType, postgres_proto::bytea_to_sql);
 impl_consume_ref_ty!(FixedSizeBinaryType, postgres_proto::bytea_to_sql);
 impl_consume_ref_ty!(Utf8Type, postgres_proto::text_to_sql);
 impl_consume_ref_ty!(LargeUtf8Type, postgres_proto::text_to_sql);
+
+impl ConsumeTy<UInt64Type> for BytesMut {
+    fn consume(&mut self, _ty: &DataType, value: u64) {
+        // this is inefficient, we'd need a special u64_to_sql function
+        super::decimal::i128_to_sql(value as i128, 0, self)
+    }
+
+    fn consume_null(&mut self) {}
+}
 
 impl ConsumeTy<Decimal128Type> for BytesMut {
     fn consume(&mut self, ty: &DataType, value: i128) {
@@ -239,7 +247,6 @@ impl ConsumeTy<Decimal256Type> for BytesMut {
 impl_consume_unsupported!(
     BytesMut,
     (
-        UInt64Type,
         TimestampSecondType,
         TimestampMillisecondType,
         TimestampNanosecondType,

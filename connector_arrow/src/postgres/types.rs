@@ -63,7 +63,7 @@ pub(crate) fn arrow_ty_to_pg(data_type: &ArrowType) -> String {
         ArrowType::UInt8 => "INT2".into(),
         ArrowType::UInt16 => "INT4".into(),
         ArrowType::UInt32 => "INT8".into(),
-        // ArrowType::UInt64 => "DECIMAL(20, 0)".into(),
+        ArrowType::UInt64 => "NUMERIC(20, 0)".into(),
         ArrowType::Float16 => "FLOAT4".into(),
         ArrowType::Float32 => "FLOAT4".into(),
         ArrowType::Float64 => "FLOAT8".into(),

@@ -44,7 +44,7 @@ pub fn all_types() -> Vec<ColumnSpec> {
             DataType::UInt8,
             DataType::UInt16,
             DataType::UInt32,
-            // DataType::UInt64,
+            DataType::UInt64,
             DataType::Float16,
             DataType::Float32,
             DataType::Float64,
@@ -108,7 +108,7 @@ pub fn uint() -> Vec<ColumnSpec> {
             DataType::UInt8,
             DataType::UInt16,
             DataType::UInt32,
-            // DataType::UInt64,
+            DataType::UInt64,
         ],
         &[false, true],
         &VALUE_GEN_PROCESS_ALL,
@@ -127,8 +127,8 @@ pub fn decimal() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[
             DataType::Decimal128(15, 4),
-            // DataType::Decimal128(Decimal128Type::MAX_PRECISION, 0),
-            // DataType::Decimal128(Decimal128Type::MAX_PRECISION, Decimal128Type::MAX_SCALE),
+            DataType::Decimal128(Decimal128Type::MAX_PRECISION, 0),
+            DataType::Decimal128(Decimal128Type::MAX_PRECISION, Decimal128Type::MAX_SCALE),
             DataType::Decimal256(45, 12),
             DataType::Decimal256(Decimal256Type::MAX_PRECISION, 0),
             DataType::Decimal256(Decimal256Type::MAX_PRECISION, Decimal256Type::MAX_SCALE),
