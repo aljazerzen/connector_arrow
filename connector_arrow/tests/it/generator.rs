@@ -180,11 +180,43 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 rng.gen::<f64>() // TODO: this is standard instead of uniform
             ]
         }
-        DataType::Timestamp(_, _) => {
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            gen_array![
+                values,
+                TimestampNanosecondBuilder::with_capacity(capacity)
+                    .with_data_type(data_type.clone()),
+                i64::MIN,
+                i64::MAX,
+                i64::ZERO,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ]
+        }
+        DataType::Timestamp(TimeUnit::Microsecond, _) => {
             gen_array![
                 values,
                 TimestampMicrosecondBuilder::with_capacity(capacity)
                     .with_data_type(data_type.clone()),
+                i64::MIN,
+                i64::MAX,
+                i64::ZERO,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ]
+        }
+        DataType::Timestamp(TimeUnit::Millisecond, _) => {
+            gen_array![
+                values,
+                TimestampMillisecondBuilder::with_capacity(capacity)
+                    .with_data_type(data_type.clone()),
+                i64::MIN,
+                i64::MAX,
+                i64::ZERO,
+                rng.gen_range(i64::MIN..=i64::MAX)
+            ]
+        }
+        DataType::Timestamp(TimeUnit::Second, _) => {
+            gen_array![
+                values,
+                TimestampSecondBuilder::with_capacity(capacity).with_data_type(data_type.clone()),
                 i64::MIN,
                 i64::MAX,
                 i64::ZERO,

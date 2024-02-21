@@ -6,7 +6,7 @@ mod schema;
 #[doc(hidden)]
 pub use append::DuckDBAppender;
 
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, TimeUnit};
 use arrow::record_batch::RecordBatch;
 
 use std::sync::Arc;
@@ -46,6 +46,16 @@ impl Connection for DuckDBConnection {
         match ty {
             DataType::Null => Some(DataType::Int64),
             DataType::Float16 => Some(DataType::Float32),
+
+            // timezone cannot be retained in the schema
+            DataType::Timestamp(TimeUnit::Microsecond, _) => {
+                Some(DataType::Timestamp(TimeUnit::Microsecond, None))
+            }
+
+            // timestamps are all converted to microseconds, so all other units
+            // overflow or lose precision, which counts as information loss.
+            // this means that we have to store them as just int64.
+            DataType::Timestamp(_, _) => Some(DataType::Int64),
             _ => None,
         }
     }

@@ -52,7 +52,19 @@ fn convert_value(arr: &dyn Array, i: usize) -> Value {
         DataType::Float16 => Value::Float(arr.as_primitive::<Float16Type>().value(i).to_f32()),
         DataType::Float32 => Value::Float(arr.as_primitive::<Float32Type>().value(i)),
         DataType::Float64 => Value::Double(arr.as_primitive::<Float64Type>().value(i)),
-        DataType::Timestamp(_, _) => unimplemented!(),
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            Value::BigInt(arr.as_primitive::<TimestampNanosecondType>().value(i))
+        }
+        DataType::Timestamp(TimeUnit::Microsecond, _) => Value::Timestamp(
+            duckdb::types::TimeUnit::Microsecond,
+            arr.as_primitive::<TimestampMicrosecondType>().value(i),
+        ),
+        DataType::Timestamp(TimeUnit::Millisecond, _) => {
+            Value::BigInt(arr.as_primitive::<TimestampMillisecondType>().value(i))
+        }
+        DataType::Timestamp(TimeUnit::Second, _) => {
+            Value::BigInt(arr.as_primitive::<TimestampSecondType>().value(i))
+        }
         DataType::Date32 => unimplemented!(),
         DataType::Date64 => unimplemented!(),
         DataType::Time32(_) => unimplemented!(),

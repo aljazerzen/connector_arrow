@@ -1,4 +1,4 @@
-use arrow::datatypes::{DataType, SchemaRef};
+use arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use itertools::Itertools;
 
 use crate::api::{SchemaEdit, SchemaGet};
@@ -98,7 +98,10 @@ fn ty_from_arrow(data_type: &DataType) -> &'static str {
         DataType::Float16 => "REAL",
         DataType::Float32 => "REAL",
         DataType::Float64 => "DOUBLE",
-        DataType::Timestamp(_, _) => unimplemented!(),
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => "BIGINT",
+        DataType::Timestamp(TimeUnit::Microsecond, _) => "TIMESTAMP",
+        DataType::Timestamp(TimeUnit::Millisecond, _) => "BIGINT",
+        DataType::Timestamp(TimeUnit::Second, _) => "BIGINT",
         DataType::Date32 => unimplemented!(),
         DataType::Date64 => unimplemented!(),
         DataType::Time32(_) => unimplemented!(),

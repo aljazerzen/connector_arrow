@@ -158,7 +158,13 @@ pub fn timestamp() -> Vec<ColumnSpec> {
             DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
         ],
         &[true],
-        &VALUE_GEN_PROCESS_ALL,
+        &[
+            ValueGenProcess::Low,
+            ValueGenProcess::High,
+            ValueGenProcess::Unit,
+            ValueGenProcess::Null,
+            ValueGenProcess::RandomUniform,
+        ],
     )
 }
 
