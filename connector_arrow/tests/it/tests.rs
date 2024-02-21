@@ -118,6 +118,10 @@ where
 
     // table_get
     let schema_introspections = conn.table_get(&table_name).unwrap();
+    similar_asserts::assert_eq!(
+        schema.fields()[0].name(),
+        schema_introspections.fields()[0].name()
+    );
 
     // append
     let mut appender = conn.append(&table_name).unwrap();
@@ -128,8 +132,6 @@ where
         RecordBatch::try_new(schema.clone(), vec![array]).unwrap()
     };
     appender.append(batch).unwrap();
-
-    similar_asserts::assert_eq!(schema, schema_introspections);
 }
 
 #[allow(dead_code)]

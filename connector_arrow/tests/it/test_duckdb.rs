@@ -41,3 +41,11 @@ fn schema_edit() {
     let mut conn = init();
     super::tests::schema_edit(&mut conn, table_name, spec::all_types());
 }
+
+#[test]
+fn ident_escaping() {
+    let table_name = "simple::ident_escaping";
+
+    let mut conn = init();
+    super::tests::ident_escaping(&mut conn, table_name);
+}

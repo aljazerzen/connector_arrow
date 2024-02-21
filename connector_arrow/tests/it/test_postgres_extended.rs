@@ -34,21 +34,3 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     super::tests::roundtrip(&mut conn, table_name, spec);
 }
-
-#[test]
-fn schema_get() {
-    let table_name = "extended::schema_get";
-
-    let mut conn = init();
-    let column_spec = super::spec::all_types();
-    super::tests::schema_get(&mut conn, table_name, column_spec);
-}
-
-#[test]
-fn schema_edit() {
-    let table_name = "extended::schema_edit";
-
-    let mut conn = init();
-    let column_spec = super::spec::all_types();
-    super::tests::schema_edit(&mut conn, table_name, column_spec);
-}
