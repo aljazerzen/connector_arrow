@@ -7,6 +7,7 @@ use itertools::{zip_eq, Itertools};
 use postgres::binary_copy::BinaryCopyInWriter;
 use postgres::types::{to_sql_checked, IsNull, ToSql};
 use postgres::{Client, CopyInWriter};
+use postgres_protocol::types as postgres_proto;
 
 use crate::api::Append;
 use crate::types::{FixedSizeBinaryType, NullType};
@@ -135,14 +136,18 @@ impl<'a> ToSql for ArrayCellRef<'a> {
 impl Consume for BytesMut {}
 
 macro_rules! impl_consume_ty {
-    ($ArrTy: ty, $to_sql: ident) => {
+    ($ArrTy: ty, $to_sql: expr) => {
         impl_consume_ty!($ArrTy, $to_sql, std::convert::identity);
     };
 
-    ($ArrTy: ty, $to_sql: ident, $conversion: expr) => {
+    ($ArrTy: ty, $to_sql: expr, $conversion: expr) => {
         impl ConsumeTy<$ArrTy> for BytesMut {
-            fn consume(&mut self, value: <$ArrTy as crate::types::ArrowType>::Native) {
-                postgres_protocol::types::$to_sql(($conversion)(value), self);
+            fn consume(
+                &mut self,
+                _ty: &DataType,
+                value: <$ArrTy as crate::types::ArrowType>::Native,
+            ) {
+                $to_sql(($conversion)(value), self);
             }
 
             fn consume_null(&mut self) {}
@@ -151,10 +156,14 @@ macro_rules! impl_consume_ty {
 }
 
 macro_rules! impl_consume_ref_ty {
-    ($ArrTy: ty, $to_sql: ident) => {
+    ($ArrTy: ty, $to_sql: expr) => {
         impl ConsumeTy<$ArrTy> for BytesMut {
-            fn consume(&mut self, value: <$ArrTy as crate::types::ArrowType>::Native) {
-                postgres_protocol::types::$to_sql(&value, self);
+            fn consume(
+                &mut self,
+                _ty: &DataType,
+                value: <$ArrTy as crate::types::ArrowType>::Native,
+            ) {
+                $to_sql(&value, self);
             }
 
             fn consume_null(&mut self) {}
@@ -163,32 +172,32 @@ macro_rules! impl_consume_ref_ty {
 }
 
 impl ConsumeTy<NullType> for BytesMut {
-    fn consume(&mut self, _: ()) {}
+    fn consume(&mut self, _ty: &DataType, _: ()) {}
 
     fn consume_null(&mut self) {}
 }
 
-impl_consume_ty!(BooleanType, bool_to_sql);
-impl_consume_ty!(Int8Type, int2_to_sql, i16::from);
-impl_consume_ty!(Int16Type, int2_to_sql);
-impl_consume_ty!(Int32Type, int4_to_sql);
-impl_consume_ty!(Int64Type, int8_to_sql);
-impl_consume_ty!(UInt8Type, int2_to_sql, i16::from);
-impl_consume_ty!(UInt16Type, int4_to_sql, i32::from);
-impl_consume_ty!(UInt32Type, int8_to_sql, i64::from);
+impl_consume_ty!(BooleanType, postgres_proto::bool_to_sql);
+impl_consume_ty!(Int8Type, postgres_proto::int2_to_sql, i16::from);
+impl_consume_ty!(Int16Type, postgres_proto::int2_to_sql);
+impl_consume_ty!(Int32Type, postgres_proto::int4_to_sql);
+impl_consume_ty!(Int64Type, postgres_proto::int8_to_sql);
+impl_consume_ty!(UInt8Type, postgres_proto::int2_to_sql, i16::from);
+impl_consume_ty!(UInt16Type, postgres_proto::int4_to_sql, i32::from);
+impl_consume_ty!(UInt32Type, postgres_proto::int8_to_sql, i64::from);
 // impl_consume_ty!(UInt64Type,  );
-impl_consume_ty!(Float16Type, float4_to_sql, f32::from);
-impl_consume_ty!(Float32Type, float4_to_sql);
-impl_consume_ty!(Float64Type, float8_to_sql);
+impl_consume_ty!(Float16Type, postgres_proto::float4_to_sql, f32::from);
+impl_consume_ty!(Float32Type, postgres_proto::float4_to_sql);
+impl_consume_ty!(Float64Type, postgres_proto::float8_to_sql);
 // impl_consume_ty!(TimestampSecondType,  );
 // impl_consume_ty!(TimestampMillisecondType,  );
-impl_consume_ty!(TimestampMicrosecondType, timestamp_to_sql);
+impl_consume_ty!(TimestampMicrosecondType, postgres_proto::timestamp_to_sql);
 // impl_consume_ty!(TimestampNanosecondType,  );
 // impl_consume_ty!(Date32Type, date_to_sql);
 // impl_consume_ty!(Date64Type, date_to_sql);
 // impl_consume_ty!(Time32SecondType,  );
 // impl_consume_ty!(Time32MillisecondType,  );
-impl_consume_ty!(Time64MicrosecondType, time_to_sql);
+impl_consume_ty!(Time64MicrosecondType, postgres_proto::time_to_sql);
 // impl_consume_ty!(Time64NanosecondType,  );
 // impl_consume_ty!(IntervalYearMonthType,  );
 // impl_consume_ty!(IntervalDayTimeType,  );
@@ -197,13 +206,35 @@ impl_consume_ty!(Time64MicrosecondType, time_to_sql);
 // impl_consume_ty!(DurationMillisecondType,  );
 // impl_consume_ty!(DurationMicrosecondType,  );
 // impl_consume_ty!(DurationNanosecondType,  );
-impl_consume_ref_ty!(BinaryType, bytea_to_sql);
-impl_consume_ref_ty!(LargeBinaryType, bytea_to_sql);
-impl_consume_ref_ty!(FixedSizeBinaryType, bytea_to_sql);
-impl_consume_ref_ty!(Utf8Type, text_to_sql);
-impl_consume_ref_ty!(LargeUtf8Type, text_to_sql);
-// impl_consume_ty!(Decimal128Type,);
-// impl_consume_ty!(Decimal256Type,  );
+impl_consume_ref_ty!(BinaryType, postgres_proto::bytea_to_sql);
+impl_consume_ref_ty!(LargeBinaryType, postgres_proto::bytea_to_sql);
+impl_consume_ref_ty!(FixedSizeBinaryType, postgres_proto::bytea_to_sql);
+impl_consume_ref_ty!(Utf8Type, postgres_proto::text_to_sql);
+impl_consume_ref_ty!(LargeUtf8Type, postgres_proto::text_to_sql);
+
+impl ConsumeTy<Decimal128Type> for BytesMut {
+    fn consume(&mut self, ty: &DataType, value: i128) {
+        let DataType::Decimal128(_, scale) = ty else {
+            unreachable!()
+        };
+
+        super::decimal::i128_to_sql(value, *scale, self)
+    }
+
+    fn consume_null(&mut self) {}
+}
+
+impl ConsumeTy<Decimal256Type> for BytesMut {
+    fn consume(&mut self, ty: &DataType, value: i256) {
+        let DataType::Decimal256(_, scale) = ty else {
+            unreachable!()
+        };
+
+        super::decimal::i256_to_sql(value, *scale, self)
+    }
+
+    fn consume_null(&mut self) {}
+}
 
 impl_consume_unsupported!(
     BytesMut,
@@ -224,7 +255,5 @@ impl_consume_unsupported!(
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        Decimal128Type,
-        Decimal256Type,
     )
 );

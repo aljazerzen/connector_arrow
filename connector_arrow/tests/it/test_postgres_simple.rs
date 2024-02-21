@@ -17,10 +17,17 @@ fn query_01() {
     super::tests::query_01(&mut conn);
 }
 
+#[test]
+fn query_02() {
+    let mut conn = init();
+    super::tests::query_02(&mut conn);
+}
+
 #[rstest]
 #[case::empty("simple::roundtrip::empty", spec::empty())]
 #[case::null_bool("simple::roundtrip::null_bool", spec::null_bool())]
 #[case::numeric("simple::roundtrip::numeric", spec::numeric())]
+#[case::decimal("simple::roundtrip::decimal", spec::decimal())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     super::tests::roundtrip(&mut conn, table_name, spec);

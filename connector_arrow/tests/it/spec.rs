@@ -8,12 +8,14 @@ pub enum ValueGenProcess {
     Null,
     Low,
     High,
+    Unit,
     RandomUniform,
 }
 
-const VALUE_GEN_PROCESS_ALL: [ValueGenProcess; 4] = [
+const VALUE_GEN_PROCESS_ALL: [ValueGenProcess; 5] = [
     ValueGenProcess::Low,
     ValueGenProcess::High,
+    ValueGenProcess::Unit,
     ValueGenProcess::Null,
     ValueGenProcess::RandomUniform,
 ];
@@ -104,6 +106,27 @@ pub fn numeric() -> Vec<ColumnSpec> {
         ],
         &[false, true],
         &VALUE_GEN_PROCESS_ALL,
+    )
+}
+
+pub fn decimal() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Decimal128(15, 4),
+            DataType::Decimal128(Decimal128Type::MAX_PRECISION, 0),
+            DataType::Decimal128(Decimal128Type::MAX_PRECISION, Decimal128Type::MAX_SCALE),
+            DataType::Decimal256(45, 12),
+            DataType::Decimal256(Decimal256Type::MAX_PRECISION, 0),
+            DataType::Decimal256(Decimal256Type::MAX_PRECISION, Decimal256Type::MAX_SCALE),
+        ],
+        &[false, true],
+        &[
+            ValueGenProcess::Low,
+            ValueGenProcess::High,
+            ValueGenProcess::Unit,
+            ValueGenProcess::Null,
+            ValueGenProcess::RandomUniform,
+        ],
     )
 }
 

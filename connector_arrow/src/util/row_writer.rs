@@ -149,7 +149,7 @@ macro_rules! impl_consume_ty {
     ($({ $ArrTy:ty => $Builder:tt } )*) => {
         $(
             impl ConsumeTy<$ArrTy> for ArrowRowWriter {
-                fn consume(&mut self, value: <$ArrTy as ArrowType>::Native) {
+                fn consume(&mut self, _ty: &DataType, value: <$ArrTy as ArrowType>::Native) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
@@ -208,7 +208,7 @@ impl_consume_ty! {
 }
 
 impl ConsumeTy<NullType> for ArrowRowWriter {
-    fn consume(&mut self, _: ()) {
+    fn consume(&mut self, _ty: &DataType, _: ()) {
         self.next_builder();
     }
 
@@ -221,7 +221,7 @@ macro_rules! impl_consume_ref_ty {
     ($({ $ArrTy:ty => $Builder:tt })*) => {
         $(
             impl ConsumeTy<$ArrTy> for ArrowRowWriter {
-                fn consume(&mut self, value: <$ArrTy as ArrowType>::Native) {
+                fn consume(&mut self, _ty: &DataType, value: <$ArrTy as ArrowType>::Native) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
@@ -247,7 +247,7 @@ impl_consume_ref_ty! {
 }
 
 impl ConsumeTy<FixedSizeBinaryType> for ArrowRowWriter {
-    fn consume(&mut self, value: <FixedSizeBinaryType as ArrowType>::Native) {
+    fn consume(&mut self, _ty: &DataType, value: <FixedSizeBinaryType as ArrowType>::Native) {
         self.next_builder()
             .downcast_mut::<arrow::array::builder::FixedSizeBinaryBuilder>()
             .expect(concat!("bad cast to ", stringify!(FixedSizeBinaryBuilder)))

@@ -127,7 +127,6 @@ impl_produce_numeric!(
     Int64Type,
     Float32Type,
     Float64Type,
-    Decimal256Type,
 );
 
 crate::impl_produce_unsupported!(
@@ -157,10 +156,21 @@ crate::impl_produce_unsupported!(
         DurationNanosecondType,
         BinaryType,
         FixedSizeBinaryType,
-        Utf8Type,
         Decimal128Type,
+        Decimal256Type,
     )
 );
+
+impl<'r> transport::ProduceTy<'r, Utf8Type> for CellRef<'r> {
+    fn produce(self) -> Result<String, ConnectorError> {
+        let val = self.0.get(self.1).unwrap().to_string();
+        Ok(val)
+    }
+
+    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
+        Ok(self.0.get(self.1).map(|x| x.to_string()))
+    }
+}
 
 impl<'r> transport::ProduceTy<'r, LargeUtf8Type> for CellRef<'r> {
     fn produce(self) -> Result<String, ConnectorError> {

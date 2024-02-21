@@ -2,7 +2,7 @@ use arrow::array::{ArrayRef, AsArray};
 use arrow::datatypes::*;
 
 use crate::types::{ArrowType, FixedSizeBinaryType};
-use crate::{impl_produce_unsupported, ConnectorError};
+use crate::ConnectorError;
 
 use super::transport::{Produce, ProduceTy};
 
@@ -82,6 +82,8 @@ impl_produce_ty!(
     DurationMillisecondType,
     DurationMicrosecondType,
     DurationNanosecondType,
+    Decimal128Type,
+    Decimal256Type,
 );
 
 // TODO: implement ProduceTy for byte array types without cloning
@@ -153,5 +155,3 @@ impl<'r> ProduceTy<'r, LargeUtf8Type> for &ArrayCellRef<'r> {
         })
     }
 }
-
-impl_produce_unsupported!(&ArrayCellRef<'r>, (Decimal128Type, Decimal256Type,));

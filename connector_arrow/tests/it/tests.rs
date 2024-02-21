@@ -9,7 +9,6 @@ use rand::SeedableRng;
 use crate::util::{load_into_table, query_table};
 use crate::{generator::generate_batch, spec::ArrowGenSpec};
 
-#[track_caller]
 pub fn query_01<C: Connection>(conn: &mut C) {
     let query = "SELECT 1 as a, NULL as b";
     let results = connector_arrow::query_one(conn, &query).unwrap();
@@ -21,6 +20,24 @@ pub fn query_01<C: Connection>(conn: &mut C) {
          +---+---+\n\
          | 1 |   |\n\
          +---+---+"
+    );
+}
+
+pub fn query_02<C: Connection>(conn: &mut C) {
+    let query = "SELECT
+        CAST(45927858023429386042648415184323464939503124872489107431467725871003289085860801 as NUMERIC(100, 20)) as a,
+        CAST(3.14 as NUMERIC(2, 0)) as b,
+        CAST(0 as NUMERIC(3, 2)) as c
+    ";
+    let results = connector_arrow::query_one(conn, &query).unwrap();
+
+    similar_asserts::assert_eq!(
+        "+-------------------------------------------------------------------------------------------------------+---+------+\n\
+         | a                                                                                                     | b | c    |\n\
+         +-------------------------------------------------------------------------------------------------------+---+------+\n\
+         | 45927858023429386042648415184323464939503124872489107431467725871003289085860801.00000000000000000000 | 3 | 0.00 |\n\
+         +-------------------------------------------------------------------------------------------------------+---+------+",
+         pretty_format_batches(&results).unwrap().to_string(),
     );
 }
 

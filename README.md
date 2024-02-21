@@ -44,7 +44,7 @@ without need for dynamic linking of C libraries.
 
 None of the sources are enabled by default, use features to enable them.
 
-## Types
+## Type coercion
 
 Converting relational data from and to Apache Arrow comes with an inherent problem: type system of
 any database does not map to arrow type system with a one-to-one relation. In practice this means
@@ -65,45 +65,47 @@ For example, `UInt8` could be coerced into `Int8` by subtracting 128 (i.e. reint
 as `Int8`). This coercion would be efficient, as the new type would not be larger than the initial,
 but it would be confusing as value 0 would be converted to -128 and value 255 to 127. Instead,
 databases that don't support unsigned integers, coerce `UInt8` to `Int16`, `UInt16` to `Int32`,
-`UInt32` to `Int64` and `UInt64` to `Decimal128(20, 0)`
+`UInt32` to `Int64` and `UInt64` to `Decimal128(20, 0)`.
 
-When converting from non-arrow data sources (everything except DuckDB), only a subset of all arrows
-types is produced. Here is a list of supported types:
+## Dynamic vs static types
 
-- [x] Null
-- [x] Boolean
-- [x] Int8
-- [x] Int16
-- [x] Int32
-- [x] Int64
-- [x] UInt8
-- [x] UInt16
-- [x] UInt32
-- [x] UInt64
-- [x] Float16
-- [x] Float32
-- [x] Float64
-- [x] Timestamp
-- [x] Date32
-- [x] Date64
-- [x] Time32
-- [x] Time64
-- [x] Duration
-- [x] Interval
-- [x] Binary
-- [x] FixedSizeBinary
-- [x] LargeBinary
-- [x] Utf8
-- [x] LargeUtf8
-- [ ] List
-- [ ] FixedSizeList
-- [ ] LargeList
-- [ ] Struct
-- [ ] Union
-- [ ] Dictionary
-- [ ] Decimal128
-- [ ] Decimal256
-- [ ] Map
-- [ ] RunEndEncoded
+Another problem when converting between two type systems is a mismatch between static and dynamic
+type parameters. For example, arrow type `Decimal128(20, 4)` defines precision and scale statically,
+in the schema, which implies that it must the same for all values in the array. On the other hand,
+PostgreSQL type `NUMERIC` has dynamic precision and scale, which means that each value may have a
+different pair of parameters. PostgreSQL does allow specifying parameters statically with
+`NUMERIC(20, 4)`, but that is only available for column definition and not for query results. Even
+when selecting directly from a table, the result will only the information that this column is
+`NUMERIC`.
 
-This restriction mostly has to do with non-trivial mapping of Arrow type into Rust native types.
+This problem is even more prevalent with SQLite, which has a fully dynamic type system. This means
+that any table or result column may contain multiple different types. It is possible the declare
+table column types, but that information is not validated at all (i.e. you could set the type to
+`PEANUT_BUTTER(42)`) and is only used to determine the [type
+affinity](https://www.sqlite.org/datatype3.html#type_affinity) of the column.
+
+This problem can be solved in the following ways:
+
+1.  **Convert to some other type.** For PostgreSQL `NUMERIC`, that would mean conversion to a
+    decimal textual representation, encoded as `Utf8`. This is generally slow and inconvenient to
+    work with.
+2.  **Buffer and infer.** If we are able receive and buffer all of the result data, we could infer
+    the type information from the data. This is obviously not possible if we want to support
+    streaming results, as it would defeat all of the benefits of streaming. It might happen that
+    values don't have uniform types. In that case, we can reject the result entirely and inform the
+    user to cast the data into a uniform type before returning the results. We can also try to cast
+    the values to some uniform type, but is generally slow, error prone and that might not be
+    possible.
+3.  **Infer from the first batch.** If we don't want to rule out streaming, we can opt for buffering
+    only the first batch of data and inferring the types from that. If any of the subsequent batches
+    turns out to have different types, we again have the options: reject or cast.
+
+At the moment, `connector_arrow` does not have a common way of solving this problem. SQLite uses
+option 2 and other connectors don't support types with dynamic types parameters.
+
+Preferred way of solving the problem is option 3: infer from the first batch and reject non-uniform
+types. This option will result in more errors being presented to the users. We justify this decision
+with observation that because conversion between the two type systems is non trivial, silent
+conversion into a different type would mean unpredictable downstream behavior, which would require
+user attention anyway. By catching the problem early, we have the option to provide informative
+error messages and hints on how to specify the result type explicitly.

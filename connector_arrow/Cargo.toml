@@ -25,10 +25,6 @@ arrow = { version = "49", default-features = false }
 
 # common optional
 hex = { version = "0.4", optional = true }
-rust_decimal = { version = "1", features = ["db-postgres"], optional = true }
-rust_decimal_macros = { version = "1", optional = true }
-urlencoding = { version = "2.1", optional = true }
-uuid = { version = "0.8", optional = true }
 fallible-streaming-iterator = { version = "0.1", optional = true }
 csv = { version = "1", optional = true }
 bytes = { version = "1", optional = true }
@@ -72,20 +68,11 @@ src_postgres = [
     "postgres-protocol",
     "csv",
     "hex",
-    "uuid",
-    "rust_decimal",
-    "rust_decimal_macros",
     "bytes",
     "byteorder",
 ]
-src_sqlite = ["rusqlite", "fallible-streaming-iterator", "urlencoding"]
-src_duckdb = [
-    "duckdb",
-    "urlencoding",
-    "uuid",
-    "rust_decimal",
-    "fallible-streaming-iterator",
-]
+src_sqlite = ["rusqlite"]
+src_duckdb = ["duckdb", "fallible-streaming-iterator"]
 
 [package.metadata.docs.rs]
 features = ["all"]

@@ -6,27 +6,28 @@ use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
 
 macro_rules! impl_transport_match {
     ($f: expr, $c: expr, $p: expr, $({ $Pat: pat => $ArrTy: ty })*) => {
+        let dt = $f.data_type();
         if !$f.is_nullable() {
-            match $f.data_type() {
-                Null => ConsumeTy::<NullType>::consume($c, ()),
+            match dt {
+                Null => ConsumeTy::<NullType>::consume($c, dt, ()),
                 $(
-                    $Pat => ConsumeTy::<$ArrTy>::consume($c, ProduceTy::<$ArrTy>::produce($p)?),
+                    $Pat => ConsumeTy::<$ArrTy>::consume($c, dt, ProduceTy::<$ArrTy>::produce($p)?),
                 )*
-                _ => todo!("unimplemented transport of {:?}", $f.data_type()),
+                _ => todo!("unimplemented transport of {:?}", dt),
             }
         } else {
-            match $f.data_type() {
-                Null => ConsumeTy::<NullType>::consume($c, ()),
+            match dt {
+                Null => ConsumeTy::<NullType>::consume($c, dt, ()),
                 $(
                     $Pat => {
                         if let Some(v) = ProduceTy::<$ArrTy>::produce_opt($p)? {
-                            ConsumeTy::<$ArrTy>::consume($c, v)
+                            ConsumeTy::<$ArrTy>::consume($c, dt, v)
                         } else {
                             ConsumeTy::<$ArrTy>::consume_null($c)
                         }
                     },
                 )*
-                _ => todo!("unimplemented transport of {:?}", $f.data_type()),
+                _ => todo!("unimplemented transport of {:?}", dt),
             }
         }
     };
@@ -180,13 +181,13 @@ pub trait Consume:
 
 /// Ability to consume a value of an an arrow type
 pub trait ConsumeTy<T: ArrowType> {
-    fn consume(&mut self, value: T::Native);
+    fn consume(&mut self, ty: &DataType, value: T::Native);
 
     fn consume_null(&mut self);
 }
 
 pub mod print {
-    use super::{ArrowType, Consume, ConsumeTy};
+    use super::{ArrowType, Consume, ConsumeTy, DataType};
 
     pub struct PrintConsumer();
 
@@ -196,7 +197,7 @@ pub mod print {
     where
         T::Native: std::fmt::Debug,
     {
-        fn consume(&mut self, value: T::Native) {
+        fn consume(&mut self, _ty: &DataType, value: T::Native) {
             println!("{}: {value:?}", std::any::type_name::<T>());
         }
 
@@ -227,7 +228,7 @@ macro_rules! impl_consume_unsupported {
     ($c: ty, ($($t: ty,)+)) => {
         $(
             impl $crate::util::transport::ConsumeTy<$t> for $c {
-                fn consume(&mut self, _val: <$t as $crate::types::ArrowType>::Native) {
+                fn consume(&mut self, _ty: &arrow::datatypes::DataType, _val: <$t as $crate::types::ArrowType>::Native) {
                     unimplemented!("unsupported");
                 }
                 fn consume_null(&mut self) {

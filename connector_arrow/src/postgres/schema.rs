@@ -87,7 +87,7 @@ impl<P> SchemaEdit for super::PostgresConnection<P> {
                 Err(TableCreateError::TableExists)
             }
             Err(e) => Err(TableCreateError::Connector(ConnectorError::Postgres(
-                PostgresError::Postgres(dbg!(e)),
+                PostgresError::Postgres(e),
             ))),
         }
     }
@@ -101,7 +101,7 @@ impl<P> SchemaEdit for super::PostgresConnection<P> {
                 Err(TableDropError::TableNonexistent)
             }
             Err(err) => Err(TableDropError::Connector(ConnectorError::Postgres(
-                PostgresError::Postgres(dbg!(err)),
+                PostgresError::Postgres(err),
             ))),
         }
     }

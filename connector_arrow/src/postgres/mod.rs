@@ -13,6 +13,7 @@
 //! ````
 
 mod append;
+mod decimal;
 mod protocol_extended;
 mod protocol_simple;
 mod schema;
@@ -116,6 +117,8 @@ where
             DataType::UInt64 => Some(DataType::Decimal128(20, 0)),
             DataType::Float16 => Some(DataType::Float32),
             DataType::Utf8 => Some(DataType::LargeUtf8),
+            DataType::Decimal128(_, _) => Some(DataType::Utf8),
+            DataType::Decimal256(_, _) => Some(DataType::Utf8),
             _ => None,
         }
     }

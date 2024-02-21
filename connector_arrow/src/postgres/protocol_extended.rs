@@ -2,6 +2,7 @@ use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
+use postgres::types::FromSql;
 use postgres::{Row, RowIter};
 
 use crate::api::{ResultReader, Statement};
@@ -185,8 +186,32 @@ crate::impl_produce_unsupported!(
         DurationNanosecondType,
         BinaryType,
         FixedSizeBinaryType,
-        Utf8Type,
         Decimal128Type,
         Decimal256Type,
     )
 );
+
+struct Numeric(String);
+
+impl<'a> FromSql<'a> for Numeric {
+    fn from_sql(
+        _ty: &postgres::types::Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(super::decimal::from_sql(raw).map(Numeric)?)
+    }
+
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        true
+    }
+}
+
+impl<'c> transport::ProduceTy<'c, Utf8Type> for CellRef<'c> {
+    fn produce(self) -> Result<String, ConnectorError> {
+        Ok(self.0.get::<_, Numeric>(self.1).0)
+    }
+
+    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
+        Ok(self.0.get::<_, Option<Numeric>>(self.1).map(|n| n.0))
+    }
+}
