@@ -116,7 +116,11 @@ where
             DataType::UInt32 => Some(DataType::Int64),
             DataType::UInt64 => Some(DataType::Utf8),
             DataType::Float16 => Some(DataType::Float32),
+
             DataType::Utf8 => Some(DataType::LargeUtf8),
+            DataType::Binary => Some(DataType::LargeBinary),
+            DataType::FixedSizeBinary(_) => Some(DataType::LargeBinary),
+
             DataType::Decimal128(_, _) => Some(DataType::Utf8),
             DataType::Decimal256(_, _) => Some(DataType::Utf8),
             _ => None,

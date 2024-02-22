@@ -24,13 +24,16 @@ fn query_02() {
 }
 
 #[rstest]
-#[case::empty("extended::roundtrip::empty", spec::empty())]
-#[case::null_bool("extended::roundtrip::null_bool", spec::null_bool())]
-#[case::int("extended::roundtrip::int", spec::int())]
-#[case::uint("extended::roundtrip::uint", spec::uint())]
-#[case::float("extended::roundtrip::float", spec::float())]
-#[case::decimal("extended::roundtrip::decimal", spec::decimal())]
+#[case::empty("roundtrip::empty", spec::empty())]
+#[case::null_bool("roundtrip::null_bool", spec::null_bool())]
+#[case::int("roundtrip::int", spec::int())]
+#[case::uint("roundtrip::uint", spec::uint())]
+#[case::float("roundtrip::float", spec::float())]
+#[case::decimal("roundtrip::decimal", spec::decimal())]
+#[case::utf8("roundtrip::utf8", spec::utf8())]
+#[case::binary("roundtrip::binary", spec::binary())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
-    super::tests::roundtrip(&mut conn, table_name, spec);
+    let table_name = format!("extended::{table_name}");
+    super::tests::roundtrip(&mut conn, &table_name, spec);
 }

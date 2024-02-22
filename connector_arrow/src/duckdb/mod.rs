@@ -56,6 +56,11 @@ impl Connection for DuckDBConnection {
             // overflow or lose precision, which counts as information loss.
             // this means that we have to store them as just int64.
             DataType::Timestamp(_, _) => Some(DataType::Int64),
+
+            DataType::LargeUtf8 => Some(DataType::Utf8),
+            DataType::LargeBinary => Some(DataType::Binary),
+            DataType::FixedSizeBinary(_) => Some(DataType::Binary),
+
             _ => None,
         }
     }

@@ -32,15 +32,27 @@ without need for dynamic linking of C libraries.
 
 |  | SQLite | DuckDB | PostgreSQL |
 | --- | --- | --- | --- |
-| Feature | `src_sqlite` | `src_duckdb` | `src_postgres` |
-| Dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) |
-| Query | x | x | x |
-| Query params |  |  |  |
-| Temporal types | x | x |  |
-| Container types |  | x |  |
-| Schema get | x | x | x |
-| Schema edit | x | x | x |
-| Append | x | x | x |
+| feature | `src_sqlite` | `src_duckdb` | `src_postgres` |
+| dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) |
+| query | x | x | x |
+| query params |  |  |  |
+| schema get | x | x | x |
+| schema edit | x | x | x |
+| append | x | x | x |
+| null & bool | x | x | x |
+| int | x | x | x |
+| uint | x | x | x |
+| float | x | x | x |
+| decimal | x |  | x |
+| timestamp | x | x |  |
+| date | x |  |  |
+| time | x |  |  |
+| duration | x |  |  |
+| interval |  |  |  |
+| utf8 | x | x | x |
+| binary | x | x | x |
+| empty |  | x | x |
+| containers |  |  |  |
 
 None of the sources are enabled by default, use features to enable them.
 

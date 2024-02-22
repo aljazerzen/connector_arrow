@@ -34,7 +34,7 @@ pub struct ColumnSpec {
     pub values: Vec<ValuesSpec>,
 }
 
-pub fn all_types() -> Vec<ColumnSpec> {
+pub fn basic_types() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[
             DataType::Null,
@@ -136,13 +136,7 @@ pub fn decimal() -> Vec<ColumnSpec> {
             DataType::Decimal256(Decimal256Type::MAX_PRECISION, Decimal256Type::MAX_SCALE),
         ],
         &[false, true],
-        &[
-            ValueGenProcess::Low,
-            ValueGenProcess::High,
-            ValueGenProcess::Unit,
-            ValueGenProcess::Null,
-            ValueGenProcess::RandomUniform,
-        ],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 
@@ -158,21 +152,15 @@ pub fn timestamp() -> Vec<ColumnSpec> {
             DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("+07:30"))),
             DataType::Timestamp(TimeUnit::Second, Some(Arc::from("+07:30"))),
         ],
-        &[true],
-        &[
-            ValueGenProcess::Low,
-            ValueGenProcess::High,
-            ValueGenProcess::Unit,
-            ValueGenProcess::Null,
-            ValueGenProcess::RandomUniform,
-        ],
+        &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
     )
 }
 
 pub fn date() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[DataType::Date32, DataType::Date64],
-        &[true],
+        &[false, true],
         &VALUE_GEN_PROCESS_ALL,
     )
 }
@@ -185,7 +173,7 @@ pub fn time() -> Vec<ColumnSpec> {
             DataType::Time64(TimeUnit::Nanosecond),
             DataType::Time64(TimeUnit::Microsecond),
         ],
-        &[true],
+        &[false, true],
         &VALUE_GEN_PROCESS_ALL,
     )
 }
@@ -198,7 +186,7 @@ pub fn duration() -> Vec<ColumnSpec> {
             DataType::Duration(TimeUnit::Millisecond),
             DataType::Duration(TimeUnit::Second),
         ],
-        &[true],
+        &[false, true],
         &VALUE_GEN_PROCESS_ALL,
     )
 }
@@ -211,7 +199,28 @@ pub fn interval() -> Vec<ColumnSpec> {
             DataType::Interval(IntervalUnit::MonthDayNano),
             DataType::Interval(IntervalUnit::DayTime),
         ],
-        &[true],
+        &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
+    )
+}
+
+pub fn utf8() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[DataType::Utf8, DataType::LargeUtf8],
+        &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
+    )
+}
+
+pub fn binary() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Binary,
+            DataType::LargeBinary,
+            DataType::FixedSizeBinary(15),
+            DataType::FixedSizeBinary(0),
+        ],
+        &[false, true],
         &VALUE_GEN_PROCESS_ALL,
     )
 }

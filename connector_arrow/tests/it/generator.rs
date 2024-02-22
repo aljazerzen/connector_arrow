@@ -41,11 +41,21 @@ macro_rules! gen_array {
         for value in $Values {
             for _ in 0..value.repeat {
                 match value.gen_process {
-                    ValueGenProcess::Null => builder.append_null(),
-                    ValueGenProcess::Low => builder.append_value($Low),
-                    ValueGenProcess::High => builder.append_value($High),
-                    ValueGenProcess::Unit => builder.append_value($Unit),
-                    ValueGenProcess::RandomUniform => builder.append_value($RandomUniform),
+                    ValueGenProcess::Null => {
+                        builder.append_null();
+                    }
+                    ValueGenProcess::Low => {
+                        let _ = builder.append_value($Low);
+                    }
+                    ValueGenProcess::High => {
+                        let _ = builder.append_value($High);
+                    }
+                    ValueGenProcess::Unit => {
+                        let _ = builder.append_value($Unit);
+                    }
+                    ValueGenProcess::RandomUniform => {
+                        let _ = builder.append_value($RandomUniform);
+                    }
                 }
             }
         }
@@ -306,11 +316,56 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 rng.gen_range(i64::MIN..=i64::MAX)
             ]
         }
-        DataType::Binary => todo!(),
-        DataType::FixedSizeBinary(_) => todo!(),
-        DataType::LargeBinary => todo!(),
-        DataType::Utf8 => todo!(),
-        DataType::LargeUtf8 => todo!(),
+        DataType::Binary => {
+            gen_array![
+                values,
+                BinaryBuilder::with_capacity(capacity, capacity * 32),
+                [],
+                [255, 0, 128, 127, 0, 0, 255, 0],
+                [0, 0, 0, 0],
+                gen_binary(0..32, rng)
+            ]
+        }
+        DataType::LargeBinary => {
+            gen_array![
+                values,
+                LargeBinaryBuilder::with_capacity(capacity, capacity * 32),
+                [],
+                [255, 0, 128, 127, 0, 0, 255, 0],
+                [0, 0, 0, 0],
+                gen_binary(0..32, rng)
+            ]
+        }
+        DataType::FixedSizeBinary(size) => {
+            gen_array![
+                values,
+                FixedSizeBinaryBuilder::with_capacity(capacity, *size),
+                vec![0; *size as usize],
+                vec![255; *size as usize],
+                vec![0; *size as usize],
+                gen_binary_of_size(*size as usize, rng)
+            ]
+        }
+        DataType::Utf8 => {
+            gen_array![
+                values,
+                StringBuilder::with_capacity(capacity, capacity * 32),
+                "what's \"low\" in a string?",
+                "let's say that special characters are high: !@#$%^&*()_\\'",
+                "",
+                gen_string(0..32, rng)
+            ]
+        }
+        DataType::LargeUtf8 => {
+            gen_array![
+                values,
+                LargeStringBuilder::with_capacity(capacity, capacity * 128),
+                "what's \"low\" in a string?",
+                "let's say that special characters are high: !@#$%^&*()_\\'",
+                "",
+                gen_string(0..128, rng)
+            ]
+        }
         DataType::List(_) => todo!(),
         DataType::FixedSizeList(_, _) => todo!(),
         DataType::LargeList(_) => todo!(),
@@ -369,4 +424,29 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
         DataType::Map(_, _) => todo!(),
         DataType::RunEndEncoded(_, _) => todo!(),
     }
+}
+
+fn gen_binary_of_size<R: Rng>(size: usize, rng: &mut R) -> Vec<u8> {
+    let mut buf = Vec::<u8>::with_capacity(size);
+    for _ in 0..size {
+        buf.push(rng.gen());
+    }
+    buf
+}
+
+fn gen_binary<R: Rng>(size_range: std::ops::Range<usize>, rng: &mut R) -> Vec<u8> {
+    let size: usize = rng.gen_range(size_range);
+    gen_binary_of_size(size, rng)
+}
+
+fn gen_string_of_size<R: Rng>(size: usize, rng: &mut R) -> String {
+    rng.sample_iter(&rand::distributions::Alphanumeric)
+        .take(size)
+        .map(char::from)
+        .collect()
+}
+
+fn gen_string<R: Rng>(size_range: std::ops::Range<usize>, rng: &mut R) -> String {
+    let size: usize = rng.gen_range(size_range);
+    gen_string_of_size(size, rng)
 }

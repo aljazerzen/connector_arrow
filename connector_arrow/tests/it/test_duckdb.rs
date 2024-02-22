@@ -21,6 +21,8 @@ fn query_01() {
 #[case::uint("roundtrip::uint", spec::uint())]
 #[case::float("roundtrip::float", spec::float())]
 #[case::timestamp("roundtrip::timestamp", spec::timestamp())]
+#[case::utf8("roundtrip::utf8", spec::utf8())]
+#[case::binary("roundtrip::binary", spec::binary())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     super::tests::roundtrip(&mut conn, table_name, spec);
@@ -31,7 +33,7 @@ fn schema_get() {
     let table_name = "schema_get";
 
     let mut conn = init();
-    super::tests::schema_get(&mut conn, table_name, spec::all_types());
+    super::tests::schema_get(&mut conn, table_name, spec::basic_types());
 }
 
 #[test]
@@ -39,7 +41,7 @@ fn schema_edit() {
     let table_name = "schema_edit";
 
     let mut conn = init();
-    super::tests::schema_edit(&mut conn, table_name, spec::all_types());
+    super::tests::schema_edit(&mut conn, table_name, spec::basic_types());
 }
 
 #[test]
