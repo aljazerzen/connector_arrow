@@ -1,7 +1,7 @@
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 
-use connector_arrow::api::{Append, Connection, ResultReader, SchemaEdit, Statement};
+use connector_arrow::api::{Append, Connector, ResultReader, SchemaEdit, Statement};
 use connector_arrow::{ConnectorError, TableCreateError, TableDropError};
 
 pub fn load_into_table<C>(
@@ -11,7 +11,7 @@ pub fn load_into_table<C>(
     table_name: &str,
 ) -> Result<(), ConnectorError>
 where
-    C: Connection + SchemaEdit,
+    C: Connector + SchemaEdit,
 {
     // table drop
     match conn.table_drop(table_name) {
@@ -40,7 +40,7 @@ where
     Ok(())
 }
 
-pub fn query_table<C: Connection>(
+pub fn query_table<C: Connector>(
     conn: &mut C,
     table_name: &str,
 ) -> Result<(SchemaRef, Vec<RecordBatch>), ConnectorError> {

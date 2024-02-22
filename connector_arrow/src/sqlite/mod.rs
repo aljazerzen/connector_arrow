@@ -10,7 +10,7 @@ pub use append::SQLiteAppender;
 #[doc(hidden)]
 pub use query::SQLiteStatement;
 
-use crate::api::Connection;
+use crate::api::Connector;
 use crate::errors::ConnectorError;
 use arrow::datatypes::DataType;
 
@@ -24,7 +24,7 @@ impl SQLiteConnection {
     }
 }
 
-impl Connection for SQLiteConnection {
+impl Connector for SQLiteConnection {
     type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
 
     type Append<'conn> = SQLiteAppender<'conn> where Self: 'conn;

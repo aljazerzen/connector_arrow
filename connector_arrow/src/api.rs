@@ -10,8 +10,8 @@ use arrow::record_batch::RecordBatch;
 
 use crate::errors::{ConnectorError, TableCreateError, TableDropError};
 
-/// A connection to a data store.
-pub trait Connection {
+/// Ability to query data from a data store and append data into the data store.
+pub trait Connector {
     type Stmt<'conn>: Statement<'conn>
     where
         Self: 'conn;
@@ -27,7 +27,8 @@ pub trait Connection {
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
 
     /// Describes how a given type will change during a roundtrip to the database.
-    /// None means that type will not change at all.
+    /// None means that type will not change.
+    // TODO: split this function into "coerce_during_query" and "coerce_during_append"
     fn coerce_type(ty: &DataType) -> Option<DataType>;
 }
 

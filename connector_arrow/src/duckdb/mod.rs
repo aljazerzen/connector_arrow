@@ -11,7 +11,7 @@ use arrow::record_batch::RecordBatch;
 
 use std::sync::Arc;
 
-use crate::api::{Connection, ResultReader, Statement};
+use crate::api::{Connector, ResultReader, Statement};
 use crate::errors::ConnectorError;
 
 pub struct DuckDBConnection {
@@ -24,7 +24,7 @@ impl DuckDBConnection {
     }
 }
 
-impl Connection for DuckDBConnection {
+impl Connector for DuckDBConnection {
     type Stmt<'conn> = DuckDBStatement<'conn>
     where
         Self: 'conn;

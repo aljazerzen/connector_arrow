@@ -3,7 +3,7 @@
 //! ```no_run
 //! use postgres::{Client, NoTls};
 //! use connector_arrow::postgres::{PostgresConnection, ProtocolExtended};
-//! use connector_arrow::api::Connection;
+//! use connector_arrow::api::Connector;
 //!
 //! let client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
 //!
@@ -24,7 +24,7 @@ use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
 
-use crate::api::{Connection, Statement};
+use crate::api::{Connector, Statement};
 use crate::errors::ConnectorError;
 
 /// Connection to PostgreSQL that implements [Connection], [crate::api::SchemaGet] and [crate::api::SchemaEdit].
@@ -82,7 +82,7 @@ pub enum PostgresError {
     IO(#[from] std::io::Error),
 }
 
-impl<P> Connection for PostgresConnection<P>
+impl<P> Connector for PostgresConnection<P>
 where
     for<'conn> PostgresStatement<'conn, P>: Statement<'conn>,
 {
@@ -116,6 +116,19 @@ where
             DataType::UInt32 => Some(DataType::Int64),
             DataType::UInt64 => Some(DataType::Utf8),
             DataType::Float16 => Some(DataType::Float32),
+
+            // PostgreSQL timestamps cannot store timezone in the schema.
+            // PostgreSQL timestamps are microseconds since 2000-01-01T00:00.
+            // Arrow timestamps can be microseconds since   1970-01-01T00:00.
+            // ... which means we cannot store the full range of the Arrow microsecond
+            //     timestamp in PostgreSQL timestamp without changing its meaning.
+            // ... so we must use Int64 instead.
+            DataType::Timestamp(_, _) => Some(DataType::Int64),
+            DataType::Date32 => Some(DataType::Int32),
+            DataType::Date64 => Some(DataType::Int64),
+            DataType::Time32(_) => Some(DataType::Int32),
+            DataType::Time64(_) => Some(DataType::Int64),
+            DataType::Duration(_) => Some(DataType::Int64),
 
             DataType::Utf8 => Some(DataType::LargeUtf8),
             DataType::Binary => Some(DataType::LargeBinary),

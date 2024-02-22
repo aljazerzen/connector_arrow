@@ -39,19 +39,19 @@ without need for dynamic linking of C libraries.
 | schema get | x | x | x |
 | schema edit | x | x | x |
 | append | x | x | x |
-| null & bool | x | x | x |
-| int | x | x | x |
-| uint | x | x | x |
-| float | x | x | x |
-| decimal | x |  | x |
-| timestamp | x | x |  |
-| date | x |  |  |
-| time | x |  |  |
-| duration | x |  |  |
-| interval |  |  |  |
-| utf8 | x | x | x |
-| binary | x | x | x |
-| empty |  | x | x |
+| roundtrip: null & bool | x | x | x |
+| roundtrip: int | x | x | x |
+| roundtrip: uint | x | x | x |
+| roundtrip: float | x | x | x |
+| roundtrip: decimal | x |  | x |
+| roundtrip: timestamp | x | x |  |
+| roundtrip: date | x |  |  |
+| roundtrip: time | x |  |  |
+| roundtrip: duration | x |  |  |
+| roundtrip: interval |  |  |  |
+| roundtrip: utf8 | x | x | x |
+| roundtrip: binary | x | x | x |
+| roundtrip: empty |  | x | x |
 | containers |  |  |  |
 
 None of the sources are enabled by default, use features to enable them.
@@ -67,17 +67,24 @@ that:
 - when pushing data, multiple arrow types might be mapped into a single database type (for example,
   in PostgreSQL, both `Utf8` and `LargeUtf8` will be mapped into `TEXT`).
 
-As a consequence, a roundtrip of pushing data to a database and querying it back will convert some
-types. We call this process "type coercion" and is documented by `Connection::coerce_type`.
+As a consequence, a roundtrip of pushing data to a database and querying it back must convert at
+least some types. We call this process "type coercion" and is documented by
+`Connection::coerce_type`.
 
-Note that this process will never lose information and will prioritize correctness and
-predictability over efficiency.
+When designing the mapping, we:
 
-For example, `UInt8` could be coerced into `Int8` by subtracting 128 (i.e. reinterpreting the bytes
-as `Int8`). This coercion would be efficient, as the new type would not be larger than the initial,
-but it would be confusing as value 0 would be converted to -128 and value 255 to 127. Instead,
-databases that don't support unsigned integers, coerce `UInt8` to `Int16`, `UInt16` to `Int32`,
-`UInt32` to `Int64` and `UInt64` to `Decimal128(20, 0)`.
+- guarantee that the roundtrip will not lose information (i.e. numbers losing precision),
+- prioritize correctness and predictability over storage efficiency.
+
+For example, most databases don't support sorting `UInt8`. To get around that, we could:
+
+1.  store it into `Int8` by bounding the value to range `0..127`, which would lose information.
+2.  store it into `Int8` by subtracting 128 (i.e. just reinterpreting the bytes as `Int8`). This
+    coercion would be efficient, as the new type would not be any larger than the original, but it
+    would be confusing as value 0 would be converted to -128 and value 255 to 127.
+3.  store it into `Int16`. This uses more space, but it does not lose information or change the
+    meaning of the stored value. So `connector_arrow` coerces `UInt8 => Int16`, `UInt16 => Int32`,
+    `UInt32 => Int64` and `UInt64 => Decimal128(20, 0)`.
 
 ## Dynamic vs static types
 
@@ -112,8 +119,8 @@ This problem can be solved in the following ways:
     only the first batch of data and inferring the types from that. If any of the subsequent batches
     turns out to have different types, we again have the options: reject or cast.
 
-At the moment, `connector_arrow` does not have a common way of solving this problem. SQLite uses
-option 2 and other connectors don't support types with dynamic types parameters.
+At the moment, `connector_arrow` does not have a common way of solving this problem. Connector for
+SQLite uses option 2 and other connectors don't support types with dynamic types parameters.
 
 Preferred way of solving the problem is option 3: infer from the first batch and reject non-uniform
 types. This option will result in more errors being presented to the users. We justify this decision

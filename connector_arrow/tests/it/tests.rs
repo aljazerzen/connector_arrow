@@ -5,14 +5,14 @@ use std::sync::Arc;
 use arrow::array::{ArrayRef, Int64Builder, RecordBatch};
 use arrow::datatypes::{Field, Schema};
 use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::api::{Append, Connection, ResultReader, SchemaEdit, SchemaGet, Statement};
+use connector_arrow::api::{Append, Connector, ResultReader, SchemaEdit, SchemaGet, Statement};
 use connector_arrow::{util::coerce, TableCreateError, TableDropError};
 use rand::SeedableRng;
 
 use crate::util::{load_into_table, query_table};
 use crate::{generator::generate_batch, spec::ArrowGenSpec};
 
-pub fn query_01<C: Connection>(conn: &mut C) {
+pub fn query_01<C: Connector>(conn: &mut C) {
     let query = "SELECT 1 as a, NULL as b";
     let results = connector_arrow::query_one(conn, &query).unwrap();
 
@@ -26,7 +26,7 @@ pub fn query_01<C: Connection>(conn: &mut C) {
     );
 }
 
-pub fn query_02<C: Connection>(conn: &mut C) {
+pub fn query_02<C: Connector>(conn: &mut C) {
     let query = "SELECT
         CAST(45927858023429386042648415184323464939503124872489107431467725871003289085860801 as NUMERIC(100, 20)) as a,
         CAST(3.14 as NUMERIC(2, 0)) as b,
@@ -46,7 +46,7 @@ pub fn query_02<C: Connection>(conn: &mut C) {
 
 pub fn roundtrip<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
-    C: Connection + SchemaEdit,
+    C: Connector + SchemaEdit,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
     let (schema, batches) = generate_batch(spec, &mut rng);
@@ -64,7 +64,7 @@ where
 
 pub fn schema_get<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
-    C: Connection + SchemaEdit + SchemaGet,
+    C: Connector + SchemaEdit + SchemaGet,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
     let (schema, batches) = generate_batch(spec, &mut rng);
@@ -79,7 +79,7 @@ where
 
 pub fn schema_edit<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
 where
-    C: Connection + SchemaEdit + SchemaGet,
+    C: Connector + SchemaEdit + SchemaGet,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
     let (schema, _) = generate_batch(spec, &mut rng);
@@ -103,7 +103,7 @@ where
 
 pub fn ident_escaping<C>(conn: &mut C, table_name_prefix: &str)
 where
-    C: Connection + SchemaEdit + SchemaGet,
+    C: Connector + SchemaEdit + SchemaGet,
 {
     let gibberish = r#"--"'--''!""@"""$#'''%^&*()_+?><\"\""#;
     let table_name = table_name_prefix.to_string() + gibberish;
@@ -137,7 +137,7 @@ where
 }
 
 #[allow(dead_code)]
-pub fn streaming<C: Connection>(conn: &mut C) {
+pub fn streaming<C: Connector>(conn: &mut C) {
     let query = "
     WITH RECURSIVE t(n) AS (
         VALUES (1)

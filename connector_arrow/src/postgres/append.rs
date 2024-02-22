@@ -189,23 +189,25 @@ impl_consume_ty!(UInt32Type, postgres_proto::int8_to_sql, i64::from);
 impl_consume_ty!(Float16Type, postgres_proto::float4_to_sql, f32::from);
 impl_consume_ty!(Float32Type, postgres_proto::float4_to_sql);
 impl_consume_ty!(Float64Type, postgres_proto::float8_to_sql);
-// impl_consume_ty!(TimestampSecondType,  );
-// impl_consume_ty!(TimestampMillisecondType,  );
-impl_consume_ty!(TimestampMicrosecondType, postgres_proto::timestamp_to_sql);
-// impl_consume_ty!(TimestampNanosecondType,  );
-// impl_consume_ty!(Date32Type, date_to_sql);
-// impl_consume_ty!(Date64Type, date_to_sql);
-// impl_consume_ty!(Time32SecondType,  );
-// impl_consume_ty!(Time32MillisecondType,  );
-impl_consume_ty!(Time64MicrosecondType, postgres_proto::time_to_sql);
-// impl_consume_ty!(Time64NanosecondType,  );
+impl_consume_ty!(TimestampSecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(TimestampMillisecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(TimestampMicrosecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(TimestampNanosecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(Date32Type, postgres_proto::int4_to_sql);
+impl_consume_ty!(Date64Type, postgres_proto::int8_to_sql);
+impl_consume_ty!(Time32SecondType, postgres_proto::int4_to_sql);
+impl_consume_ty!(Time32MillisecondType, postgres_proto::int4_to_sql);
+impl_consume_ty!(Time64MicrosecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(Time64NanosecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(DurationSecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(DurationMillisecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(DurationMicrosecondType, postgres_proto::int8_to_sql);
+impl_consume_ty!(DurationNanosecondType, postgres_proto::int8_to_sql);
+
 // impl_consume_ty!(IntervalYearMonthType,  );
 // impl_consume_ty!(IntervalDayTimeType,  );
 // impl_consume_ty!(IntervalMonthDayNanoType,  );
-// impl_consume_ty!(DurationSecondType,  );
-// impl_consume_ty!(DurationMillisecondType,  );
-// impl_consume_ty!(DurationMicrosecondType,  );
-// impl_consume_ty!(DurationNanosecondType,  );
+
 impl_consume_ref_ty!(BinaryType, postgres_proto::bytea_to_sql);
 impl_consume_ref_ty!(LargeBinaryType, postgres_proto::bytea_to_sql);
 impl_consume_ref_ty!(FixedSizeBinaryType, postgres_proto::bytea_to_sql);
@@ -248,20 +250,8 @@ impl ConsumeTy<Decimal256Type> for BytesMut {
 impl_consume_unsupported!(
     BytesMut,
     (
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampNanosecondType,
-        Date32Type,
-        Date64Type,
-        Time32SecondType,
-        Time32MillisecondType,
-        Time64NanosecondType,
         IntervalYearMonthType,
         IntervalDayTimeType,
         IntervalMonthDayNanoType,
-        DurationSecondType,
-        DurationMillisecondType,
-        DurationMicrosecondType,
-        DurationNanosecondType,
     )
 );

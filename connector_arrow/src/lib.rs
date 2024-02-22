@@ -13,7 +13,7 @@
 //!
 //! Example for SQLite:
 //! ```
-//! # use connector_arrow::api::{Connection, Statement, ResultReader};
+//! # use connector_arrow::api::{Connector, Statement, ResultReader};
 //! # use connector_arrow::arrow::record_batch::RecordBatch;
 //! # use connector_arrow::arrow::datatypes::SchemaRef;
 //! # use connector_arrow::sqlite::SQLiteConnection;
@@ -56,10 +56,10 @@ pub use errors::*;
 
 use arrow::record_batch::RecordBatch;
 
-use self::api::{Connection, Statement};
+use self::api::{Connector, Statement};
 
 /// Open a connection, execute a single query and return the connection back into the pool.
-pub fn query_one<C: Connection>(
+pub fn query_one<C: Connector>(
     conn: &mut C,
     query: &str,
 ) -> Result<Vec<RecordBatch>, ConnectorError> {
