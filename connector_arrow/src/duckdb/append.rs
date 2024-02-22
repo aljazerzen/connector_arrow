@@ -1,8 +1,13 @@
-use arrow::array::*;
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use duckdb::{types::Value, Appender};
+use itertools::zip_eq;
+use itertools::Itertools;
 
+use crate::impl_consume_unsupported;
+use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
+use crate::util::transport::{self, Consume, ConsumeTy};
+use crate::util::ArrayCellRef;
 use crate::{api::Append, ConnectorError};
 
 pub struct DuckDBAppender<'conn> {
@@ -11,10 +16,24 @@ pub struct DuckDBAppender<'conn> {
 
 impl<'conn> Append<'conn> for DuckDBAppender<'conn> {
     fn append(&mut self, batch: RecordBatch) -> Result<(), ConnectorError> {
-        for row_index in 0..batch.num_rows() {
-            let row = convert_row(&batch, row_index);
-            self.inner
-                .append_row(duckdb::appender_params_from_iter(row))?;
+        let schema = batch.schema();
+        let mut cell_refs = zip_eq(batch.columns(), schema.fields())
+            .map(|(array, field)| ArrayCellRef {
+                array,
+                field,
+                row_number: 0,
+            })
+            .collect_vec();
+
+        for row_number in 0..batch.num_rows() {
+            let mut row: Vec<Value> = Vec::new();
+
+            for cell_ref in &mut cell_refs {
+                cell_ref.row_number = row_number;
+                transport::transport(cell_ref.field, cell_ref as &_, &mut row).unwrap();
+            }
+            let row = duckdb::appender_params_from_iter(row);
+            self.inner.append_row(row)?;
         }
 
         Ok(())
@@ -25,66 +44,89 @@ impl<'conn> Append<'conn> for DuckDBAppender<'conn> {
     }
 }
 
-fn convert_row(batch: &RecordBatch, row_index: usize) -> Vec<Value> {
-    let mut res = Vec::with_capacity(batch.num_columns());
-    for col_array in batch.columns() {
-        res.push(convert_value(col_array, row_index));
-    }
-    res
+impl Consume for Vec<Value> {}
+
+macro_rules! impl_consume_ty {
+    ($ArrTy: ty, $value_kind: expr) => {
+        impl_consume_ty!($ArrTy, $value_kind, std::convert::identity);
+    };
+
+    ($ArrTy: ty, $value_kind: expr, $conversion: expr) => {
+        impl ConsumeTy<$ArrTy> for Vec<Value> {
+            fn consume(&mut self, _ty: &DataType, value: <$ArrTy as ArrowType>::Native) {
+                self.push($value_kind(($conversion)(value)));
+            }
+
+            fn consume_null(&mut self) {
+                self.push(Value::Null);
+            }
+        }
+    };
 }
 
-fn convert_value(arr: &dyn Array, i: usize) -> Value {
-    if arr.is_null(i) {
-        return Value::Null;
+impl ConsumeTy<NullType> for Vec<Value> {
+    fn consume(&mut self, _ty: &DataType, _value: ()) {
+        self.push(Value::Null);
     }
 
-    match arr.data_type() {
-        DataType::Null => Value::Null,
-        DataType::Boolean => Value::Boolean(arr.as_boolean().value(i)),
-        DataType::Int8 => Value::TinyInt(arr.as_primitive::<Int8Type>().value(i)),
-        DataType::Int16 => Value::SmallInt(arr.as_primitive::<Int16Type>().value(i)),
-        DataType::Int32 => Value::Int(arr.as_primitive::<Int32Type>().value(i)),
-        DataType::Int64 => Value::BigInt(arr.as_primitive::<Int64Type>().value(i)),
-        DataType::UInt8 => Value::UTinyInt(arr.as_primitive::<UInt8Type>().value(i)),
-        DataType::UInt16 => Value::USmallInt(arr.as_primitive::<UInt16Type>().value(i)),
-        DataType::UInt32 => Value::UInt(arr.as_primitive::<UInt32Type>().value(i)),
-        DataType::UInt64 => Value::UBigInt(arr.as_primitive::<UInt64Type>().value(i)),
-        DataType::Float16 => Value::Float(arr.as_primitive::<Float16Type>().value(i).to_f32()),
-        DataType::Float32 => Value::Float(arr.as_primitive::<Float32Type>().value(i)),
-        DataType::Float64 => Value::Double(arr.as_primitive::<Float64Type>().value(i)),
-        DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            Value::BigInt(arr.as_primitive::<TimestampNanosecondType>().value(i))
-        }
-        DataType::Timestamp(TimeUnit::Microsecond, _) => Value::Timestamp(
+    fn consume_null(&mut self) {
+        self.push(Value::Null);
+    }
+}
+
+impl ConsumeTy<TimestampMicrosecondType> for Vec<Value> {
+    fn consume(&mut self, _ty: &DataType, value: i64) {
+        self.push(Value::Timestamp(
             duckdb::types::TimeUnit::Microsecond,
-            arr.as_primitive::<TimestampMicrosecondType>().value(i),
-        ),
-        DataType::Timestamp(TimeUnit::Millisecond, _) => {
-            Value::BigInt(arr.as_primitive::<TimestampMillisecondType>().value(i))
-        }
-        DataType::Timestamp(TimeUnit::Second, _) => {
-            Value::BigInt(arr.as_primitive::<TimestampSecondType>().value(i))
-        }
-        DataType::Date32 => unimplemented!(),
-        DataType::Date64 => unimplemented!(),
-        DataType::Time32(_) => unimplemented!(),
-        DataType::Time64(_) => unimplemented!(),
-        DataType::Duration(_) => unimplemented!(),
-        DataType::Interval(_) => unimplemented!(),
-        DataType::Binary => Value::Blob(arr.as_binary::<i32>().value(i).to_vec()),
-        DataType::FixedSizeBinary(_) => Value::Blob(arr.as_fixed_size_binary().value(i).to_vec()),
-        DataType::LargeBinary => Value::Blob(arr.as_binary::<i64>().value(i).to_vec()),
-        DataType::Utf8 => Value::Text(arr.as_string::<i32>().value(i).to_string()),
-        DataType::LargeUtf8 => Value::Text(arr.as_string::<i32>().value(i).to_string()),
-        DataType::List(_) => unimplemented!(),
-        DataType::FixedSizeList(_, _) => unimplemented!(),
-        DataType::LargeList(_) => unimplemented!(),
-        DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_, _) => unimplemented!(),
-        DataType::Dictionary(_, _) => unimplemented!(),
-        DataType::Decimal128(_, _) => unimplemented!(),
-        DataType::Decimal256(_, _) => unimplemented!(),
-        DataType::Map(_, _) => unimplemented!(),
-        DataType::RunEndEncoded(_, _) => unimplemented!(),
+            value,
+        ));
+    }
+
+    fn consume_null(&mut self) {
+        self.push(Value::Null);
     }
 }
+
+impl_consume_ty!(BooleanType, Value::Boolean);
+impl_consume_ty!(Int8Type, Value::TinyInt);
+impl_consume_ty!(Int16Type, Value::SmallInt);
+impl_consume_ty!(Int32Type, Value::Int);
+impl_consume_ty!(Int64Type, Value::BigInt);
+impl_consume_ty!(UInt8Type, Value::UTinyInt);
+impl_consume_ty!(UInt16Type, Value::USmallInt);
+impl_consume_ty!(UInt32Type, Value::UInt);
+impl_consume_ty!(UInt64Type, Value::UBigInt);
+impl_consume_ty!(Float16Type, Value::Float, f32::from);
+impl_consume_ty!(Float32Type, Value::Float);
+impl_consume_ty!(Float64Type, Value::Double);
+
+impl_consume_ty!(TimestampSecondType, Value::BigInt);
+impl_consume_ty!(TimestampMillisecondType, Value::BigInt);
+impl_consume_ty!(TimestampNanosecondType, Value::BigInt);
+
+impl_consume_ty!(BinaryType, Value::Blob);
+impl_consume_ty!(LargeBinaryType, Value::Blob);
+impl_consume_ty!(FixedSizeBinaryType, Value::Blob);
+impl_consume_ty!(Utf8Type, Value::Text);
+impl_consume_ty!(LargeUtf8Type, Value::Text);
+
+impl_consume_unsupported!(
+    Vec<Value>,
+    (
+        Date32Type,
+        Date64Type,
+        Time32SecondType,
+        Time32MillisecondType,
+        Time64MicrosecondType,
+        Time64NanosecondType,
+        DurationSecondType,
+        DurationMillisecondType,
+        DurationMicrosecondType,
+        DurationNanosecondType,
+        IntervalYearMonthType,
+        IntervalDayTimeType,
+        IntervalMonthDayNanoType,
+        Decimal128Type,
+        Decimal256Type,
+    )
+);
