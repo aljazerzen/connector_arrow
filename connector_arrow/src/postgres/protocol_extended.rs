@@ -5,7 +5,7 @@ use postgres::fallible_iterator::FallibleIterator;
 use postgres::types::FromSql;
 use postgres::{Row, RowIter};
 
-use crate::api::{ResultReader, Statement};
+use crate::api::{ArrowValue, ResultReader, Statement};
 use crate::types::{ArrowType, FixedSizeBinaryType};
 use crate::util::transport;
 use crate::util::{ArrowRowWriter, CellReader};
@@ -14,11 +14,9 @@ use crate::{errors::ConnectorError, util::RowsReader};
 use super::{types, PostgresError, PostgresStatement, ProtocolExtended};
 
 impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolExtended> {
-    type Params = ();
-
     type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;
 
-    fn start(&mut self, _params: ()) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
         let stmt = &self.stmt;
         let schema = types::pg_stmt_to_arrow(stmt)?;
 

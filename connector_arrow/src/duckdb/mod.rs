@@ -11,7 +11,7 @@ use arrow::record_batch::RecordBatch;
 
 use std::sync::Arc;
 
-use crate::api::{Connector, ResultReader, Statement};
+use crate::api::{ArrowValue, Connector, ResultReader, Statement};
 use crate::errors::ConnectorError;
 
 pub struct DuckDBConnection {
@@ -72,13 +72,11 @@ pub struct DuckDBStatement<'conn> {
 }
 
 impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
-    type Params = ();
-
     type Reader<'stmt> = DuckDBReader<'stmt>
     where
         Self: 'stmt;
 
-    fn start(&mut self, _params: ()) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
         let arrow = self.stmt.query_arrow([])?;
         Ok(DuckDBReader { arrow })
     }

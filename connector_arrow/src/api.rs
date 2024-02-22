@@ -5,6 +5,8 @@
 //! - [SchemaGet], for schema introspection,
 //! - [SchemaEdit], for basic schema migration commands,
 
+use std::any::Any;
+
 use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
 
@@ -34,15 +36,13 @@ pub trait Connector {
 
 /// A task that is to be executed in the data store, over a connection.
 pub trait Statement<'conn> {
-    type Params: Send + Sync + Clone;
-
     type Reader<'stmt>: ResultReader<'stmt>
     where
         Self: 'stmt;
 
     /// Start executing.
     /// This will create a reader that can retrieve the result schema and data.
-    fn start(&mut self, params: ()) -> Result<Self::Reader<'_>, ConnectorError>;
+    fn start(&mut self, params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError>;
 }
 
 /// Reads result of the query, starting with the schema.
@@ -72,6 +72,19 @@ pub trait SchemaEdit {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError>;
 
     fn table_drop(&mut self, name: &str) -> Result<(), TableDropError>;
+}
+
+/// A value from the Arrow type system.
+///
+/// Can only be implemented in this crate.
+pub trait ArrowValue: sealed::Sealed + Any {
+    fn get_data_type(&self) -> &DataType;
+
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub(crate) mod sealed {
+    pub trait Sealed {}
 }
 
 /// Stub types that can be used to signal that certain capability is not implemented

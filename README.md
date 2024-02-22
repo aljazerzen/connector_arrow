@@ -11,8 +11,8 @@ databases as "data stores for Arrow format," aligning with the philosophy of dat
 ## Key features
 
 - **Query**: Query databases and retrieve results in Apache Arrow format.
-- **Query Parameters**: Utilize Arrow type system for query parameters (WIP).
-- **Temporal and Container Types**: Correctly handles temporal and container types (WIP).
+- **Query Parameters**: Utilize Arrow type system for query parameters.
+- **Temporal and Container Types**: Correctly handles temporal and container types.
 - **Schema Introspection**: Query the database for schema of specific tables.
 - **Schema Migration**: Basic schema migration commands.
 - **Append**: Write `arrow::record_batch::RecordBatch` into database tables.

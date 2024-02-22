@@ -150,7 +150,7 @@ pub fn streaming<C: Connector>(conn: &mut C) {
     let mut stmt = conn.query(query).unwrap();
 
     // start reading
-    let mut reader = stmt.start(()).unwrap();
+    let mut reader = stmt.start(&[]).unwrap();
 
     // get schema
     let schema = reader.get_schema().unwrap();

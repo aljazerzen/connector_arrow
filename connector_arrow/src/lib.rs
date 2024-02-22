@@ -5,8 +5,8 @@
 //!
 //! Capabilities:
 //! - **Query**: Query databases and retrieve results in Apache Arrow format.
-//! - **Query Parameters**: Utilize Arrow type system for query parameters (WIP).
-//! - **Temporal and Container Types**: Correctly handles temporal and container types (WIP).
+//! - **Query Parameters**: Utilize Arrow type system for query parameters.
+//! - **Temporal and Container Types**: Correctly handles temporal and container types.
 //! - **Schema Introspection**: Query the database for schema of specific tables.
 //! - **Schema Migration**: Basic schema migration commands.
 //! - **Append**: Write [arrow::record_batch::RecordBatch] into database tables.
@@ -27,7 +27,7 @@
 //!
 //! let mut stmt = conn.query("SELECT 1 as a")?;
 //!
-//! let mut reader = stmt.start(())?;
+//! let mut reader = stmt.start(&[])?;
 //!
 //! let schema: SchemaRef = reader.get_schema()?;
 //!
@@ -41,6 +41,7 @@
 
 pub mod api;
 mod errors;
+mod params;
 pub mod types;
 pub mod util;
 
@@ -69,7 +70,7 @@ pub fn query_one<C: Connector>(
     let mut stmt = conn.query(query)?;
 
     // start reading
-    let reader = stmt.start(())?;
+    let reader = stmt.start(&[])?;
 
     // collect results
     let batches = reader.collect::<Result<_, _>>()?;

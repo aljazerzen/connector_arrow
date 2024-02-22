@@ -2,7 +2,7 @@ use arrow::datatypes::*;
 use hex::decode;
 use postgres::{SimpleQueryMessage, SimpleQueryRow};
 
-use crate::api::Statement;
+use crate::api::{ArrowValue, Statement};
 use crate::types::{ArrowType, FixedSizeBinaryType};
 use crate::util::{collect_rows_to_arrow, transport, ArrowReader, CellReader};
 use crate::{errors::ConnectorError, util::RowsReader};
@@ -10,11 +10,9 @@ use crate::{errors::ConnectorError, util::RowsReader};
 use super::{types, PostgresError, PostgresStatement, ProtocolSimple};
 
 impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolSimple> {
-    type Params = ();
-
     type Reader<'stmt> = ArrowReader where Self: 'stmt;
 
-    fn start(&mut self, _params: ()) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
         let stmt = &self.stmt;
         let schema = types::pg_stmt_to_arrow(stmt)?;
 

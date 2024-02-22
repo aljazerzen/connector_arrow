@@ -4,7 +4,7 @@ use arrow::datatypes::*;
 use itertools::zip_eq;
 use rusqlite::types::Value;
 
-use crate::api::Statement;
+use crate::api::{ArrowValue, Statement};
 use crate::types::FixedSizeBinaryType;
 use crate::util::transport::{Produce, ProduceTy};
 use crate::util::ArrowReader;
@@ -18,14 +18,13 @@ pub struct SQLiteStatement<'conn> {
 }
 
 impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
-    type Params = ();
     type Reader<'task> = ArrowReader where Self: 'task;
 
-    fn start(&mut self, params: Self::Params) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
         let column_count = self.stmt.column_count();
 
         let rows: Vec<Vec<Value>> = {
-            let mut rows_iter = self.stmt.query(params)?;
+            let mut rows_iter = self.stmt.query([])?;
 
             // read all of the rows into a buffer
             let mut rows = Vec::with_capacity(1024);
