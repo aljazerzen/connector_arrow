@@ -59,11 +59,8 @@ use arrow::record_batch::RecordBatch;
 
 use self::api::{Connector, Statement};
 
-/// Open a connection, execute a single query and return the connection back into the pool.
-pub fn query_one<C: Connector>(
-    conn: &mut C,
-    query: &str,
-) -> Result<Vec<RecordBatch>, ConnectorError> {
+/// Open a connection, execute a single query and return the results.
+pub fn query<C: Connector>(conn: &mut C, query: &str) -> Result<Vec<RecordBatch>, ConnectorError> {
     log::debug!("query: {query}");
 
     // prepare statement

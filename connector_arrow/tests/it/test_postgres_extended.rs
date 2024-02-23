@@ -1,7 +1,9 @@
 use connector_arrow::postgres::{PostgresConnection, ProtocolExtended};
 use rstest::*;
 
-use super::spec;
+use crate::spec;
+use crate::test_postgres_common::literals_cases;
+use crate::util::QueryOfSingleLiteral;
 
 fn init() -> PostgresConnection<ProtocolExtended> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -40,4 +42,15 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     let table_name = format!("extended::{table_name}");
     super::tests::roundtrip(&mut conn, &table_name, spec);
+}
+
+#[rstest]
+#[case::bool(literals_cases::bool())]
+#[case::int(literals_cases::int())]
+#[case::float(literals_cases::float())]
+#[case::decimal(literals_cases::decimal())]
+#[case::timestamp(literals_cases::timestamp())]
+fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
+    let mut conn = init();
+    crate::util::query_literals(&mut conn, queries)
 }

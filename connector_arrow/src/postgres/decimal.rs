@@ -45,11 +45,14 @@ pub fn from_sql(raw: &[u8]) -> std::io::Result<String> {
     // number of digits (in base 10) to print after decimal separator
     let scale = i16::from_be_bytes(read_two_bytes(&mut raw)?);
 
-    if sign == 0xC000 {
-        // TODO: are we ok with this? Other options are NULL and error. Both of them feel worse.
-        return Ok("NaN".into());
-    }
-    let negate = sign == 0x4000;
+    let negate = match sign {
+        0x0000 => false,
+        0x4000 => true,
+        0xD000 => return Ok("Infinity".into()),
+        0xF000 => return Ok("-Infinity".into()),
+        0xC000 => return Ok("NaN".into()),
+        _ => panic!("invalid sign value: {:x}", sign),
+    };
 
     // read all of the groups
     let mut buf = String::new();

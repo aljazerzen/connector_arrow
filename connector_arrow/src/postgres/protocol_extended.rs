@@ -131,30 +131,49 @@ type CellRef<'a> = (&'a Row, usize);
 impl<'c> transport::Produce<'c> for CellRef<'c> {}
 
 macro_rules! impl_produce {
-    ($($t: ty,)+) => {
-        $(
-            impl<'c> transport::ProduceTy<'c, $t> for CellRef<'c> {
-                fn produce(self) -> Result<<$t as ArrowType>::Native, ConnectorError> {
-                    Ok(self.0.get(self.1))
-                }
-
-                fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
-                    Ok(self.0.get(self.1))
-                }
+    ($t: ty, $native: ty, $conversion_fn: expr) => {
+        impl<'c> transport::ProduceTy<'c, $t> for CellRef<'c> {
+            fn produce(self) -> Result<<$t as ArrowType>::Native, ConnectorError> {
+                let value = self.0.get::<_, $native>(self.1);
+                $conversion_fn(value)
             }
-        )+
+
+            fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
+                let value = self.0.get::<_, Option<$native>>(self.1);
+                value.map($conversion_fn).transpose()
+            }
+        }
     };
 }
+
+impl_produce!(BooleanType, bool, Result::Ok);
+impl_produce!(Int8Type, i8, Result::Ok);
+impl_produce!(Int16Type, i16, Result::Ok);
+impl_produce!(Int32Type, i32, Result::Ok);
+impl_produce!(Int64Type, i64, Result::Ok);
+impl_produce!(Float32Type, f32, Result::Ok);
+impl_produce!(Float64Type, f64, Result::Ok);
+impl_produce!(LargeBinaryType, Vec<u8>, Result::Ok);
+impl_produce!(LargeUtf8Type, String, Result::Ok);
 impl_produce!(
-    BooleanType,
-    Int8Type,
-    Int16Type,
-    Int32Type,
-    Int64Type,
-    Float32Type,
-    Float64Type,
-    LargeBinaryType,
-    LargeUtf8Type,
+    TimestampSecondType,
+    TimestampY2000,
+    TimestampY2000::into_second
+);
+impl_produce!(
+    TimestampMillisecondType,
+    TimestampY2000,
+    TimestampY2000::into_millisecond
+);
+impl_produce!(
+    TimestampMicrosecondType,
+    TimestampY2000,
+    TimestampY2000::into_microsecond
+);
+impl_produce!(
+    TimestampNanosecondType,
+    TimestampY2000,
+    TimestampY2000::into_nanosecond
 );
 
 crate::impl_produce_unsupported!(
@@ -165,10 +184,10 @@ crate::impl_produce_unsupported!(
         UInt32Type,
         UInt64Type,
         Float16Type,
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampMicrosecondType,
-        TimestampNanosecondType,
+        // TimestampSecondType,
+        // TimestampMillisecondType,
+        // TimestampMicrosecondType,
+        // TimestampNanosecondType,
         Date32Type,
         Date64Type,
         Time32SecondType,
@@ -211,5 +230,50 @@ impl<'c> transport::ProduceTy<'c, Utf8Type> for CellRef<'c> {
 
     fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
         Ok(self.0.get::<_, Option<Numeric>>(self.1).map(|n| n.0))
+    }
+}
+
+struct TimestampY2000(i64);
+
+const DUR_1970_TO_2000_SEC: i64 = 10957 * 24 * 60 * 60;
+
+impl TimestampY2000 {
+    fn into_nanosecond(self) -> Result<i64, ConnectorError> {
+        self.0
+            .checked_add(DUR_1970_TO_2000_SEC * 1000 * 1000)
+            .and_then(|micros_y1970| micros_y1970.mul_checked(1000).ok())
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+    fn into_microsecond(self) -> Result<i64, ConnectorError> {
+        self.0
+            .checked_add(DUR_1970_TO_2000_SEC * 1000 * 1000)
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+    fn into_millisecond(self) -> Result<i64, ConnectorError> {
+        self.0
+            .div_checked(1000)
+            .ok()
+            .and_then(|millis_y2000| millis_y2000.checked_add(DUR_1970_TO_2000_SEC * 1000))
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+    fn into_second(self) -> Result<i64, ConnectorError> {
+        self.0
+            .div_checked(1_000_000)
+            .ok()
+            .and_then(|sec_y2000| sec_y2000.checked_add(DUR_1970_TO_2000_SEC))
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+}
+
+impl<'a> FromSql<'a> for TimestampY2000 {
+    fn from_sql(
+        _ty: &postgres::types::Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        postgres_protocol::types::timestamp_from_sql(raw).map(TimestampY2000)
+    }
+
+    fn accepts(_ty: &postgres::types::Type) -> bool {
+        true
     }
 }

@@ -3,7 +3,9 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType as ArrowType, *};
 use postgres::types::Type as PgType;
 
-use crate::errors::ConnectorError;
+use crate::{api::Connector, errors::ConnectorError};
+
+use super::{PostgresConnection, ProtocolExtended};
 
 pub fn pg_stmt_to_arrow(
     stmt: &postgres::Statement,
@@ -18,35 +20,11 @@ pub fn pg_stmt_to_arrow(
 
 pub fn pg_ty_to_arrow(ty: &PgType) -> ArrowType {
     match ty.name() {
-        "int2" => ArrowType::Int16,
-        "int4" => ArrowType::Int32,
-        "int8" => ArrowType::Int64,
-        "float4" => ArrowType::Float32,
-        "float8" => ArrowType::Float64,
-        "numeric" => ArrowType::Utf8,
-        // "_bool" => ArrowType::Bool,
-        // "_int2" => ArrowType::Int2Array,
-        // "_int4" => ArrowType::Int4Array,
-        // "_int8" => ArrowType::Int8Array,
-        // "_float4" => ArrowType::Float4Array,
-        // "_float8" => ArrowType::Float8Array,
-        // "_numeric" => ArrowType::NumericArray,
-        // "_varchar" => ArrowType::VarcharArray,
-        // "_text" => ArrowType::TextArray,
-        "bool" => ArrowType::Boolean,
-        "text" | "citext" | "ltree" | "lquery" | "ltxtquery" | "name" => ArrowType::LargeUtf8,
-        "bpchar" => ArrowType::LargeUtf8,
+        "text" => ArrowType::LargeUtf8,
         "varchar" => ArrowType::LargeUtf8,
         "bytea" => ArrowType::LargeBinary,
-        // "time" => ArrowType::Time,
-        // "timestamp" => ArrowType::Timestamp,
-        // "timestamptz" => ArrowType::TimestampTz,
-        // "date" => ArrowType::Date,
-        // "uuid" => ArrowType::UUID,
-        // "json" => ArrowType::JSON,
-        // "jsonb" => ArrowType::JSONB,
-        // "hstore" => ArrowType::HSTORE,
-        _ => unimplemented!("{}", ty.name()),
+        name => PostgresConnection::<ProtocolExtended>::type_db_into_arrow(name)
+            .unwrap_or_else(|| unimplemented!("{name}")),
     }
 }
 

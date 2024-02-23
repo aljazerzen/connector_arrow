@@ -18,6 +18,9 @@ pub enum ConnectorError {
         hint: Option<String>,
     },
 
+    #[error("When converting values from database representation into into an Arrow types, it fell out of supported range.")]
+    DataOutOfRange,
+
     #[error(transparent)]
     UrlEncoding(#[from] FromUtf8Error),
 

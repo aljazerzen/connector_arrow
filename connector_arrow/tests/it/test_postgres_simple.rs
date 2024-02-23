@@ -1,7 +1,9 @@
 use connector_arrow::postgres::{PostgresConnection, ProtocolSimple};
 use rstest::*;
 
-use super::spec;
+use crate::spec;
+use crate::test_postgres_common::literals_cases;
+use crate::util::QueryOfSingleLiteral;
 
 fn init() -> PostgresConnection<ProtocolSimple> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -42,28 +44,13 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     super::tests::roundtrip(&mut conn, &table_name, spec);
 }
 
-#[test]
-fn schema_get() {
-    let table_name = "simple::schema_get";
-
+#[rstest]
+#[case::bool(literals_cases::bool())]
+#[case::int(literals_cases::int())]
+#[case::float(literals_cases::float())]
+#[case::decimal(literals_cases::decimal())]
+// #[case::timestamp(literals_cases::timestamp())]
+fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
     let mut conn = init();
-    let column_spec = super::spec::basic_types();
-    super::tests::schema_get(&mut conn, table_name, column_spec);
-}
-
-#[test]
-fn schema_edit() {
-    let table_name = "simple::schema_edit";
-
-    let mut conn = init();
-    let column_spec = super::spec::basic_types();
-    super::tests::schema_edit(&mut conn, table_name, column_spec);
-}
-
-#[test]
-fn ident_escaping() {
-    let table_name = "simple::ident_escaping";
-
-    let mut conn = init();
-    super::tests::ident_escaping(&mut conn, table_name);
+    crate::util::query_literals(&mut conn, queries)
 }

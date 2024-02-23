@@ -28,9 +28,21 @@ pub trait Connector {
     /// Prepare an appender for the given table.
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
 
-    /// Describes how a given type will change during a roundtrip to the database.
-    /// None means that type will not change.
-    // TODO: split this function into "coerce_during_query" and "coerce_during_append"
+    /// Describes how database types map into the arrow types.
+    /// None means that querying this type is not supported.
+    // I cannot think of a better name. I'd want it to start with `type_`.
+    fn type_db_into_arrow(_database_ty: &str) -> Option<DataType> {
+        todo!()
+    }
+
+    /// Describes how arrow types map into the database types.
+    /// None means that appending this type is not supported.
+    fn type_arrow_into_db(_ty: &DataType) -> Option<String> {
+        todo!()
+    }
+
+    /// Describes how arrow types map into the database types.
+    /// None means that appending this type is not supported.
     fn coerce_type(ty: &DataType) -> Option<DataType>;
 }
 

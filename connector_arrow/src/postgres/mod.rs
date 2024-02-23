@@ -19,7 +19,7 @@ mod protocol_simple;
 mod schema;
 mod types;
 
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, TimeUnit};
 use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -138,6 +138,26 @@ where
             DataType::Decimal256(_, _) => Some(DataType::Utf8),
             _ => None,
         }
+    }
+
+    fn type_db_into_arrow(ty: &str) -> Option<DataType> {
+        Some(match ty {
+            "boolean" | "bool" => DataType::Boolean,
+            "smallint" | "int2" => DataType::Int16,
+            "integer" | "int4" => DataType::Int32,
+            "bigint" | "int8" => DataType::Int64,
+            "real" | "float4" => DataType::Float32,
+            "double precision" | "float8" => DataType::Float64,
+            "numeric" | "decimal" => DataType::Utf8,
+
+            "timestamp" | "timestamp without time zone" => {
+                DataType::Timestamp(TimeUnit::Microsecond, None)
+            }
+            "timestamptz" | "timestamp with time zone" => {
+                DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".into()))
+            }
+            _ => return None,
+        })
     }
 }
 
