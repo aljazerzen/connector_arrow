@@ -20,7 +20,12 @@ fn query_01() {
 #[case::int("roundtrip::int", spec::int())]
 #[case::uint("roundtrip::uint", spec::uint())]
 #[case::float("roundtrip::float", spec::float())]
+// #[case::decimal("roundtrip::decimal", spec::decimal())]
 #[case::timestamp("roundtrip::timestamp", spec::timestamp())]
+// #[case::date("roundtrip::date", spec::date())]
+// #[case::time("roundtrip::time", spec::time())]
+// #[case::duration("roundtrip::duration", spec::duration())]
+// #[case::interval("roundtrip::interval", spec::interval())]
 #[case::utf8("roundtrip::utf8", spec::utf8())]
 #[case::binary("roundtrip::binary", spec::binary())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {

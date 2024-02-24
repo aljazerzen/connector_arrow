@@ -191,7 +191,6 @@ pub fn duration() -> Vec<ColumnSpec> {
     )
 }
 
-#[allow(dead_code)]
 pub fn interval() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[

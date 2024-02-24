@@ -44,10 +44,10 @@ without need for dynamic linking of C libraries.
 | roundtrip: uint | x | x | x |
 | roundtrip: float | x | x | x |
 | roundtrip: decimal | x |  | x |
-| roundtrip: timestamp | x | x |  |
-| roundtrip: date | x |  |  |
-| roundtrip: time | x |  |  |
-| roundtrip: duration | x |  |  |
+| roundtrip: timestamp | x | x | x |
+| roundtrip: date | x |  | x |
+| roundtrip: time | x |  | x |
+| roundtrip: duration | x |  | x |
 | roundtrip: interval |  |  |  |
 | roundtrip: utf8 | x | x | x |
 | roundtrip: binary | x | x | x |
