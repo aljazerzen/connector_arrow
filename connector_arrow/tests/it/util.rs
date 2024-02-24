@@ -68,7 +68,12 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
     for (index, query) in queries.into_iter().enumerate() {
         let field_name = format!("f_{}", index);
 
-        let dt = C::type_db_into_arrow(&query.db_ty).unwrap();
+        let dt = C::type_db_into_arrow(&query.db_ty).unwrap_or_else(|| {
+            panic!(
+                "test failed: datebase type {} cannot be converted to arrow",
+                query.db_ty
+            )
+        });
         expected_arrays.push(new_singleton_array(&dt, query.value));
         let field = Field::new(&field_name, dt, true);
         expected_fields.push(field);
@@ -91,7 +96,14 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
     });
     let batch = batches.into_iter().exactly_one().unwrap();
 
-    similar_asserts::assert_eq!(expected, batch);
+    similar_asserts::assert_eq!(
+        arrow::util::pretty::pretty_format_batches(&vec![expected])
+            .unwrap()
+            .to_string(),
+        arrow::util::pretty::pretty_format_batches(&vec![batch])
+            .unwrap()
+            .to_string(),
+    );
 }
 
 fn new_singleton_array(data_type: &DataType, value: Box<dyn ArrowValue>) -> ArrayRef {

@@ -152,7 +152,7 @@ crate::impl_produce_unsupported!(
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        BinaryType,
+        LargeBinaryType,
         FixedSizeBinaryType,
         Decimal128Type,
         Decimal256Type,
@@ -181,9 +181,9 @@ impl<'r> transport::ProduceTy<'r, LargeUtf8Type> for CellRef<'r> {
     }
 }
 
-impl<'r> transport::ProduceTy<'r, LargeBinaryType> for CellRef<'r> {
+impl<'r> transport::ProduceTy<'r, BinaryType> for CellRef<'r> {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
-        transport::ProduceTy::<LargeBinaryType>::produce_opt(self)?.ok_or_else(err_null)
+        transport::ProduceTy::<BinaryType>::produce_opt(self)?.ok_or_else(err_null)
     }
 
     fn produce_opt(self) -> Result<Option<Vec<u8>>, ConnectorError> {

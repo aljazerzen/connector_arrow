@@ -19,13 +19,8 @@ pub fn pg_stmt_to_arrow(
 }
 
 pub fn pg_ty_to_arrow(ty: &PgType) -> ArrowType {
-    match ty.name() {
-        "text" => ArrowType::LargeUtf8,
-        "varchar" => ArrowType::LargeUtf8,
-        "bytea" => ArrowType::LargeBinary,
-        name => PostgresConnection::<ProtocolExtended>::type_db_into_arrow(name)
-            .unwrap_or_else(|| unimplemented!("{name}")),
-    }
+    PostgresConnection::<ProtocolExtended>::type_db_into_arrow(ty.name())
+        .unwrap_or_else(|| unimplemented!("{}", ty.name()))
 }
 
 pub(crate) fn arrow_ty_to_pg(data_type: &ArrowType) -> String {

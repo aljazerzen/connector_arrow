@@ -2,7 +2,7 @@ use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
-use postgres::types::FromSql;
+use postgres::types::{FromSql, Type};
 use postgres::{Row, RowIter};
 
 use crate::api::{ArrowValue, ResultReader, Statement};
@@ -153,27 +153,21 @@ impl_produce!(Int32Type, i32, Result::Ok);
 impl_produce!(Int64Type, i64, Result::Ok);
 impl_produce!(Float32Type, f32, Result::Ok);
 impl_produce!(Float64Type, f64, Result::Ok);
-impl_produce!(LargeBinaryType, Vec<u8>, Result::Ok);
+impl_produce!(BinaryType, Binary, Binary::into_arrow);
+impl_produce!(LargeBinaryType, Binary, Binary::into_arrow);
+impl_produce!(Utf8Type, StrOrNum, StrOrNum::into_arrow);
 impl_produce!(LargeUtf8Type, String, Result::Ok);
-impl_produce!(
-    TimestampSecondType,
-    TimestampY2000,
-    TimestampY2000::into_second
-);
-impl_produce!(
-    TimestampMillisecondType,
-    TimestampY2000,
-    TimestampY2000::into_millisecond
-);
 impl_produce!(
     TimestampMicrosecondType,
     TimestampY2000,
     TimestampY2000::into_microsecond
 );
+impl_produce!(Time64MicrosecondType, Time64, Time64::into_microsecond);
+impl_produce!(Date32Type, DaysSinceY2000, DaysSinceY2000::into_date32);
 impl_produce!(
-    TimestampNanosecondType,
-    TimestampY2000,
-    TimestampY2000::into_nanosecond
+    IntervalMonthDayNanoType,
+    IntervalMonthDayMicros,
+    IntervalMonthDayMicros::into_arrow
 );
 
 crate::impl_produce_unsupported!(
@@ -184,96 +178,173 @@ crate::impl_produce_unsupported!(
         UInt32Type,
         UInt64Type,
         Float16Type,
-        // TimestampSecondType,
-        // TimestampMillisecondType,
-        // TimestampMicrosecondType,
-        // TimestampNanosecondType,
-        Date32Type,
+        TimestampSecondType,
+        TimestampMillisecondType,
+        TimestampNanosecondType,
         Date64Type,
         Time32SecondType,
         Time32MillisecondType,
-        Time64MicrosecondType,
         Time64NanosecondType,
         IntervalYearMonthType,
         IntervalDayTimeType,
-        IntervalMonthDayNanoType,
         DurationSecondType,
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        BinaryType,
         FixedSizeBinaryType,
         Decimal128Type,
         Decimal256Type,
     )
 );
 
-struct Numeric(String);
+struct StrOrNum(String);
 
-impl<'a> FromSql<'a> for Numeric {
+impl StrOrNum {
+    fn into_arrow(self) -> Result<String, ConnectorError> {
+        Ok(self.0)
+    }
+}
+
+impl<'a> FromSql<'a> for StrOrNum {
     fn from_sql(
-        _ty: &postgres::types::Type,
+        ty: &Type,
         raw: &'a [u8],
     ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-        Ok(super::decimal::from_sql(raw).map(Numeric)?)
+        if matches!(ty, &Type::NUMERIC) {
+            Ok(super::decimal::from_sql(raw).map(StrOrNum)?)
+        } else {
+            let slice = postgres_protocol::types::text_from_sql(raw)?;
+            Ok(StrOrNum(slice.to_string()))
+        }
     }
 
-    fn accepts(_ty: &postgres::types::Type) -> bool {
+    fn accepts(_ty: &Type) -> bool {
         true
     }
 }
 
-impl<'c> transport::ProduceTy<'c, Utf8Type> for CellRef<'c> {
-    fn produce(self) -> Result<String, ConnectorError> {
-        Ok(self.0.get::<_, Numeric>(self.1).0)
-    }
-
-    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
-        Ok(self.0.get::<_, Option<Numeric>>(self.1).map(|n| n.0))
-    }
-}
+const DUR_1970_TO_2000_DAYS: i32 = 10957;
+const DUR_1970_TO_2000_SEC: i64 = DUR_1970_TO_2000_DAYS as i64 * 24 * 60 * 60;
 
 struct TimestampY2000(i64);
 
-const DUR_1970_TO_2000_SEC: i64 = 10957 * 24 * 60 * 60;
-
-impl TimestampY2000 {
-    fn into_nanosecond(self) -> Result<i64, ConnectorError> {
-        self.0
-            .checked_add(DUR_1970_TO_2000_SEC * 1000 * 1000)
-            .and_then(|micros_y1970| micros_y1970.mul_checked(1000).ok())
-            .ok_or(ConnectorError::DataOutOfRange)
-    }
-    fn into_microsecond(self) -> Result<i64, ConnectorError> {
-        self.0
-            .checked_add(DUR_1970_TO_2000_SEC * 1000 * 1000)
-            .ok_or(ConnectorError::DataOutOfRange)
-    }
-    fn into_millisecond(self) -> Result<i64, ConnectorError> {
-        self.0
-            .div_checked(1000)
-            .ok()
-            .and_then(|millis_y2000| millis_y2000.checked_add(DUR_1970_TO_2000_SEC * 1000))
-            .ok_or(ConnectorError::DataOutOfRange)
-    }
-    fn into_second(self) -> Result<i64, ConnectorError> {
-        self.0
-            .div_checked(1_000_000)
-            .ok()
-            .and_then(|sec_y2000| sec_y2000.checked_add(DUR_1970_TO_2000_SEC))
-            .ok_or(ConnectorError::DataOutOfRange)
-    }
-}
-
 impl<'a> FromSql<'a> for TimestampY2000 {
     fn from_sql(
-        _ty: &postgres::types::Type,
+        _ty: &Type,
         raw: &'a [u8],
     ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         postgres_protocol::types::timestamp_from_sql(raw).map(TimestampY2000)
     }
 
-    fn accepts(_ty: &postgres::types::Type) -> bool {
+    fn accepts(_ty: &Type) -> bool {
         true
+    }
+}
+
+impl TimestampY2000 {
+    fn into_microsecond(self) -> Result<i64, ConnectorError> {
+        self.0
+            .checked_add(DUR_1970_TO_2000_SEC * 1000 * 1000)
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+}
+
+struct DaysSinceY2000(i32);
+
+impl<'a> FromSql<'a> for DaysSinceY2000 {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        postgres_protocol::types::date_from_sql(raw).map(DaysSinceY2000)
+    }
+
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
+
+impl DaysSinceY2000 {
+    fn into_date32(self) -> Result<i32, ConnectorError> {
+        self.0
+            .checked_add(DUR_1970_TO_2000_DAYS)
+            .ok_or(ConnectorError::DataOutOfRange)
+    }
+}
+
+struct Time64(i64);
+
+impl<'a> FromSql<'a> for Time64 {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        postgres_protocol::types::time_from_sql(raw).map(Time64)
+    }
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
+
+impl Time64 {
+    fn into_microsecond(self) -> Result<i64, ConnectorError> {
+        Ok(self.0)
+    }
+}
+
+struct IntervalMonthDayMicros(i32, i32, i64);
+
+impl<'a> FromSql<'a> for IntervalMonthDayMicros {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let micros = postgres_protocol::types::time_from_sql(&raw[0..8])?;
+        let days = postgres_protocol::types::int4_from_sql(&raw[8..12])?;
+        let months = postgres_protocol::types::int4_from_sql(&raw[12..16])?;
+        Ok(IntervalMonthDayMicros(months, days, micros))
+    }
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
+
+impl IntervalMonthDayMicros {
+    fn into_arrow(self) -> Result<i128, ConnectorError> {
+        let nanos = (self.2.checked_mul(1000)).ok_or(ConnectorError::DataOutOfRange)?;
+
+        let mut bytes = [0; 16];
+        bytes[0..4].copy_from_slice(&self.0.to_be_bytes());
+        bytes[4..8].copy_from_slice(&self.1.to_be_bytes());
+        bytes[8..16].copy_from_slice(&nanos.to_be_bytes());
+        Ok(i128::from_be_bytes(bytes))
+    }
+}
+
+struct Binary<'a>(&'a [u8]);
+
+impl<'a> FromSql<'a> for Binary<'a> {
+    fn from_sql(
+        ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(if matches!(ty, &Type::VARBIT | &Type::BIT) {
+            let varbit = postgres_protocol::types::varbit_from_sql(raw)?;
+            dbg!(varbit.len());
+            dbg!(varbit.bytes());
+            Binary(varbit.bytes())
+        } else {
+            Binary(postgres_protocol::types::bytea_from_sql(raw))
+        })
+    }
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
+
+impl Binary<'_> {
+    fn into_arrow(self) -> Result<Vec<u8>, ConnectorError> {
+        // this is a clone, that is needed because Produce requires Vec<u8>
+        Ok(self.0.to_vec())
     }
 }

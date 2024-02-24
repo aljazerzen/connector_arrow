@@ -89,39 +89,39 @@ macro_rules! impl_arrow_value_tuple {
 }
 
 impl_arrow_value_tuple!(
+    i32,
+    (
+        Date32Type,
+        Time32SecondType,
+        Time32MillisecondType,
+        IntervalYearMonthType,
+    )
+);
+
+impl_arrow_value_tuple!(
     i64,
     (
         TimestampSecondType,
         TimestampMillisecondType,
         TimestampMicrosecondType,
         TimestampNanosecondType,
-    )
-);
-
-impl_produce_unsupported!(
-    &'r dyn ArrowValue,
-    (
-        NullType,
-        Float16Type,
-        // BinaryType,
-        // Utf8Type,
-        Date32Type,
         Date64Type,
-        Time32SecondType,
-        Time32MillisecondType,
         Time64MicrosecondType,
         Time64NanosecondType,
-        IntervalYearMonthType,
-        IntervalDayTimeType,
-        IntervalMonthDayNanoType,
         DurationSecondType,
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        LargeBinaryType,
-        FixedSizeBinaryType,
-        LargeUtf8Type,
-        Decimal128Type,
-        Decimal256Type,
+        IntervalDayTimeType,
     )
 );
+
+impl_arrow_value_tuple!(i128, (IntervalMonthDayNanoType, Decimal128Type,));
+
+impl_arrow_value_tuple!(i256, (Decimal256Type,));
+
+impl_arrow_value_tuple!(String, (LargeUtf8Type,));
+
+impl_arrow_value_tuple!(Vec<u8>, (LargeBinaryType, FixedSizeBinaryType,));
+
+impl_produce_unsupported!(&'r dyn ArrowValue, (NullType, Float16Type,));

@@ -19,7 +19,7 @@ mod protocol_simple;
 mod schema;
 mod types;
 
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use postgres::Client;
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -130,9 +130,9 @@ where
             DataType::Time64(_) => Some(DataType::Int64),
             DataType::Duration(_) => Some(DataType::Int64),
 
-            DataType::Utf8 => Some(DataType::LargeUtf8),
-            DataType::Binary => Some(DataType::LargeBinary),
-            DataType::FixedSizeBinary(_) => Some(DataType::LargeBinary),
+            DataType::LargeUtf8 => Some(DataType::Utf8),
+            DataType::LargeBinary => Some(DataType::Binary),
+            DataType::FixedSizeBinary(_) => Some(DataType::Binary),
 
             DataType::Decimal128(_, _) => Some(DataType::Utf8),
             DataType::Decimal256(_, _) => Some(DataType::Utf8),
@@ -156,6 +156,19 @@ where
             "timestamptz" | "timestamp with time zone" => {
                 DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".into()))
             }
+            "date" => DataType::Date32,
+            "time" | "time without time zone" => DataType::Time64(TimeUnit::Microsecond),
+            "interval" => DataType::Interval(IntervalUnit::MonthDayNano),
+
+            "bytea" => DataType::Binary,
+            "bit" | "bit varying" | "varbit" => DataType::Binary,
+            _ if ty.starts_with("bit") => DataType::Binary,
+
+            "text" | "varchar" | "char" | "bpchar" => DataType::Utf8,
+            _ if ty.starts_with("varchar") | ty.starts_with("char") | ty.starts_with("bpchar") => {
+                DataType::Utf8
+            }
+
             _ => return None,
         })
     }

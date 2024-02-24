@@ -50,6 +50,11 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
 #[case::float(literals_cases::float())]
 #[case::decimal(literals_cases::decimal())]
 #[case::timestamp(literals_cases::timestamp())]
+#[case::date(literals_cases::date())]
+#[case::time(literals_cases::time())]
+#[case::interval(literals_cases::interval())]
+#[case::binary(literals_cases::binary())]
+#[case::text(literals_cases::text())]
 fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
     let mut conn = init();
     crate::util::query_literals(&mut conn, queries)

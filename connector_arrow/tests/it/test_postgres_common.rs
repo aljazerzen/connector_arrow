@@ -35,6 +35,8 @@ fn ident_escaping() {
 }
 
 pub mod literals_cases {
+    use arrow::datatypes::{DataType, TimeUnit};
+
     use crate::util::QueryOfSingleLiteral;
 
     pub fn bool() -> Vec<QueryOfSingleLiteral> {
@@ -126,22 +128,85 @@ pub mod literals_cases {
         ]
     }
 
+    pub fn date() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            ("date", "DATE '2024-02-23'", (DataType::Date32, 19776_i32)).into(),
+            ("date", "'4713-01-01 BC'", (DataType::Date32, -2440550_i32)).into(),
+            ("date", "'5874897-1-1'", (DataType::Date32, 2145042541_i32)).into(),
+        ]
+    }
+
+    pub fn time() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            (
+                "time",
+                "'17:18:36'",
+                (DataType::Time64(TimeUnit::Microsecond), 62316000000_i64),
+            )
+                .into(),
+            (
+                "time without time zone",
+                "'17:18:36.789'",
+                (DataType::Time64(TimeUnit::Microsecond), 62316789000_i64),
+            )
+                .into(),
+            // timetz not supported by postgres crate
+            // (
+            //     "time with time zone",
+            //     "'17:18:36.789+01:00'",
+            //     (DataType::Time64(TimeUnit::Microsecond), 65916789000_i64),
+            // )
+            //     .into(),
+            // (
+            //     "time with time zone",
+            //     "'17:18:36.789 CEST'",
+            //     (DataType::Time64(TimeUnit::Microsecond), 65916789000_i64),
+            // )
+            //     .into(),
+        ]
+    }
+
+    pub fn interval() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            (
+                "interval",
+                "'P12M3DT4H5M6S'",
+                (
+                    DataType::Duration(TimeUnit::Microsecond),
+                    0x0000000C_00000003_00000d6001e7f400_i128,
+                ),
+            )
+                .into(),
+            (
+                "interval",
+                "'P-1Y-2M3DT-4H-5M-6S'",
+                (
+                    DataType::Duration(TimeUnit::Microsecond),
+                    0xfffffff2_00000003_fffff29ffe180c00_u128 as i128,
+                ),
+            )
+                .into(),
+        ]
+    }
+
+    pub fn binary() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            ("bytea", "'\\xDEADBEEF'", vec![0xDE, 0xAD, 0xBE, 0xEF]).into(),
+            ("bit(4)", "B'1011'", vec![0b10110000]).into(),
+            ("bit varying(6)", "B'1011'", vec![0b10110000]).into(),
+        ]
+    }
+
+    pub fn text() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            ("text", "'ok'", "ok".to_string()).into(),
+            ("char(6)", "'hello'", "hello ".to_string()).into(),
+            ("varchar(6)", "'world'", "world".to_string()).into(),
+            ("bpchar", "' nope  '", " nope  ".to_string()).into(),
+        ]
+    }
+
     // TODO:
-    // bit [ (n) ]
-    // bit varying [ (n) ]
-    // bytea
-    //
-    // character [ (n) ]
-    // character varying [ (n) ]
-    // text
-    //
-    // timestamp [ (p) ] [ without time zone ]
-    // timestamp [ (p) ] with time zone
-    // date
-    // time [ (p) ] [ without time zone ]
-    // time [ (p) ] with time zone
-    // interval [ fields ] [ (p) ]
-    //
     // point
     // box
     // circle
@@ -163,7 +228,6 @@ pub mod literals_cases {
     //
     // tsquery
     // tsvector
-    //
     // pg_lsn
     // pg_snapshot
     // txid_snapshot
