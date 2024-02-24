@@ -27,7 +27,7 @@
 //!
 //! let mut stmt = conn.query("SELECT 1 as a")?;
 //!
-//! let mut reader = stmt.start(&[])?;
+//! let mut reader = stmt.start([])?;
 //!
 //! let schema: SchemaRef = reader.get_schema()?;
 //!
@@ -67,7 +67,7 @@ pub fn query<C: Connector>(conn: &mut C, query: &str) -> Result<Vec<RecordBatch>
     let mut stmt = conn.query(query)?;
 
     // start reading
-    let reader = stmt.start(&[])?;
+    let reader = stmt.start([])?;
 
     // collect results
     let batches = reader.collect::<Result<_, _>>()?;

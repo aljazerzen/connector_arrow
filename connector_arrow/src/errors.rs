@@ -21,6 +21,12 @@ pub enum ConnectorError {
     #[error("When converting values from database representation into into an Arrow types, it fell out of supported range.")]
     DataOutOfRange,
 
+    #[error("{connector_name} does not support {feature}")]
+    NotSupported {
+        feature: &'static str,
+        connector_name: &'static str,
+    },
+
     #[error(transparent)]
     UrlEncoding(#[from] FromUtf8Error),
 

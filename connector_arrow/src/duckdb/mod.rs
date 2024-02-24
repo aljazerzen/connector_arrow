@@ -118,7 +118,10 @@ impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
     where
         Self: 'stmt;
 
-    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
+    where
+        I: IntoIterator<Item = &'p dyn ArrowValue>,
+    {
         let arrow = self.stmt.query_arrow([])?;
         Ok(DuckDBReader { arrow })
     }

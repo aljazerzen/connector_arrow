@@ -46,7 +46,9 @@ pub trait Statement<'conn> {
 
     /// Start executing.
     /// This will create a reader that can retrieve the result schema and data.
-    fn start(&mut self, params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError>;
+    fn start<'p, I>(&mut self, params: I) -> Result<Self::Reader<'_>, ConnectorError>
+    where
+        I: IntoIterator<Item = &'p dyn ArrowValue>;
 }
 
 /// Reads result of the query, starting with the schema.
@@ -81,7 +83,7 @@ pub trait SchemaEdit {
 /// A value from the Arrow type system.
 ///
 /// Can only be implemented in this crate.
-pub trait ArrowValue: sealed::Sealed + Any {
+pub trait ArrowValue: sealed::Sealed + Any + std::fmt::Debug {
     fn get_data_type(&self) -> &DataType;
 
     fn as_any(&self) -> &dyn Any;

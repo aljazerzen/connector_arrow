@@ -63,7 +63,7 @@ pub fn query_table<C: Connector>(
     let mut stmt = conn
         .query(&format!("SELECT * FROM \"{table_name}\""))
         .unwrap();
-    let mut reader = stmt.start(&[])?;
+    let mut reader = stmt.start([])?;
 
     let schema = reader.get_schema()?;
 

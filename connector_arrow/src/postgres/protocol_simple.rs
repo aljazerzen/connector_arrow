@@ -12,7 +12,17 @@ use super::{types, PostgresError, PostgresStatement, ProtocolSimple};
 impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolSimple> {
     type Reader<'stmt> = ArrowReader where Self: 'stmt;
 
-    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start<'p, I>(&mut self, params: I) -> Result<Self::Reader<'_>, ConnectorError>
+    where
+        I: IntoIterator<Item = &'p dyn ArrowValue>,
+    {
+        if params.into_iter().count() > 0 {
+            return Err(ConnectorError::NotSupported {
+                connector_name: "PostgreSQL simple protocol",
+                feature: "query params",
+            });
+        }
+
         let stmt = &self.stmt;
         let schema = types::pg_stmt_to_arrow(stmt)?;
 

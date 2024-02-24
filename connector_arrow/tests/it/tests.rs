@@ -5,7 +5,9 @@ use std::sync::Arc;
 use arrow::array::{ArrayRef, Int64Builder, RecordBatch};
 use arrow::datatypes::{Field, Schema};
 use arrow::util::pretty::pretty_format_batches;
-use connector_arrow::api::{Append, Connector, ResultReader, SchemaEdit, SchemaGet, Statement};
+use connector_arrow::api::{
+    Append, ArrowValue, Connector, ResultReader, SchemaEdit, SchemaGet, Statement,
+};
 use connector_arrow::{util::coerce, TableCreateError, TableDropError};
 use rand::SeedableRng;
 
@@ -41,6 +43,37 @@ pub fn query_02<C: Connector>(conn: &mut C) {
          | 45927858023429386042648415184323464939503124872489107431467725871003289085860801.00000000000000000000 | 3 | 0.00 |\n\
          +-------------------------------------------------------------------------------------------------------+---+------+",
          pretty_format_batches(&results).unwrap().to_string(),
+    );
+}
+
+pub fn query_03<C: Connector>(conn: &mut C) {
+    let query = "SELECT
+        CAST($1 as bool) as a_bool, CAST($2 as integer) as an_int, CAST($3 as real) as a_real, CAST($4 as text) as a_text
+    ";
+    let mut stmt = conn.query(query).unwrap();
+
+    let param_1 = true;
+    let param_2 = 42_i32;
+    let param_3 = 42.4_f32;
+    let param_4 = "al is vel".to_string();
+    let reader = stmt
+        .start([
+            &param_1 as &dyn ArrowValue,
+            &param_2 as &dyn ArrowValue,
+            &param_3 as &dyn ArrowValue,
+            &param_4 as &dyn ArrowValue,
+        ])
+        .unwrap();
+
+    let results = reader.collect::<Result<Vec<_>, _>>().unwrap();
+
+    similar_asserts::assert_eq!(
+        "+--------+--------+--------+-----------+\n\
+        | a_bool | an_int | a_real | a_text    |\n\
+        +--------+--------+--------+-----------+\n\
+        | true   | 42     | 42.4   | al is vel |\n\
+        +--------+--------+--------+-----------+",
+        pretty_format_batches(&results).unwrap().to_string(),
     );
 }
 
@@ -150,7 +183,7 @@ pub fn streaming<C: Connector>(conn: &mut C) {
     let mut stmt = conn.query(query).unwrap();
 
     // start reading
-    let mut reader = stmt.start(&[]).unwrap();
+    let mut reader = stmt.start([]).unwrap();
 
     // get schema
     let schema = reader.get_schema().unwrap();

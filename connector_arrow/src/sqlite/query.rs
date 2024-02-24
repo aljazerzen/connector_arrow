@@ -20,7 +20,10 @@ pub struct SQLiteStatement<'conn> {
 impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
     type Reader<'task> = ArrowReader where Self: 'task;
 
-    fn start(&mut self, _params: &[&dyn ArrowValue]) -> Result<Self::Reader<'_>, ConnectorError> {
+    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
+    where
+        I: IntoIterator<Item = &'p dyn ArrowValue>,
+    {
         let column_count = self.stmt.column_count();
 
         let rows: Vec<Vec<Value>> = {
