@@ -5,7 +5,8 @@ use itertools::Itertools;
 use postgres::error::SqlState;
 use postgres::types::Type;
 
-use crate::api::{SchemaEdit, SchemaGet};
+use crate::api::{Connector, SchemaEdit, SchemaGet};
+use crate::postgres::{PostgresConnection, ProtocolExtended};
 use crate::util::escape::escaped_ident;
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
@@ -69,7 +70,11 @@ impl<P> SchemaEdit for super::PostgresConnection<P> {
             .fields()
             .iter()
             .map(|field| {
-                let ty = super::types::arrow_ty_to_pg(field.data_type());
+                let ty =
+                    PostgresConnection::<ProtocolExtended>::type_arrow_into_db(field.data_type())
+                        .unwrap_or_else(|| {
+                            unimplemented!("cannot store type {} in PostgreSQL", field.data_type());
+                        });
 
                 let is_nullable =
                     field.is_nullable() || matches!(field.data_type(), DataType::Null);

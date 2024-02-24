@@ -2,11 +2,11 @@ use arrow::datatypes::{Field, Schema, SchemaRef};
 use itertools::Itertools;
 use std::sync::Arc;
 
-use crate::api::{SchemaEdit, SchemaGet};
+use crate::api::{Connector, SchemaEdit, SchemaGet};
 use crate::errors::{ConnectorError, TableCreateError, TableDropError};
 use crate::util::escape::escaped_ident;
 
-use super::types::{self, ty_from_arrow};
+use super::types;
 use super::SQLiteConnection;
 
 impl SchemaGet for SQLiteConnection {
@@ -65,7 +65,7 @@ pub(crate) fn table_create(
         .fields()
         .iter()
         .map(|field| {
-            let ty = ty_from_arrow(field.data_type());
+            let ty = SQLiteConnection::type_arrow_into_db(field.data_type()).unwrap_or_default();
 
             let not_null = if field.is_nullable() { "" } else { " NOT NULL" };
 

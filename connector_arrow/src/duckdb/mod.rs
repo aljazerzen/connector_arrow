@@ -42,27 +42,69 @@ impl Connector for DuckDBConnection {
         })
     }
 
-    fn coerce_type(ty: &DataType) -> Option<DataType> {
-        match ty {
-            DataType::Null => Some(DataType::Int64),
-            DataType::Float16 => Some(DataType::Float32),
+    fn type_db_into_arrow(database_ty: &str) -> Option<DataType> {
+        Some(match database_ty {
+            "BOOLEAN" => DataType::Boolean,
+            "TINYINT" => DataType::Int8,
+            "SMALLINT" => DataType::Int16,
+            "INTEGER" => DataType::Int32,
+            "BIGINT" => DataType::Int64,
+            "UTINYINT" => DataType::UInt8,
+            "USMALLINT" => DataType::UInt16,
+            "UINTEGER" => DataType::UInt32,
+            "UBIGINT" => DataType::UInt64,
+            "REAL" => DataType::Float32,
+            "DOUBLE" => DataType::Float64,
 
-            // timezone cannot be retained in the schema
-            DataType::Timestamp(TimeUnit::Microsecond, _) => {
-                Some(DataType::Timestamp(TimeUnit::Microsecond, None))
-            }
+            "TIMESTAMP" => DataType::Timestamp(TimeUnit::Microsecond, None),
 
+            "DATE" => DataType::Date64,
+
+            "BLOB" => DataType::Binary,
+            "VARCHAR" => DataType::Utf8,
+            _ => return None,
+        })
+    }
+
+    fn type_arrow_into_db(ty: &DataType) -> Option<String> {
+        let s = match ty {
+            DataType::Null => "BIGINT",
+
+            DataType::Boolean => "BOOLEAN",
+            DataType::Int8 => "TINYINT",
+            DataType::Int16 => "SMALLINT",
+            DataType::Int32 => "INTEGER",
+            DataType::Int64 => "BIGINT",
+            DataType::UInt8 => "UTINYINT",
+            DataType::UInt16 => "USMALLINT",
+            DataType::UInt32 => "UINTEGER",
+            DataType::UInt64 => "UBIGINT",
+            DataType::Float16 => "REAL",
+            DataType::Float32 => "REAL",
+            DataType::Float64 => "DOUBLE",
+
+            DataType::Timestamp(TimeUnit::Microsecond, _) => "TIMESTAMP",
             // timestamps are all converted to microseconds, so all other units
             // overflow or lose precision, which counts as information loss.
-            // this means that we have to store them as just int64.
-            DataType::Timestamp(_, _) => Some(DataType::Int64),
+            // this means that we have to store them as int64.
+            DataType::Timestamp(_, _) => "BIGINT",
 
-            DataType::LargeUtf8 => Some(DataType::Utf8),
-            DataType::LargeBinary => Some(DataType::Binary),
-            DataType::FixedSizeBinary(_) => Some(DataType::Binary),
+            DataType::Date32 => "DATE",
+            DataType::Date64 => "DATE",
+            DataType::Time32(_) => "TIME",
+            DataType::Time64(_) => "TIME",
+            DataType::Duration(_) => return None,
+            DataType::Interval(_) => "INTERVAL",
 
-            _ => None,
-        }
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "BLOB",
+            DataType::Utf8 | DataType::LargeUtf8 => "VARCHAR",
+
+            DataType::Decimal128(_, _) => todo!(),
+            DataType::Decimal256(_, _) => todo!(),
+
+            _ => return None,
+        };
+        Some(s.to_string())
     }
 }
 

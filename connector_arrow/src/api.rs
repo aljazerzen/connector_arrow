@@ -31,19 +31,11 @@ pub trait Connector {
     /// Describes how database types map into the arrow types.
     /// None means that querying this type is not supported.
     // I cannot think of a better name. I'd want it to start with `type_`.
-    fn type_db_into_arrow(_database_ty: &str) -> Option<DataType> {
-        todo!()
-    }
+    fn type_db_into_arrow(_database_ty: &str) -> Option<DataType>;
 
     /// Describes how arrow types map into the database types.
     /// None means that appending this type is not supported.
-    fn type_arrow_into_db(_ty: &DataType) -> Option<String> {
-        todo!()
-    }
-
-    /// Describes how arrow types map into the database types.
-    /// None means that appending this type is not supported.
-    fn coerce_type(ty: &DataType) -> Option<DataType>;
+    fn type_arrow_into_db(_ty: &DataType) -> Option<String>;
 }
 
 /// A task that is to be executed in the data store, over a connection.

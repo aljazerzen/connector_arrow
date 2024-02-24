@@ -2,16 +2,16 @@ use std::sync::Arc;
 
 use arrow::datatypes::*;
 use itertools::zip_eq;
-use rusqlite::types::Value;
+use rusqlite::types::{Type, Value};
 
-use crate::api::{ArrowValue, Statement};
+use crate::api::{ArrowValue, Connector, Statement};
 use crate::types::FixedSizeBinaryType;
 use crate::util::transport::{Produce, ProduceTy};
 use crate::util::ArrowReader;
 use crate::util::{collect_rows_to_arrow, CellReader, RowsReader};
 use crate::ConnectorError;
 
-use super::types;
+use super::SQLiteConnection;
 
 pub struct SQLiteStatement<'conn> {
     pub stmt: rusqlite::Statement<'conn>,
@@ -66,7 +66,13 @@ fn infer_schema(
         for (col_index, cell) in row.iter().enumerate() {
             let ty = &mut types[col_index];
             if ty.is_none() {
-                *ty = types::ty_to_arrow(cell.data_type());
+                *ty = match cell.data_type() {
+                    Type::Null => None,
+                    dt => {
+                        let dt = dt.to_string().to_uppercase();
+                        Some(SQLiteConnection::type_db_into_arrow(&dt).unwrap())
+                    }
+                };
             }
             if ty.is_none() {
                 all_known = false;
@@ -147,7 +153,7 @@ impl<'r> ProduceTy<'r, Float64Type> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, LargeUtf8Type> for Value {
+impl<'r> ProduceTy<'r, Utf8Type> for Value {
     fn produce(self) -> Result<String, ConnectorError> {
         unimplemented!()
     }
@@ -160,7 +166,7 @@ impl<'r> ProduceTy<'r, LargeUtf8Type> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, LargeBinaryType> for Value {
+impl<'r> ProduceTy<'r, BinaryType> for Value {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
         unimplemented!()
     }
@@ -203,9 +209,9 @@ crate::impl_produce_unsupported!(
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        BinaryType,
+        LargeBinaryType,
         FixedSizeBinaryType,
-        Utf8Type,
+        LargeUtf8Type,
         Decimal128Type,
         Decimal256Type,
     )

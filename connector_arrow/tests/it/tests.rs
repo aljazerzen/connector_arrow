@@ -9,7 +9,7 @@ use connector_arrow::api::{Append, Connector, ResultReader, SchemaEdit, SchemaGe
 use connector_arrow::{util::coerce, TableCreateError, TableDropError};
 use rand::SeedableRng;
 
-use crate::util::{load_into_table, query_table};
+use crate::util::{coerce_type, load_into_table, query_table};
 use crate::{generator::generate_batch, spec::ArrowGenSpec};
 
 pub fn query_01<C: Connector>(conn: &mut C) {
@@ -54,7 +54,7 @@ where
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
 
     let (schema_coerced, batches_coerced) =
-        coerce::coerce_batches(schema, &batches, C::coerce_type, Some(true)).unwrap();
+        coerce::coerce_batches(schema, &batches, coerce_type::<C>, Some(true)).unwrap();
 
     let (schema_query, batches_query) = query_table(conn, table_name).unwrap();
 
@@ -70,7 +70,7 @@ where
     let (schema, batches) = generate_batch(spec, &mut rng);
 
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
-    let schema = coerce::coerce_schema(schema, &C::coerce_type, Some(false));
+    let schema = coerce::coerce_schema(schema, &coerce_type::<C>, Some(false));
 
     let schema_introspection = conn.table_get(table_name).unwrap();
     let schema_introspection = coerce::coerce_schema(schema_introspection, |_| None, Some(false));

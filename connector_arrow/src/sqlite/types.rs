@@ -1,17 +1,6 @@
 use arrow::datatypes::DataType;
-use rusqlite::types::Type;
 
 use crate::ConnectorError;
-
-pub fn ty_to_arrow(ty: Type) -> Option<DataType> {
-    match ty {
-        Type::Integer => Some(DataType::Int64),
-        Type::Real => Some(DataType::Float64),
-        Type::Text => Some(DataType::LargeUtf8),
-        Type::Blob => Some(DataType::LargeBinary),
-        Type::Null => None,
-    }
-}
 
 pub fn decl_ty_to_arrow(decl_ty: &str, col: &str, table: &str) -> Result<DataType, ConnectorError> {
     // SQLite does not have a "required" column type, only "suggest" column type,
@@ -44,44 +33,4 @@ pub fn decl_ty_to_arrow(decl_ty: &str, col: &str, table: &str) -> Result<DataTyp
         message: format!("column `{col}` was declared with type `{ty}`, which results in `NUMERIC` affinity, which is not supported."),
         hint: Some("Supported types are INTEGER, REAL, TEXT and BLOB".to_string())
     })
-}
-
-pub fn ty_from_arrow(ty: &DataType) -> &'static str {
-    match ty {
-        DataType::Null => "NULL",
-        DataType::Boolean => "INTEGER",
-        DataType::Int8 => "INTEGER",
-        DataType::Int16 => "INTEGER",
-        DataType::Int32 => "INTEGER",
-        DataType::Int64 => "INTEGER",
-        DataType::UInt8 => "INTEGER",
-        DataType::UInt16 => "INTEGER",
-        DataType::UInt32 => "INTEGER",
-        DataType::UInt64 => "TEXT",
-        DataType::Float16 => "REAL",
-        DataType::Float32 => "REAL",
-        DataType::Float64 => "REAL",
-        DataType::Timestamp(_, _) => "INTEGER",
-        DataType::Date32 => "INTEGER",
-        DataType::Date64 => "INTEGER",
-        DataType::Time32(_) => "INTEGER",
-        DataType::Time64(_) => "INTEGER",
-        DataType::Duration(_) => "INTEGER",
-        DataType::Interval(_) => unimplemented!(),
-        DataType::Binary => "BLOB",
-        DataType::FixedSizeBinary(_) => "BLOB",
-        DataType::LargeBinary => "BLOB",
-        DataType::Utf8 => "TEXT",
-        DataType::LargeUtf8 => "TEXT",
-        DataType::List(_) => unimplemented!(),
-        DataType::FixedSizeList(_, _) => unimplemented!(),
-        DataType::LargeList(_) => unimplemented!(),
-        DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_, _) => unimplemented!(),
-        DataType::Dictionary(_, _) => unimplemented!(),
-        DataType::Decimal128(_, _) => "TEXT",
-        DataType::Decimal256(_, _) => "TEXT",
-        DataType::Map(_, _) => unimplemented!(),
-        DataType::RunEndEncoded(_, _) => unimplemented!(),
-    }
 }

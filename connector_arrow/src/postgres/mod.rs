@@ -107,39 +107,6 @@ where
         append::PostgresAppender::new(&mut self.client, table_name)
     }
 
-    fn coerce_type(ty: &DataType) -> Option<DataType> {
-        match ty {
-            DataType::Null => Some(DataType::Int16),
-            DataType::Int8 => Some(DataType::Int16),
-            DataType::UInt8 => Some(DataType::Int16),
-            DataType::UInt16 => Some(DataType::Int32),
-            DataType::UInt32 => Some(DataType::Int64),
-            DataType::UInt64 => Some(DataType::Utf8),
-            DataType::Float16 => Some(DataType::Float32),
-
-            // PostgreSQL timestamps cannot store timezone in the schema.
-            // PostgreSQL timestamps are microseconds since 2000-01-01T00:00.
-            // Arrow timestamps can be microseconds since   1970-01-01T00:00.
-            // ... which means we cannot store the full range of the Arrow microsecond
-            //     timestamp in PostgreSQL timestamp without changing its meaning.
-            // ... so we must use Int64 instead.
-            DataType::Timestamp(_, _) => Some(DataType::Int64),
-            DataType::Date32 => Some(DataType::Int32),
-            DataType::Date64 => Some(DataType::Int64),
-            DataType::Time32(_) => Some(DataType::Int32),
-            DataType::Time64(_) => Some(DataType::Int64),
-            DataType::Duration(_) => Some(DataType::Int64),
-
-            DataType::LargeUtf8 => Some(DataType::Utf8),
-            DataType::LargeBinary => Some(DataType::Binary),
-            DataType::FixedSizeBinary(_) => Some(DataType::Binary),
-
-            DataType::Decimal128(_, _) => Some(DataType::Utf8),
-            DataType::Decimal256(_, _) => Some(DataType::Utf8),
-            _ => None,
-        }
-    }
-
     fn type_db_into_arrow(ty: &str) -> Option<DataType> {
         Some(match ty {
             "boolean" | "bool" => DataType::Boolean,
@@ -162,15 +129,72 @@ where
 
             "bytea" => DataType::Binary,
             "bit" | "bit varying" | "varbit" => DataType::Binary,
-            _ if ty.starts_with("bit") => DataType::Binary,
 
             "text" | "varchar" | "char" | "bpchar" => DataType::Utf8,
+
+            _ if ty.starts_with("bit") => DataType::Binary,
             _ if ty.starts_with("varchar") | ty.starts_with("char") | ty.starts_with("bpchar") => {
                 DataType::Utf8
             }
+            _ if ty.starts_with("decimal") | ty.starts_with("numeric") => DataType::Utf8,
 
             _ => return None,
         })
+    }
+
+    fn type_arrow_into_db(ty: &DataType) -> Option<String> {
+        Some(
+            match ty {
+                DataType::Null => "smallint",
+                DataType::Boolean => "bool",
+
+                DataType::Int8 => "smallint",
+                DataType::Int16 => "smallint",
+                DataType::Int32 => "integer",
+                DataType::Int64 => "bigint",
+
+                DataType::UInt8 => "smallint",
+                DataType::UInt16 => "integer",
+                DataType::UInt32 => "bigint",
+                DataType::UInt64 => "decimal(20, 0)",
+
+                DataType::Float16 => "real",
+                DataType::Float32 => "real",
+                DataType::Float64 => "double precision",
+
+                // PostgreSQL timestamps cannot store timezone in the schema.
+                // PostgreSQL timestamps are microseconds since 2000-01-01T00:00.
+                // Arrow timestamps *can be* microseconds since 1970-01-01T00:00.
+                // ... which means we cannot store the full range of the Arrow microsecond
+                //     timestamp in PostgreSQL timestamp without changing its meaning.
+                // ... so we must Int64 instead.
+                DataType::Timestamp(_, _) => "bigint",
+                DataType::Date32 => "integer",
+                DataType::Date64 => "bigint",
+                DataType::Time32(_) => "integer",
+                DataType::Time64(_) => "bigint",
+                DataType::Duration(_) => "bigint",
+                DataType::Interval(_) => return None,
+
+                DataType::Utf8 | DataType::LargeUtf8 => "text",
+
+                DataType::Binary | DataType::LargeBinary | DataType::FixedSizeBinary(_) => "bytea",
+
+                DataType::Decimal128(precision, scale) | DataType::Decimal256(precision, scale) => {
+                    return Some(format!("decimal({precision}, {scale})"))
+                }
+
+                DataType::List(_)
+                | DataType::FixedSizeList(_, _)
+                | DataType::LargeList(_)
+                | DataType::Struct(_)
+                | DataType::Union(_, _)
+                | DataType::Dictionary(_, _)
+                | DataType::Map(_, _)
+                | DataType::RunEndEncoded(_, _) => return None,
+            }
+            .into(),
+        )
     }
 }
 

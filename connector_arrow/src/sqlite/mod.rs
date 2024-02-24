@@ -40,47 +40,60 @@ impl Connector for SQLiteConnection {
         SQLiteAppender::new(table.to_string(), transaction)
     }
 
-    fn coerce_type(ty: &DataType) -> Option<DataType> {
-        match ty {
-            DataType::Boolean => Some(DataType::Int64),
+    fn type_db_into_arrow(database_ty: &str) -> Option<DataType> {
+        match database_ty {
+            "NULL" => Some(DataType::Null),
+            "INTEGER" => Some(DataType::Int64),
+            "REAL" => Some(DataType::Float64),
+            "TEXT" => Some(DataType::Utf8),
+            "BLOB" => Some(DataType::Binary),
+            _ => None,
+        }
+    }
 
-            DataType::Int8 => Some(DataType::Int64),
-            DataType::Int16 => Some(DataType::Int64),
-            DataType::Int32 => Some(DataType::Int64),
-            DataType::Int64 => Some(DataType::Int64),
+    fn type_arrow_into_db(ty: &DataType) -> Option<String> {
+        let s = match ty {
+            DataType::Null => "NULL",
+            DataType::Boolean => "INTEGER",
 
-            DataType::UInt8 => Some(DataType::Int64),
-            DataType::UInt16 => Some(DataType::Int64),
-            DataType::UInt32 => Some(DataType::Int64),
-            DataType::UInt64 => Some(DataType::LargeUtf8),
+            DataType::Int8 => "INTEGER",
+            DataType::Int16 => "INTEGER",
+            DataType::Int32 => "INTEGER",
+            DataType::Int64 => "INTEGER",
 
-            DataType::Float16 => Some(DataType::Float64),
-            DataType::Float32 => Some(DataType::Float64),
-            DataType::Float64 => Some(DataType::Float64),
+            DataType::UInt8 => "INTEGER",
+            DataType::UInt16 => "INTEGER",
+            DataType::UInt32 => "INTEGER",
+            DataType::UInt64 => "TEXT",
+
+            DataType::Float16 => "REAL",
+            DataType::Float32 => "REAL",
+            DataType::Float64 => "REAL",
 
             // temporal types are stored as plain integers
             // - for Timestamp(Second, Some("00:00")), this is convenient,
             //   since it can be used as SQLite's 'unixepoch'
             // - for all others, this is very inconvenient,
             //   but better than losing information in a roundtrip.
-            DataType::Timestamp(_, _) => Some(DataType::Int64),
-            DataType::Date32 => Some(DataType::Int64),
-            DataType::Date64 => Some(DataType::Int64),
-            DataType::Time32(_) => Some(DataType::Int64),
-            DataType::Time64(_) => Some(DataType::Int64),
-            DataType::Duration(_) => Some(DataType::Int64),
-            DataType::Interval(_) => unimplemented!(),
+            DataType::Timestamp(_, _) => "INTEGER",
+            DataType::Date32 => "INTEGER",
+            DataType::Date64 => "INTEGER",
+            DataType::Time32(_) => "INTEGER",
+            DataType::Time64(_) => "INTEGER",
+            DataType::Duration(_) => "INTEGER",
+            DataType::Interval(_) => return None,
 
-            DataType::Binary => Some(DataType::LargeBinary),
-            DataType::FixedSizeBinary(_) => Some(DataType::LargeBinary),
-            DataType::LargeBinary => Some(DataType::LargeBinary),
+            DataType::Binary => "BLOB",
+            DataType::FixedSizeBinary(_) => "BLOB",
+            DataType::LargeBinary => "BLOB",
 
-            DataType::Utf8 => Some(DataType::LargeUtf8),
-            DataType::LargeUtf8 => Some(DataType::LargeUtf8),
+            DataType::Utf8 => "TEXT",
+            DataType::LargeUtf8 => "TEXT",
 
-            DataType::Decimal128(_, _) => Some(DataType::LargeUtf8),
-            DataType::Decimal256(_, _) => Some(DataType::LargeUtf8),
-            _ => None,
-        }
+            DataType::Decimal128(_, _) => "TEXT",
+            DataType::Decimal256(_, _) => "TEXT",
+            _ => return None,
+        };
+        Some(s.to_string())
     }
 }

@@ -9,6 +9,17 @@ use connector_arrow::util::transport::transport;
 use connector_arrow::util::ArrowRowWriter;
 use connector_arrow::{ConnectorError, TableCreateError, TableDropError};
 
+pub fn coerce_type<C: Connector>(ty: &DataType) -> Option<DataType> {
+    let db_ty = C::type_arrow_into_db(ty).unwrap();
+    let roundtrip_ty =
+        C::type_db_into_arrow(&db_ty).unwrap_or_else(|| panic!("cannot query type {}", db_ty));
+    if *ty != roundtrip_ty {
+        Some(roundtrip_ty)
+    } else {
+        None
+    }
+}
+
 pub fn load_into_table<C>(
     conn: &mut C,
     schema: SchemaRef,
