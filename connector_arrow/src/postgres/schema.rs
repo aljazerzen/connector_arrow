@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Schema, SchemaRef};
 use itertools::Itertools;
 use postgres::error::SqlState;
 use postgres::types::Type;
@@ -46,17 +46,14 @@ impl<P> SchemaGet for super::PostgresConnection<P> {
             .map(|row| -> Result<_, ConnectorError> {
                 let name: String = row.get(0);
                 let typid: u32 = row.get(1);
-                let notnull: bool = row.get(2);
+                let not_null: bool = row.get(2);
 
-                let ty =
-                    Type::from_oid(typid).ok_or_else(|| ConnectorError::IncompatibleSchema {
-                        table_name: table_name.to_string(),
-                        message: format!("column `{name}` has unsupported type (oid = {typid})"),
-                        hint: Some("Supported types are INTEGER, REAL, TEXT and BLOB".to_string()),
-                    })?;
-                let ty = super::types::pg_ty_to_arrow(&ty);
+                let ty = Type::from_oid(typid).ok_or(ConnectorError::NotSupported {
+                    connector_name: "connector_arrow::postgres table_get",
+                    feature: "custom types",
+                })?;
 
-                Ok(Field::new(name, ty, !notnull))
+                Ok(super::types::pg_field_to_arrow(name, &ty, !not_null))
             })
             .try_collect()?;
 

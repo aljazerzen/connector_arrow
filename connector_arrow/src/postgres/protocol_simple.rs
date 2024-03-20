@@ -18,7 +18,7 @@ impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolSimple> {
     {
         if params.into_iter().count() > 0 {
             return Err(ConnectorError::NotSupported {
-                connector_name: "PostgreSQL simple protocol",
+                connector_name: "connector_arrow::postgres simple protocol",
                 feature: "query params",
             });
         }

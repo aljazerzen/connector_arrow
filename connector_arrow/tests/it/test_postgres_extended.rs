@@ -66,3 +66,10 @@ fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
     let mut conn = init();
     crate::util::query_literals(&mut conn, queries)
 }
+
+#[rstest]
+#[case::bool(literals_cases::network_addr())]
+fn query_literals_binary(#[case] queries: Vec<QueryOfSingleLiteral>) {
+    let mut conn = init();
+    crate::util::query_literals_binary(&mut conn, queries)
+}

@@ -29,7 +29,8 @@ pub trait Connector {
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError>;
 
     /// Describes how database types map into the arrow types.
-    /// None means that querying this type is not supported.
+    /// None means that querying this type will return [DataType::Binary] with field
+    /// metadata [METADATA_DB_TYPE] set to original type name.
     // I cannot think of a better name. I'd want it to start with `type_`.
     fn type_db_into_arrow(_database_ty: &str) -> Option<DataType>;
 
@@ -56,6 +57,10 @@ pub trait ResultReader<'stmt>: Iterator<Item = Result<RecordBatch, ConnectorErro
     /// Return the schema of the result.
     fn get_schema(&mut self) -> Result<SchemaRef, ConnectorError>;
 }
+
+/// Key of the metadata on [arrow::datatypes::Field] that stores the name of the database type
+/// that this field was created from.
+pub const METADATA_DB_TYPE: &str = "db_type";
 
 /// Receive [RecordBatch]es that have to be written to a table in the data store.
 pub trait Append<'conn> {

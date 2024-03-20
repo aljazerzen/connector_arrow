@@ -53,6 +53,7 @@ without need for dynamic linking of C libraries.
 | roundtrip: binary | x | x | x |  |
 | roundtrip: empty |  | x | x |  |
 | containers |  |  |  |  |
+| binary fallback | x |  | x |  |
 
 None of the sources are enabled by default, use features to enable them.
 

@@ -29,8 +29,8 @@ pub enum ConnectorError {
 
     #[error("{connector_name} does not support {feature}")]
     NotSupported {
-        feature: &'static str,
         connector_name: &'static str,
+        feature: &'static str,
     },
 
     #[error(transparent)]

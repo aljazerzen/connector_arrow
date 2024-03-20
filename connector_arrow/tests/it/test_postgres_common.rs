@@ -208,6 +208,60 @@ pub mod literals_cases {
         ]
     }
 
+    pub fn network_addr() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            (
+                "cidr",
+                "'192.168/25'",
+                vec![
+                    02, // family: IPv4
+                    25, // netmask
+                    01, // is cidr
+                    04, // length
+                    192, 168, 0, 0,
+                ],
+            )
+                .into(),
+            (
+                "cidr",
+                "'2001:4f8:3:ba:2e0:81ff:fe22:d1f1/128'",
+                vec![
+                    03,  // family: IPv6
+                    128, // netmask
+                    01,  // is cidr
+                    16,  // length
+                    0x20, 0x01, 0x04, 0xf8, 0x00, 0x03, 0x00, 0xba, 0x02, 0xe0, 0x81, 0xff, 0xfe,
+                    0x22, 0xd1, 0xf1,
+                ],
+            )
+                .into(),
+            (
+                "inet",
+                "'192.168.0.1/24'",
+                vec![
+                    02, // family: IPv4
+                    24, // netmask
+                    00, // is cidr
+                    04, // length
+                    192, 168, 0, 1,
+                ],
+            )
+                .into(),
+            (
+                "macaddr",
+                "'08:00:2b:01:02:03'",
+                vec![0x08, 0x00, 0x2b, 0x01, 0x02, 0x03],
+            )
+                .into(),
+            (
+                "macaddr8",
+                "'08:00:2b:01:02:03:04:05'",
+                vec![0x08, 0x00, 0x2b, 0x01, 0x02, 0x03, 0x04, 0x05],
+            )
+                .into(),
+        ]
+    }
+
     // TODO:
     // point
     // box
@@ -217,10 +271,6 @@ pub mod literals_cases {
     // polygon
     // path
     //
-    // cidr
-    // inet
-    // macaddr
-    // macaddr8
     // money
     //
     // json

@@ -81,10 +81,58 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
 
         let dt = C::type_db_into_arrow(&query.db_ty).unwrap_or_else(|| {
             panic!(
-                "test failed: datebase type {} cannot be converted to arrow",
+                "test failed: database type {} cannot be converted to arrow",
                 query.db_ty
             )
         });
+        expected_arrays.push(new_singleton_array(&dt, query.value));
+        let field = Field::new(&field_name, dt, true);
+        expected_fields.push(field);
+
+        sql_selects.push(format!(
+            "CAST({} AS {}) as {field_name}",
+            query.value_sql, query.db_ty
+        ));
+    }
+
+    let schema = Arc::new(Schema::new(expected_fields));
+    let expected = RecordBatch::try_new(schema, expected_arrays).unwrap();
+
+    let sql = format!("SELECT {};", sql_selects.join(", "));
+    let batches = connector_arrow::query(conn, &sql).unwrap_or_else(|e| {
+        panic!(
+            "error while executing the following query:\n{}\nerror: {}",
+            sql, e
+        )
+    });
+    let batch = batches.into_iter().exactly_one().unwrap();
+
+    similar_asserts::assert_eq!(
+        arrow::util::pretty::pretty_format_batches(&vec![expected])
+            .unwrap()
+            .to_string(),
+        arrow::util::pretty::pretty_format_batches(&vec![batch])
+            .unwrap()
+            .to_string(),
+    );
+}
+
+pub fn query_literals_binary<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLiteral>) {
+    let mut sql_selects = Vec::new();
+    let mut expected_fields = Vec::new();
+    let mut expected_arrays = Vec::new();
+
+    for (index, query) in queries.into_iter().enumerate() {
+        let field_name = format!("f_{}", index);
+
+        if let Some(dt) = C::type_db_into_arrow(&query.db_ty) {
+            panic!(
+                "test failed: database type {} is expected to fallback to binary, but got {:?}",
+                query.db_ty, dt
+            )
+        }
+        let dt = DataType::Binary;
+
         expected_arrays.push(new_singleton_array(&dt, query.value));
         let field = Field::new(&field_name, dt, true);
         expected_fields.push(field);
