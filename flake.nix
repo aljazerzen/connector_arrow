@@ -19,7 +19,7 @@
         dontCheckPython = drv: drv.overridePythonAttrs (old: { doCheck = false; });
 
         essentials = with pkgs; [
-          (fenix_pkgs.complete.withComponents [
+          (fenix_pkgs.stable.withComponents [
             "cargo"
             "clippy"
             "rust-src"

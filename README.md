@@ -30,29 +30,29 @@ without need for dynamic linking of C libraries.
 
 ## Support matrix
 
-|  | SQLite | DuckDB | PostgreSQL |
-| --- | --- | --- | --- |
-| feature | `src_sqlite` | `src_duckdb` | `src_postgres` |
-| dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) |
-| query | x | x | x |
-| query params |  |  | x |
-| schema get | x | x | x |
-| schema edit | x | x | x |
-| append | x | x | x |
-| roundtrip: null & bool | x | x | x |
-| roundtrip: int | x | x | x |
-| roundtrip: uint | x | x | x |
-| roundtrip: float | x | x | x |
-| roundtrip: decimal | x |  | x |
-| roundtrip: timestamp | x | x | x |
-| roundtrip: date | x |  | x |
-| roundtrip: time | x |  | x |
-| roundtrip: duration | x |  | x |
-| roundtrip: interval |  |  |  |
-| roundtrip: utf8 | x | x | x |
-| roundtrip: binary | x | x | x |
-| roundtrip: empty |  | x | x |
-| containers |  |  |  |
+|  | SQLite | DuckDB | PostgreSQL | MySQL |
+| --- | --- | --- | --- | --- |
+| feature | `src_sqlite` | `src_duckdb` | `src_postgres` | `src_mysql` |
+| dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) | [mysql](https://crates.io/crates/mysql) |
+| query | x | x | x | x |
+| query params |  |  | x |  |
+| schema get | x | x | x |  |
+| schema edit | x | x | x |  |
+| append | x | x | x |  |
+| roundtrip: null & bool | x | x | x |  |
+| roundtrip: int | x | x | x |  |
+| roundtrip: uint | x | x | x |  |
+| roundtrip: float | x | x | x |  |
+| roundtrip: decimal | x |  | x |  |
+| roundtrip: timestamp | x | x | x |  |
+| roundtrip: date | x |  | x |  |
+| roundtrip: time | x |  | x |  |
+| roundtrip: duration | x |  | x |  |
+| roundtrip: interval |  |  |  |  |
+| roundtrip: utf8 | x | x | x |  |
+| roundtrip: binary | x | x | x |  |
+| roundtrip: empty |  | x | x |  |
+| containers |  |  |  |  |
 
 None of the sources are enabled by default, use features to enable them.
 

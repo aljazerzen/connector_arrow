@@ -9,7 +9,7 @@ macro_rules! impl_transport_match {
         let dt = $f.data_type();
         if !$f.is_nullable() {
             match dt {
-                Null => ConsumeTy::<NullType>::consume($c, dt, ()),
+                Null => ConsumeTy::<NullType>::consume_null($c),
                 $(
                     $Pat => ConsumeTy::<$ArrTy>::consume($c, dt, ProduceTy::<$ArrTy>::produce($p)?),
                 )*
@@ -17,7 +17,7 @@ macro_rules! impl_transport_match {
             }
         } else {
             match dt {
-                Null => ConsumeTy::<NullType>::consume($c, dt, ()),
+                Null => ConsumeTy::<NullType>::consume_null($c),
                 $(
                     $Pat => {
                         if let Some(v) = ProduceTy::<$ArrTy>::produce_opt($p)? {

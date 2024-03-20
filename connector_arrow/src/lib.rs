@@ -45,6 +45,8 @@ pub mod util;
 
 #[cfg(feature = "src_duckdb")]
 pub mod duckdb;
+#[cfg(feature = "src_mysql")]
+pub mod mysql;
 #[cfg(feature = "src_postgres")]
 pub mod postgres;
 #[cfg(feature = "src_sqlite")]

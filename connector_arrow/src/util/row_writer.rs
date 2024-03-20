@@ -60,11 +60,7 @@ impl ArrowRowWriter {
             self.flush()?;
         }
 
-        let to_allocate = if row_count < self.min_batch_size {
-            self.min_batch_size
-        } else {
-            row_count
-        };
+        let to_allocate = usize::max(row_count, self.min_batch_size);
 
         let builders: Vec<Box<dyn ArrayBuilder>> = self
             .schema
@@ -85,7 +81,7 @@ impl ArrowRowWriter {
         };
         let columns: Vec<ArrayRef> = builders
             .iter_mut()
-            .map(|builder| builder.finish())
+            .map(|builder| builder.finish().slice(0, self.rows_reserved))
             .collect();
         let rb = RecordBatch::try_new(self.schema.clone(), columns)?;
         self.data.push(rb);

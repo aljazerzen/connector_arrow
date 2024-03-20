@@ -1,16 +1,51 @@
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use itertools::Itertools;
 
 use crate::errors::ConnectorError;
 use crate::util::{transport, ArrowRowWriter};
+
+/// Get next [RecordBatch] from a row-major reader.
+pub fn next_batch_from_rows<'stmt, T: RowsReader<'stmt>>(
+    schema: &SchemaRef,
+    rows_reader: &mut T,
+    batch_size: usize,
+) -> Result<Option<RecordBatch>, ConnectorError> {
+    let mut writer = ArrowRowWriter::new(schema.clone(), batch_size);
+
+    for _ in 0..batch_size {
+        if let Some(mut cell_reader) = rows_reader.next_row()? {
+            writer.prepare_for_batch(1)?;
+
+            dbg!("row");
+
+            for field in &schema.fields {
+                dbg!(field);
+
+                let cell_ref = cell_reader.next_cell();
+
+                transport::transport(field, cell_ref.unwrap(), &mut writer)?;
+            }
+        } else {
+            break;
+        }
+    }
+
+    let batches = writer.finish()?;
+    if batches.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(batches.into_iter().exactly_one().unwrap()))
+    }
+}
 
 /// Convert row-major reader into [RecordBatch]es.
 pub fn collect_rows_to_arrow<'stmt, T: RowsReader<'stmt>>(
     schema: SchemaRef,
     rows_reader: &mut T,
-    min_batch_size: usize,
+    batch_size: usize,
 ) -> Result<Vec<RecordBatch>, ConnectorError> {
-    let mut writer = ArrowRowWriter::new(schema.clone(), min_batch_size);
+    let mut writer = ArrowRowWriter::new(schema.clone(), batch_size);
     log::debug!("reading rows");
 
     while let Some(mut row_reader) = rows_reader.next_row()? {

@@ -34,6 +34,8 @@ fn ident_escaping() {
     super::tests::ident_escaping(&mut conn, table_name);
 }
 
+/// These tests cases are used to test of querying of Postgres-native types
+/// that cannot be obtained by converting Arrow into PostgreSQL.
 pub mod literals_cases {
     use arrow::datatypes::{DataType, TimeUnit};
 

@@ -9,7 +9,7 @@ use postgres::{Row, RowIter};
 use crate::api::{ArrowValue, ResultReader, Statement};
 use crate::types::{ArrowType, FixedSizeBinaryType};
 use crate::util::transport;
-use crate::util::{ArrowRowWriter, CellReader};
+use crate::util::CellReader;
 use crate::{errors::ConnectorError, util::RowsReader};
 
 use super::{types, PostgresError, PostgresStatement, ProtocolExtended};
@@ -41,18 +41,13 @@ impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolExtended> {
 
         // create the row reader
         let row_reader = PostgresRowStream::new(rows);
-        Ok(PostgresBatchStream {
-            schema,
-            row_reader,
-            is_finished: false,
-        })
+        Ok(PostgresBatchStream { schema, row_reader })
     }
 }
 
 pub struct PostgresBatchStream<'a> {
     schema: SchemaRef,
     row_reader: PostgresRowStream<'a>,
-    is_finished: bool,
 }
 
 impl<'a> ResultReader<'a> for PostgresBatchStream<'a> {
@@ -61,55 +56,21 @@ impl<'a> ResultReader<'a> for PostgresBatchStream<'a> {
     }
 }
 
-impl<'a> PostgresBatchStream<'a> {
-    fn next_batch(&mut self) -> Result<Option<RecordBatch>, ConnectorError> {
-        if self.is_finished {
-            return Ok(None);
-        }
-
-        let batch_size = 1024;
-
-        let mut writer = ArrowRowWriter::new(self.schema.clone(), batch_size);
-
-        for _ in 0..batch_size {
-            if let Some(mut cell_reader) = self.row_reader.next_row()? {
-                writer.prepare_for_batch(1)?;
-
-                for field in &self.schema.fields {
-                    let cell_ref = cell_reader.next_cell();
-
-                    transport::transport(field, cell_ref.unwrap(), &mut writer)?;
-                }
-            } else {
-                self.is_finished = true;
-                break;
-            }
-        }
-
-        let batches = writer.finish()?;
-        if batches.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(batches.into_iter().exactly_one().unwrap()))
-        }
-    }
-}
-
 impl<'a> Iterator for PostgresBatchStream<'a> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_batch().transpose()
+        crate::util::next_batch_from_rows(&self.schema, &mut self.row_reader, 1024).transpose()
     }
 }
 
 struct PostgresRowStream<'a> {
-    iter: postgres::RowIter<'a>,
+    iter: fallible_iterator::Fuse<postgres::RowIter<'a>>,
 }
 
 impl<'a> PostgresRowStream<'a> {
     pub fn new(iter: RowIter<'a>) -> Self {
-        Self { iter }
+        Self { iter: iter.fuse() }
     }
 }
 

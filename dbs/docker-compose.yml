@@ -12,12 +12,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # mysql:
-  #   image: "mariadb:10"
-  #   ports:
-  #     - "3306:3306"
-  #   environment:
-  #     MYSQL_DATABASE: dummy
-  #     MYSQL_ROOT_PASSWORD: root
-  #   command: --secure-file-priv=""
+  mysql:
+    image: mariadb:10
+    ports: [3306:3306]
+    environment:
+      MYSQL_DATABASE: dummy
+      MYSQL_ROOT_PASSWORD: root
+    command: --secure-file-priv=""

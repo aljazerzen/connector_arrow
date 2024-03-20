@@ -5,6 +5,12 @@ use thiserror::Error;
 /// Errors that can be raised from this library.
 #[derive(Error, Debug)]
 pub enum ConnectorError {
+    #[error("Provided query does not have a result set.")]
+    NoResultSets,
+
+    #[error("Provided query is trying to return multiple result sets.")]
+    MultipleResultSets,
+
     #[error("Schema of the result cannot be inferred or converted to Arrow schema")]
     CannotConvertSchema,
 
@@ -44,6 +50,10 @@ pub enum ConnectorError {
     #[cfg(feature = "src_postgres")]
     #[error(transparent)]
     Postgres(#[from] super::postgres::PostgresError),
+
+    #[cfg(feature = "src_mysql")]
+    #[error(transparent)]
+    MySQL(#[from] mysql::Error),
 }
 
 #[derive(Error, Debug)]

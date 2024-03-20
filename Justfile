@@ -1,4 +1,5 @@
 export POSTGRES_URL := "postgres://root:root@localhost:5432/dummy"
+export MYSQL_URL := "mysql://root:root@localhost:3306/dummy"
 
 default:
     just --list
@@ -22,6 +23,7 @@ test-feature-gate:
     cargo check --features src_postgres
     cargo check --features src_sqlite
     cargo check --features src_duckdb
+    cargo check --features src_mysql
     cargo clippy -- -D warnings
     cargo clippy --features all -- -D warnings
 
