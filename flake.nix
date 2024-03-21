@@ -42,10 +42,8 @@
         ];
 
         dbs = with pkgs; [
-          postgresql_15
           sqlite
-          mysql
-          duckdb
+          duckdb # version of duckdb here should match to version specified in Cargo.toml
         ];
 
       in
