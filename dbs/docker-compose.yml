@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U user db]
+      test: [CMD-SHELL, pg_isready -U user -d db]
       interval: 5s
       timeout: 5s
       retries: 5
