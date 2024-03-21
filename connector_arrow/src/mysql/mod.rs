@@ -169,7 +169,6 @@ struct MySQLCellRef<'a> {
 
 impl<'r> Produce<'r> for MySQLCellRef<'r> {}
 
-#[macro_export]
 macro_rules! impl_produce_ty {
     ($p: ty, ($($t: ty,)+)) => {
         $(

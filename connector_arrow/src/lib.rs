@@ -51,6 +51,8 @@ pub mod mysql;
 pub mod postgres;
 #[cfg(feature = "src_sqlite")]
 pub mod sqlite;
+#[cfg(feature = "src_tiberius")]
+pub mod tiberius;
 
 pub use arrow;
 pub use errors::*;

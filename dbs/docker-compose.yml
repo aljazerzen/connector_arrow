@@ -4,11 +4,11 @@ services:
     image: postgres:16-alpine
     ports: [5432:5432]
     environment:
-      POSTGRES_DB: dummy
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
+      POSTGRES_DB: db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U root]
+      test: [CMD-SHELL, pg_isready -U user db]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -16,6 +16,16 @@ services:
     image: mariadb:10
     ports: [3306:3306]
     environment:
-      MYSQL_DATABASE: dummy
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db
+      MYSQL_ROOT_PASSWORD: pass
     command: --secure-file-priv=""
+  mssql:
+    image: mcr.microsoft.com/mssql/server
+    ports: [1433:1433]
+    platform: linux/amd64  # https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1436802153
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: passwordA1
+      LC_ALL: en_US.UTF-8
+      MSSQL_COLLATION: Latin1_General_100_CS_AI_SC_UTF8

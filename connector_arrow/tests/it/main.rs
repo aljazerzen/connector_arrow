@@ -15,3 +15,5 @@ mod test_postgres_extended;
 mod test_postgres_simple;
 #[cfg(feature = "src_sqlite")]
 mod test_sqlite;
+#[cfg(feature = "src_tiberius")]
+mod test_tiberius;

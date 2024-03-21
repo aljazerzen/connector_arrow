@@ -54,6 +54,10 @@ pub enum ConnectorError {
     #[cfg(feature = "src_mysql")]
     #[error(transparent)]
     MySQL(#[from] mysql::Error),
+
+    #[cfg(feature = "src_tiberius")]
+    #[error(transparent)]
+    Tiberius(#[from] tiberius::error::Error),
 }
 
 #[derive(Error, Debug)]
