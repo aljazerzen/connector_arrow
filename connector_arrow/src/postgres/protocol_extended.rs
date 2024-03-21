@@ -306,8 +306,6 @@ impl<'a> FromSql<'a> for Binary<'a> {
     ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
         Ok(if matches!(ty, &Type::VARBIT | &Type::BIT) {
             let varbit = postgres_protocol::types::varbit_from_sql(raw)?;
-            dbg!(varbit.len());
-            dbg!(varbit.bytes());
             Binary(varbit.bytes())
         } else {
             Binary(postgres_protocol::types::bytea_from_sql(raw))

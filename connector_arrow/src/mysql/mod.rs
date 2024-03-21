@@ -49,92 +49,32 @@ impl<C: Queryable> Connector for MySQLConnection<C> {
 
     fn type_db_into_arrow(ty: &str) -> Option<DataType> {
         Some(match ty {
-            "boolean" | "bool" => DataType::Boolean,
-            "smallint" | "int2" => DataType::Int16,
-            "integer" | "int4" => DataType::Int32,
-            "bigint" | "int8" => DataType::Int64,
-            "real" | "float4" => DataType::Float32,
-            "double precision" | "float8" => DataType::Float64,
-            "numeric" | "decimal" => DataType::Utf8,
+            "null" => DataType::Null,
 
-            "timestamp" | "timestamp without time zone" => {
-                DataType::Timestamp(TimeUnit::Microsecond, None)
-            }
-            "timestamptz" | "timestamp with time zone" => {
-                DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".into()))
-            }
-            "date" => DataType::Date32,
-            "time" | "time without time zone" => DataType::Time64(TimeUnit::Microsecond),
-            "interval" => DataType::Interval(IntervalUnit::MonthDayNano),
+            "tinyint" | "bool" | "boolean" => DataType::Int8,
+            "smallint" => DataType::Int16,
+            "integer" | "int" => DataType::Int32,
+            "bigint" => DataType::Int64,
+
+            "tinyint unsigned" => DataType::UInt8,
+            "smallint unsigned" => DataType::UInt16,
+            "integer unsigned" | "int unsigned" => DataType::UInt32,
+            "bigint unsigned" => DataType::UInt64,
+
+            "real" | "float4" => DataType::Float32,
+            "double" | "float8" => DataType::Float64,
 
             "bytea" => DataType::Binary,
-            "bit" | "bit varying" | "varbit" => DataType::Binary,
+            "bit" | "tiny_blob" | "medium_blob" | "long_blob" | "blob" => DataType::Binary,
 
-            "text" | "varchar" | "char" | "bpchar" => DataType::Utf8,
-
-            _ if ty.starts_with("bit") => DataType::Binary,
-            _ if ty.starts_with("varchar") | ty.starts_with("char") | ty.starts_with("bpchar") => {
-                DataType::Utf8
-            }
-            _ if ty.starts_with("decimal") | ty.starts_with("numeric") => DataType::Utf8,
+            "varchar" | "var_string" | "string" => DataType::Utf8,
 
             _ => return None,
         })
     }
 
-    fn type_arrow_into_db(ty: &DataType) -> Option<String> {
-        Some(
-            match ty {
-                DataType::Null => "smallint",
-                DataType::Boolean => "bool",
-
-                DataType::Int8 => "smallint",
-                DataType::Int16 => "smallint",
-                DataType::Int32 => "integer",
-                DataType::Int64 => "bigint",
-
-                DataType::UInt8 => "smallint",
-                DataType::UInt16 => "integer",
-                DataType::UInt32 => "bigint",
-                DataType::UInt64 => "decimal(20, 0)",
-
-                DataType::Float16 => "real",
-                DataType::Float32 => "real",
-                DataType::Float64 => "double precision",
-
-                // PostgreSQL timestamps cannot store timezone in the schema.
-                // PostgreSQL timestamps are microseconds since 2000-01-01T00:00.
-                // Arrow timestamps *can be* microseconds since 1970-01-01T00:00.
-                // ... which means we cannot store the full range of the Arrow microsecond
-                //     timestamp in PostgreSQL timestamp without changing its meaning.
-                // ... so we must Int64 instead.
-                DataType::Timestamp(_, _) => "bigint",
-                DataType::Date32 => "integer",
-                DataType::Date64 => "bigint",
-                DataType::Time32(_) => "integer",
-                DataType::Time64(_) => "bigint",
-                DataType::Duration(_) => "bigint",
-                DataType::Interval(_) => return None,
-
-                DataType::Utf8 | DataType::LargeUtf8 => "text",
-
-                DataType::Binary | DataType::LargeBinary | DataType::FixedSizeBinary(_) => "bytea",
-
-                DataType::Decimal128(precision, scale) | DataType::Decimal256(precision, scale) => {
-                    return Some(format!("decimal({precision}, {scale})"))
-                }
-
-                DataType::List(_)
-                | DataType::FixedSizeList(_, _)
-                | DataType::LargeList(_)
-                | DataType::Struct(_)
-                | DataType::Union(_, _)
-                | DataType::Dictionary(_, _)
-                | DataType::Map(_, _)
-                | DataType::RunEndEncoded(_, _) => return None,
-            }
-            .into(),
-        )
+    fn type_arrow_into_db(_ty: &DataType) -> Option<String> {
+        None
     }
 }
 

@@ -17,11 +17,7 @@ pub fn next_batch_from_rows<'stmt, T: RowsReader<'stmt>>(
         if let Some(mut cell_reader) = rows_reader.next_row()? {
             writer.prepare_for_batch(1)?;
 
-            dbg!("row");
-
             for field in &schema.fields {
-                dbg!(field);
-
                 let cell_ref = cell_reader.next_cell();
 
                 transport::transport(field, cell_ref.unwrap(), &mut writer)?;
