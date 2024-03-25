@@ -65,7 +65,7 @@ impl<'a> Iterator for PostgresBatchStream<'a> {
 }
 
 struct PostgresRowStream<'a> {
-    iter: fallible_iterator::Fuse<postgres::RowIter<'a>>,
+    iter: postgres_fallible_iterator::Fuse<postgres::RowIter<'a>>,
 }
 
 impl<'a> PostgresRowStream<'a> {

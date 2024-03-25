@@ -26,7 +26,6 @@ arrow = { version = "49", default-features = false }
 # common optional
 hex = { version = "0.4", optional = true }
 fallible-streaming-iterator = { version = "0.1", optional = true }
-fallible-iterator = { version = "0.2", optional = true }
 csv = { version = "1", optional = true }
 bytes = { version = "1", optional = true }
 byteorder = { version = "1", optional = true }
@@ -46,6 +45,11 @@ features = ["with-chrono-0_4", "with-uuid-0_8", "with-serde_json-1"]
 [dependencies.postgres-protocol]
 version = "0.6.6"
 default-features = false
+optional = true
+
+[dependencies.postgres-fallible-iterator]
+package = "fallible-iterator"
+version = "0.2" # this dep is bound to potgres's transitive dep
 optional = true
 
 [dependencies.rusqlite]
@@ -85,11 +89,11 @@ all = ["src_sqlite", "src_duckdb", "src_postgres", "src_mysql", "src_tiberius"]
 src_postgres = [
     "postgres",
     "postgres-protocol",
+    "postgres-fallible-iterator",
     "csv",
     "hex",
     "bytes",
     "byteorder",
-    "fallible-iterator",
 ]
 src_sqlite = ["rusqlite"]
 src_duckdb = ["duckdb", "fallible-streaming-iterator"]
