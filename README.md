@@ -30,28 +30,28 @@ without need for dynamic linking of C libraries.
 
 ## Support matrix
 
-|  | SQLite | DuckDB | PostgreSQL | MySQL | Microsoft SQL Server |
+| RDBMS | SQLite | DuckDB | PostgreSQL | MySQL | Microsoft SQL Server |
 | --- | --- | --- | --- | --- | --- |
 | feature | `src_sqlite` | `src_duckdb` | `src_postgres` | `src_mysql` | `src_tiberius` |
 | dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) | [mysql](https://crates.io/crates/mysql) | [tiberius](https://crates.io/crates/tiberius) |
 | query | x | x | x | x | x |
 | query params |  |  | x |  |  |
-| schema get | x | x | x |  |  |
-| schema edit | x | x | x |  |  |
-| append | x | x | x |  |  |
-| roundtrip: null & bool | x | x | x |  |  |
-| roundtrip: int | x | x | x |  |  |
-| roundtrip: uint | x | x | x |  |  |
-| roundtrip: float | x | x | x |  |  |
+| schema get | x | x | x | x |  |
+| schema edit | x | x | x | x |  |
+| append | x | x | x | x |  |
+| roundtrip: null & bool | x | x | x | x |  |
+| roundtrip: int | x | x | x | x |  |
+| roundtrip: uint | x | x | x | x |  |
+| roundtrip: float | x | x | x | x |  |
 | roundtrip: decimal | x |  | x |  |  |
 | roundtrip: timestamp | x | x | x |  |  |
 | roundtrip: date | x |  | x |  |  |
 | roundtrip: time | x |  | x |  |  |
 | roundtrip: duration | x |  | x |  |  |
 | roundtrip: interval |  |  |  |  |  |
-| roundtrip: utf8 | x | x | x |  |  |
-| roundtrip: binary | x | x | x |  |  |
-| roundtrip: empty |  | x | x |  |  |
+| roundtrip: utf8 | x | x | x | x |  |
+| roundtrip: binary | x | x | x | x |  |
+| roundtrip: empty |  | x | x | x |  |
 | containers |  |  |  |  |  |
 | binary fallback | x |  | x |  |  |
 

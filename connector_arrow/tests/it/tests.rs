@@ -77,8 +77,13 @@ pub fn query_03<C: Connector>(conn: &mut C) {
     );
 }
 
-pub fn roundtrip<C>(conn: &mut C, table_name: &str, spec: ArrowGenSpec)
-where
+pub fn roundtrip<C>(
+    conn: &mut C,
+    table_name: &str,
+    spec: ArrowGenSpec,
+    ident_quote_char: char,
+    nullable_results: bool,
+) where
     C: Connector + SchemaEdit,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
@@ -86,10 +91,11 @@ where
 
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
 
+    let override_nullable = if !nullable_results { Some(true) } else { None };
     let (schema_coerced, batches_coerced) =
-        coerce::coerce_batches(schema, &batches, coerce_type::<C>, Some(true)).unwrap();
+        coerce::coerce_batches(schema, &batches, coerce_type::<C>, override_nullable).unwrap();
 
-    let (schema_query, batches_query) = query_table(conn, table_name).unwrap();
+    let (schema_query, batches_query) = query_table(conn, table_name, ident_quote_char).unwrap();
 
     similar_asserts::assert_eq!(schema_coerced, schema_query);
     similar_asserts::assert_eq!(batches_coerced, batches_query);

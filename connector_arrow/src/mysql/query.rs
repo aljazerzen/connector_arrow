@@ -93,6 +93,7 @@ impl<'a> util::CellReader<'a> for MySQLCellReader {
             cell: self.cell,
         };
         self.cell += 1;
+
         Some(r)
     }
 }
@@ -113,7 +114,12 @@ macro_rules! impl_produce_ty {
                     Ok(self.row.take(self.cell).unwrap())
                 }
                 fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
-                    Ok(self.row.take(self.cell))
+                    let res = self.row.take_opt(self.cell).unwrap();
+                    match res {
+                        Ok(v) => Ok(Some(v)),
+                        Err(mysql::FromValueError(mysql::Value::NULL)) => Ok(None),
+                        Err(mysql::FromValueError(v)) => Err(ConnectorError::from(mysql::Error::FromValueError(v)))
+                    }
                 }
             }
         )+

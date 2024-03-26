@@ -8,6 +8,11 @@ pub fn escaped_ident(ident: &str) -> EscapedIdent<'_> {
     EscapedIdent { ident, quote: '"' }
 }
 
+#[allow(dead_code)]
+pub fn escaped_ident_bt(ident: &str) -> EscapedIdent<'_> {
+    EscapedIdent { ident, quote: '`' }
+}
+
 pub static VALID_IDENT: Lazy<Regex> = Lazy::new(|| {
     // An ident starting with `a-z_` and containing other characters `a-z0-9_$`
     //
