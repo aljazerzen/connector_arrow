@@ -59,9 +59,12 @@ where
 pub fn query_table<C: Connector>(
     conn: &mut C,
     table_name: &str,
+    ident_quote_char: char,
 ) -> Result<(SchemaRef, Vec<RecordBatch>), ConnectorError> {
     let mut stmt = conn
-        .query(&format!("SELECT * FROM \"{table_name}\""))
+        .query(&format!(
+            "SELECT * FROM {ident_quote_char}{table_name}{ident_quote_char}"
+        ))
         .unwrap();
     let mut reader = stmt.start([])?;
 

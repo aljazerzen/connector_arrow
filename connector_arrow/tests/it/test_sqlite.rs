@@ -26,11 +26,11 @@ fn query_01() {
 #[case::time("roundtrip::time", spec::time())]
 #[case::duration("roundtrip::duration", spec::duration())]
 // #[case::interval("roundtrip::interval", spec::interval())]
-#[case::utf8("roundtrip::utf8", spec::utf8())]
-#[case::binary("roundtrip::binary", spec::binary())]
+#[case::utf8("roundtrip::utf8", spec::utf8_large())]
+#[case::binary("roundtrip::binary", spec::binary_large())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
-    super::tests::roundtrip(&mut conn, table_name, spec);
+    super::tests::roundtrip(&mut conn, table_name, spec, '"', false);
 }
 
 #[test]

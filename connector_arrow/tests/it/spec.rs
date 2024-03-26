@@ -204,6 +204,10 @@ pub fn interval() -> Vec<ColumnSpec> {
 }
 
 pub fn utf8() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(&[DataType::Utf8], &[false, true], &VALUE_GEN_PROCESS_ALL)
+}
+
+pub fn utf8_large() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[DataType::Utf8, DataType::LargeUtf8],
         &[false, true],
@@ -215,8 +219,27 @@ pub fn binary() -> Vec<ColumnSpec> {
     domains_to_batch_spec(
         &[
             DataType::Binary,
+            DataType::FixedSizeBinary(1),
+            DataType::FixedSizeBinary(2),
+            DataType::FixedSizeBinary(3),
+            DataType::FixedSizeBinary(4),
+        ],
+        &[false, true],
+        &VALUE_GEN_PROCESS_ALL,
+    )
+}
+
+pub fn binary_large() -> Vec<ColumnSpec> {
+    domains_to_batch_spec(
+        &[
+            DataType::Binary,
             DataType::LargeBinary,
             DataType::FixedSizeBinary(15),
+            DataType::FixedSizeBinary(1),
+            DataType::FixedSizeBinary(2),
+            DataType::FixedSizeBinary(3),
+            DataType::FixedSizeBinary(4),
+            DataType::FixedSizeBinary(5),
             DataType::FixedSizeBinary(0),
         ],
         &[false, true],
