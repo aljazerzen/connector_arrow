@@ -191,7 +191,11 @@ where
                 | DataType::Union(_, _)
                 | DataType::Dictionary(_, _)
                 | DataType::Map(_, _)
-                | DataType::RunEndEncoded(_, _) => return None,
+                | DataType::RunEndEncoded(_, _)
+                | DataType::BinaryView
+                | DataType::Utf8View
+                | DataType::ListView(_)
+                | DataType::LargeListView(_) => return None,
             }
             .into(),
         )

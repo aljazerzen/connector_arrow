@@ -21,7 +21,7 @@ chrono = "0.4"
 serde_json = "1"
 
 # make sure this is in-sync with duckdb
-arrow = { version = "49", default-features = false }
+arrow = { version = "51", default-features = false }
 
 # common optional
 hex = { version = "0.4", optional = true }
@@ -49,7 +49,7 @@ optional = true
 
 [dependencies.postgres-fallible-iterator]
 package = "fallible-iterator"
-version = "0.2" # this dep is bound to potgres's transitive dep
+version = "0.2" # this dep is bound to postgres's transitive dep
 optional = true
 
 [dependencies.rusqlite]
@@ -58,7 +58,7 @@ default-features = false
 optional = true
 
 [dependencies.duckdb]
-version = "0.10.1"
+version = "0.10.2"
 default-features = false
 optional = true
 
@@ -75,7 +75,7 @@ optional = true
 
 [dev-dependencies]
 env_logger = "0.11"
-arrow = { version = "49", features = ["prettyprint"], default-features = false }
+arrow = { version = "51", features = ["prettyprint"], default-features = false }
 similar-asserts = { version = "1.5.0" }
 half = "2.3.1"
 rand = { version = "0.8.5", default-features = false }

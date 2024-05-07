@@ -423,6 +423,10 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
         }
         DataType::Map(_, _) => todo!(),
         DataType::RunEndEncoded(_, _) => todo!(),
+        DataType::BinaryView => todo!(),
+        DataType::Utf8View => todo!(),
+        DataType::ListView(_) => todo!(),
+        DataType::LargeListView(_) => todo!(),
     }
 }
 

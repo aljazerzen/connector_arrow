@@ -123,5 +123,9 @@ fn ty_from_arrow(data_type: &DataType) -> &'static str {
         DataType::Decimal256(_, _) => unimplemented!(),
         DataType::Map(_, _) => unimplemented!(),
         DataType::RunEndEncoded(_, _) => unimplemented!(),
+        DataType::BinaryView => todo!(),
+        DataType::Utf8View => todo!(),
+        DataType::ListView(_) => todo!(),
+        DataType::LargeListView(_) => todo!(),
     }
 }
