@@ -1,7 +1,7 @@
 //! Database client interface that uses Apache Arrow as data-transfer format and schema definition format.
 //!
 //! The important traits are:
-//! - [Connection], providing [Connection::query] and [Connection::append] functions,
+//! - [Connector], providing [Connector::query] and [Connector::append] functions,
 //! - [SchemaGet], for schema introspection,
 //! - [SchemaEdit], for basic schema migration commands,
 

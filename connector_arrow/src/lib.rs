@@ -36,6 +36,23 @@
 //! ```
 //!
 //! For a list of supported databases, refer to the [crates.io page](https://crates.io/crates/connector_arrow).
+//!
+//! ## Transitive dependency on arrow
+//!
+//! If you depend on `connector_arrow`, it is recommended not to depend on `arrow`
+//! directly, but use re-export from this crate instead. This advice is only relevant
+//! if your crate does not need any additional `arrow` features.
+//!
+//! ```
+//! use connector_arrow::arrow;
+//! ```
+//!
+//! If you do depend on `arrow` directly, you have to make sure to use exactly the
+//! same version as is used by `connector_arrow`, otherwise types from `arrow` and
+//! `connector_arrow` will not be interchangeable and might lead to type errors.
+//!
+//! This situation is made much worse by unusually high cadence of major version
+//! releases of arrow-rs, even without breaking changes.
 
 pub mod api;
 mod errors;
