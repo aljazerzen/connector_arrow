@@ -205,11 +205,14 @@ impl_consume_ty! {
 
 impl ConsumeTy<NullType> for ArrowRowWriter {
     fn consume(&mut self, _ty: &DataType, _: ()) {
-        self.next_builder();
+        ConsumeTy::<NullType>::consume_null(self)
     }
 
     fn consume_null(&mut self) {
-        self.next_builder();
+        self.next_builder()
+            .downcast_mut::<arrow::array::builder::NullBuilder>()
+            .expect(concat!("bad cast to ", stringify!(NullBuilder)))
+            .append_null();
     }
 }
 

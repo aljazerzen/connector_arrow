@@ -10,21 +10,14 @@ use crate::ConnectorError;
 pub fn get_result_schema<'a, P: Protocol>(
     result: &mysql::ResultSet<'a, 'a, 'a, 'a, P>,
 ) -> Result<SchemaRef, ConnectorError> {
-    dbg!("get_result_schema");
-
     let mut fields = Vec::new();
     for column in result.columns().as_ref() {
         let is_unsigned = !(column.flags() & ColumnFlags::UNSIGNED_FLAG).is_empty();
         let is_not_null = !(column.flags() & ColumnFlags::NOT_NULL_FLAG).is_empty();
-        let is_blob = !(column.flags() & ColumnFlags::BLOB_FLAG).is_empty();
+        let _is_blob = !(column.flags() & ColumnFlags::BLOB_FLAG).is_empty();
         let is_binary = !(column.flags() & ColumnFlags::BINARY_FLAG).is_empty();
 
-        dbg!(column.name_str());
-        dbg!(is_blob);
-        dbg!(is_binary);
-
         let db_ty = get_name_of_column_type(&column.column_type(), is_unsigned, is_binary);
-        dbg!(db_ty);
         fields.push(create_field(
             column.name_str().to_string(),
             db_ty,

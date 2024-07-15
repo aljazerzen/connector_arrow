@@ -268,7 +268,11 @@ impl Time64 {
     }
 }
 
-struct IntervalMonthDayMicros(i32, i32, i64);
+struct IntervalMonthDayMicros {
+    months: i32,
+    days: i32,
+    micros: i64,
+}
 
 impl<'a> FromSql<'a> for IntervalMonthDayMicros {
     fn from_sql(
@@ -278,7 +282,11 @@ impl<'a> FromSql<'a> for IntervalMonthDayMicros {
         let micros = postgres_protocol::types::time_from_sql(&raw[0..8])?;
         let days = postgres_protocol::types::int4_from_sql(&raw[8..12])?;
         let months = postgres_protocol::types::int4_from_sql(&raw[12..16])?;
-        Ok(IntervalMonthDayMicros(months, days, micros))
+        Ok(IntervalMonthDayMicros {
+            months,
+            days,
+            micros,
+        })
     }
     fn accepts(_ty: &Type) -> bool {
         true
@@ -286,14 +294,13 @@ impl<'a> FromSql<'a> for IntervalMonthDayMicros {
 }
 
 impl IntervalMonthDayMicros {
-    fn into_arrow(self) -> Result<i128, ConnectorError> {
-        let nanos = (self.2.checked_mul(1000)).ok_or(ConnectorError::DataOutOfRange)?;
-
-        let mut bytes = [0; 16];
-        bytes[0..4].copy_from_slice(&self.0.to_be_bytes());
-        bytes[4..8].copy_from_slice(&self.1.to_be_bytes());
-        bytes[8..16].copy_from_slice(&nanos.to_be_bytes());
-        Ok(i128::from_be_bytes(bytes))
+    fn into_arrow(self) -> Result<IntervalMonthDayNano, ConnectorError> {
+        let nanoseconds = (self.micros.checked_mul(1000)).ok_or(ConnectorError::DataOutOfRange)?;
+        Ok(IntervalMonthDayNano {
+            months: self.months,
+            days: self.days,
+            nanoseconds,
+        })
     }
 }
 

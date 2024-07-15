@@ -112,11 +112,14 @@ impl_arrow_value_tuple!(
         DurationMillisecondType,
         DurationMicrosecondType,
         DurationNanosecondType,
-        IntervalDayTimeType,
     )
 );
 
-impl_arrow_value_tuple!(i128, (IntervalMonthDayNanoType, Decimal128Type,));
+impl_arrow_value_tuple!(IntervalDayTime, (IntervalDayTimeType,));
+
+impl_arrow_value_tuple!(IntervalMonthDayNano, (IntervalMonthDayNanoType,));
+
+impl_arrow_value_tuple!(i128, (Decimal128Type,));
 
 impl_arrow_value_tuple!(i256, (Decimal256Type,));
 

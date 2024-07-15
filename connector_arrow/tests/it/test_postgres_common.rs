@@ -37,7 +37,7 @@ fn ident_escaping() {
 /// These tests cases are used to test of querying of Postgres-native types
 /// that cannot be obtained by converting Arrow into PostgreSQL.
 pub mod literals_cases {
-    use arrow::datatypes::{DataType, TimeUnit};
+    use arrow::datatypes::{DataType, IntervalMonthDayNano, IntervalUnit, TimeUnit};
 
     use crate::util::QueryOfSingleLiteral;
 
@@ -174,8 +174,12 @@ pub mod literals_cases {
                 "interval",
                 "'P12M3DT4H5M6S'",
                 (
-                    DataType::Duration(TimeUnit::Microsecond),
-                    0x0000000C_00000003_00000d6001e7f400_i128,
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNano {
+                        months: 12,
+                        days: 3,
+                        nanoseconds: 0x00000d6001e7f400_i64,
+                    },
                 ),
             )
                 .into(),
@@ -183,8 +187,12 @@ pub mod literals_cases {
                 "interval",
                 "'P-1Y-2M3DT-4H-5M-6S'",
                 (
-                    DataType::Duration(TimeUnit::Microsecond),
-                    0xfffffff2_00000003_fffff29ffe180c00_u128 as i128,
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNano {
+                        months: -14,
+                        days: 3,
+                        nanoseconds: -14706000000000i64,
+                    },
                 ),
             )
                 .into(),

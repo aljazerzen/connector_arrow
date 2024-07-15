@@ -67,7 +67,8 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
     let capacity = count_values(values);
     match data_type {
         DataType::Null => {
-            let mut builder = NullBuilder::with_capacity(capacity);
+            let mut builder = NullBuilder::new();
+            builder.append_nulls(capacity);
             Arc::new(builder.finish()) as ArrayRef
         }
         DataType::Boolean => {
@@ -297,24 +298,26 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
             ]
         }
         DataType::Interval(IntervalUnit::MonthDayNano) => {
-            gen_array![
+            let array = gen_array![
                 values,
-                IntervalMonthDayNanoBuilder::with_capacity(capacity),
+                Decimal128Builder::with_capacity(capacity),
                 i128::MIN,
                 i128::MAX,
                 0,
                 rng.gen_range(i128::MIN..=i128::MAX)
-            ]
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
         }
         DataType::Interval(IntervalUnit::DayTime) => {
-            gen_array![
+            let array = gen_array![
                 values,
-                IntervalDayTimeBuilder::with_capacity(capacity),
+                Int64Builder::with_capacity(capacity),
                 i64::MIN,
                 i64::MAX,
                 0,
                 rng.gen_range(i64::MIN..=i64::MAX)
-            ]
+            ];
+            arrow::compute::cast(&array, data_type).unwrap()
         }
         DataType::Binary => {
             gen_array![
