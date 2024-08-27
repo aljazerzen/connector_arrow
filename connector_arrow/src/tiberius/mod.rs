@@ -1,16 +1,15 @@
+mod append;
+mod query;
+mod schema;
 mod types;
 
-use arrow::{datatypes::*, record_batch::RecordBatch};
-use futures::{AsyncRead, AsyncWrite, StreamExt};
+use arrow::datatypes::*;
+use futures::{AsyncRead, AsyncWrite};
+use itertools::Itertools;
 use std::sync::Arc;
-use tiberius::QueryStream;
 use tokio::runtime::Runtime;
 
-use crate::api::{unimplemented, Connector, ResultReader, Statement};
-use crate::impl_produce_unsupported;
-use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
-use crate::util::transport::ProduceTy;
-use crate::util::{self, transport::Produce};
+use crate::api::Connector;
 use crate::ConnectorError;
 
 pub struct TiberiusConnection<S: AsyncRead + AsyncWrite + Unpin + Send> {
@@ -25,215 +24,125 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusConnection<S> {
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<S> {
-    type Stmt<'conn> = TiberiusStatement<'conn, S> where Self: 'conn;
+    type Stmt<'conn> = query::TiberiusStatement<'conn, S> where Self: 'conn;
 
-    type Append<'conn> = unimplemented::Appender where Self: 'conn;
+    type Append<'conn> = append::TiberiusAppender<'conn, S> where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        Ok(TiberiusStatement {
+        Ok(query::TiberiusStatement {
             conn: self,
             query: query.to_string(),
         })
     }
 
-    fn append<'a>(&'a mut self, _table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        Ok(unimplemented::Appender {})
+    fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
+        append::TiberiusAppender::new(self.rt.clone(), &mut self.client, table_name)
     }
 
+    #[allow(clippy::get_first)]
     fn type_db_into_arrow(ty: &str) -> Option<DataType> {
-        Some(match ty {
+        let ty = ty.to_lowercase();
+
+        // parse arguments
+        let (name, args) = if let Some((name, args)) = ty.split_once('(') {
+            (
+                name,
+                args.trim_end_matches(')')
+                    .split(',')
+                    .filter_map(|a| a.trim().parse::<i16>().ok())
+                    .collect_vec(),
+            )
+        } else {
+            (ty.as_str(), vec![])
+        };
+
+        Some(match name {
             "null" | "intn" => DataType::Null,
             "bit" => DataType::Boolean,
+
             "tinyint" => DataType::UInt8,
             "smallint" => DataType::Int16,
             "int" => DataType::Int32,
             "bigint" => DataType::Int64,
-            "float" => DataType::Float32,
-            "real" => DataType::Float64,
+
+            "char" | "nchar" | "varchar" | "nvarchar" | "text" | "ntext" => DataType::Utf8,
+
+            "real" | "float" => {
+                let is_f32 = args
+                    .get(0)
+                    .map(|p| *p <= 24)
+                    .unwrap_or_else(|| name == "real");
+                if is_f32 {
+                    DataType::Float32
+                } else {
+                    DataType::Float64
+                }
+            }
+
+            "decimal" | "numeric" => {
+                let precision = args.get(0).cloned().unwrap_or(18) as u8;
+                let scale = args.get(1).cloned().unwrap_or(0) as i8;
+
+                if precision <= 128 {
+                    DataType::Decimal128(precision, scale)
+                } else {
+                    DataType::Decimal256(precision, scale)
+                }
+            }
+
             _ => return None,
         })
     }
 
-    fn type_arrow_into_db(_ty: &DataType) -> Option<String> {
-        None
-    }
-}
+    fn type_arrow_into_db(ty: &DataType) -> Option<String> {
+        Some(
+            match ty {
+                DataType::Null => "tinyint",
+                DataType::Boolean => "bit",
+                DataType::Int8 => "smallint",
+                DataType::Int16 => "smallint",
+                DataType::Int32 => "int",
+                DataType::Int64 => "bigint",
+                DataType::UInt8 => "tinyint",
+                DataType::UInt16 => "int",
+                DataType::UInt32 => "bigint",
+                DataType::UInt64 => "decimal(20, 0)",
 
-pub struct TiberiusStatement<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> {
-    conn: &'conn mut TiberiusConnection<S>,
-    query: String,
-}
+                DataType::Float32 => "float(24)", // 24 bits in mantissa
+                DataType::Float64 => "float(53)", // 53 bits in mantissa
+                DataType::Float16 => "float(24)", // could be float(11), but there is no storage saved
 
-impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
-    for TiberiusStatement<'conn, S>
-{
-    type Reader<'stmt> = TiberiusResultReader<'stmt>
-    where
-        Self: 'stmt;
+                // DataType::Timestamp(_, _) => todo!(),
+                // DataType::Date32 => todo!(),
+                // DataType::Date64 => todo!(),
+                // DataType::Time32(_) => todo!(),
+                // DataType::Time64(_) => todo!(),
+                // DataType::Duration(_) => todo!(),
+                // DataType::Interval(_) => todo!(),
+                // DataType::Binary => "varbinary",
+                // DataType::FixedSizeBinary(0) => "varbinary",
+                // DataType::FixedSizeBinary(size) => return Some(format!("binary({size})")),
+                // DataType::LargeBinary => "varbinary",
 
-    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn crate::api::ArrowValue>,
-    {
-        // TODO: params
-
-        let mut stream = self
-            .conn
-            .rt
-            .block_on(self.conn.client.query(&self.query, &[]))?;
-
-        // get columns
-        let columns = self.conn.rt.block_on(stream.columns())?;
-        let schema = types::get_result_schema(columns)?;
-        self.conn.rt.block_on(stream.next());
-
-        Ok(TiberiusResultReader {
-            schema,
-            stream: TiberiusStream {
-                rt: self.conn.rt.clone(),
-                stream,
-            },
-        })
-    }
-}
-
-pub struct TiberiusResultReader<'stmt> {
-    schema: SchemaRef,
-    stream: TiberiusStream<'stmt>,
-}
-
-struct TiberiusStream<'stmt> {
-    rt: Arc<Runtime>,
-    stream: QueryStream<'stmt>,
-}
-
-impl<'stmt> ResultReader<'stmt> for TiberiusResultReader<'stmt> {
-    fn get_schema(&mut self) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
-        Ok(self.schema.clone())
-    }
-}
-
-impl<'stmt> Iterator for TiberiusResultReader<'stmt> {
-    type Item = Result<RecordBatch, ConnectorError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        util::next_batch_from_rows(&self.schema, &mut self.stream, 1024).transpose()
-    }
-}
-
-impl<'s> util::RowsReader<'s> for TiberiusStream<'s> {
-    type CellReader<'row> = TiberiusCellReader
-    where
-        Self: 'row;
-
-    fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
-        let item = self.rt.block_on(self.stream.next());
-
-        // are we done?
-        let Some(item) = item else { return Ok(None) };
-
-        // are there more result sets?
-        let row = match item? {
-            tiberius::QueryItem::Row(row) => row,
-            tiberius::QueryItem::Metadata(metadata) => {
-                dbg!(metadata);
-                // yes, this there are
-                return Err(ConnectorError::MultipleResultSets);
+                // DataType::BinaryView => todo!(),
+                DataType::Utf8 => "nvarchar(max)",
+                DataType::LargeUtf8 => "nvarchar(max)",
+                // DataType::Utf8View => todo!(),
+                // DataType::List(_) => todo!(),
+                // DataType::ListView(_) => todo!(),
+                // DataType::FixedSizeList(_, _) => todo!(),
+                // DataType::LargeList(_) => todo!(),
+                // DataType::LargeListView(_) => todo!(),
+                // DataType::Struct(_) => todo!(),
+                // DataType::Union(_, _) => todo!(),
+                // DataType::Dictionary(_, _) => todo!(),
+                // DataType::Decimal128(_, _) => todo!(),
+                // DataType::Decimal256(_, _) => todo!(),
+                // DataType::Map(_, _) => todo!(),
+                // DataType::RunEndEncoded(_, _) => todo!(),
+                _ => return None,
             }
-        };
-
-        Ok(Some(TiberiusCellReader { row, cell: 0 }))
+            .to_string(),
+        )
     }
 }
-
-struct TiberiusCellReader {
-    row: tiberius::Row,
-    cell: usize,
-}
-
-impl<'a> util::CellReader<'a> for TiberiusCellReader {
-    type CellRef<'cell> = TiberiusCellRef<'cell>
-    where
-        Self: 'cell;
-
-    fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
-        let r = TiberiusCellRef {
-            row: &mut self.row,
-            cell: self.cell,
-        };
-        self.cell += 1;
-        Some(r)
-    }
-}
-
-#[derive(Debug)]
-struct TiberiusCellRef<'a> {
-    row: &'a mut tiberius::Row,
-    cell: usize,
-}
-
-impl<'r> Produce<'r> for TiberiusCellRef<'r> {}
-
-macro_rules! impl_produce_ty {
-    ($p: ty, ($($t: ty,)+)) => {
-        $(
-            impl<'r> ProduceTy<'r, $t> for $p {
-                fn produce(self) -> Result<<$t as ArrowType>::Native, ConnectorError> {
-                    Ok(self.row.get(self.cell).unwrap())
-                }
-                fn produce_opt(self) -> Result<Option<<$t as ArrowType>::Native>, ConnectorError> {
-                    Ok(self.row.get(self.cell))
-                }
-            }
-        )+
-    };
-}
-
-impl_produce_ty!(
-    TiberiusCellRef<'r>,
-    (
-        BooleanType,
-        Int16Type,
-        Int32Type,
-        Int64Type,
-        UInt8Type,
-        Float32Type,
-        Float64Type,
-    )
-);
-
-impl_produce_unsupported!(
-    TiberiusCellRef<'r>,
-    (
-        NullType,
-        Int8Type,
-        UInt16Type,
-        Float16Type,
-        UInt32Type,
-        UInt64Type,
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampMicrosecondType,
-        TimestampNanosecondType,
-        Date32Type,
-        Date64Type,
-        Time32SecondType,
-        Time32MillisecondType,
-        Time64MicrosecondType,
-        Time64NanosecondType,
-        IntervalYearMonthType,
-        IntervalDayTimeType,
-        IntervalMonthDayNanoType,
-        DurationSecondType,
-        DurationMillisecondType,
-        DurationMicrosecondType,
-        DurationNanosecondType,
-        LargeUtf8Type,
-        LargeBinaryType,
-        FixedSizeBinaryType,
-        Decimal128Type,
-        Decimal256Type,
-        Utf8Type,
-        BinaryType,
-    )
-);

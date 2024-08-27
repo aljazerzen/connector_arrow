@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use arrow::datatypes::*;
 use tiberius::{Column, ColumnType};
@@ -16,15 +16,23 @@ pub fn get_result_schema(columns: Option<&[Column]>) -> Result<SchemaRef, Connec
     for column in columns {
         let db_ty = get_name_of_column_type(&column.column_type());
 
-        fields.push(create_field(column.name().to_string(), db_ty, true));
+        fields.push(create_field(column.name(), db_ty, true));
     }
 
     Ok(Arc::new(Schema::new(fields)))
 }
 
-fn create_field(name: String, db_ty: &str, nullable: bool) -> Field {
+pub fn create_field(name: &str, db_ty: &str, nullable: bool) -> Field {
+    let mut metadata = HashMap::new();
+
     let data_type = super::TiberiusConnection::<Compat<TcpStream>>::type_db_into_arrow(db_ty);
-    let data_type = data_type.unwrap_or_else(|| todo!("database type: {}", db_ty));
+
+    // if we cannot map to an arrow type, map into a binary
+    let data_type = data_type.unwrap_or_else(|| {
+        metadata.insert(crate::api::METADATA_DB_TYPE.to_string(), db_ty.to_string());
+
+        DataType::Binary
+    });
 
     Field::new(name, data_type, nullable)
 }
@@ -34,7 +42,7 @@ fn get_name_of_column_type(col_ty: &ColumnType) -> &'static str {
 
     match col_ty {
         Null => "null",
-        Bit => "bit",
+        Bit | Bitn => "bit",
 
         Int1 => "tinyint",
         Int2 => "smallint",
@@ -42,12 +50,13 @@ fn get_name_of_column_type(col_ty: &ColumnType) -> &'static str {
         Int8 => "bigint",
 
         Intn => "intn",
-        Decimaln => "decimaln",
-        Numericn => "numericn",
 
-        Float4 => "float4",
-        Float8 => "float8",
-        Floatn => "floatn",
+        // TODO: this should not be hardcoded to 20
+        // it should be a dynamic value that might differ for each row?
+        Decimaln | Numericn => "decimal(20)",
+
+        Float4 => "float(24)",
+        Float8 | Floatn => "float(53)",
 
         Money => "money",
         Money4 => "money4",
@@ -62,7 +71,6 @@ fn get_name_of_column_type(col_ty: &ColumnType) -> &'static str {
 
         Guid => "guid",
 
-        Bitn => "bitn",
         BigVarBin => "bigvarbin",
         BigBinary => "bigbinary",
 
