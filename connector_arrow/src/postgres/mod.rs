@@ -2,29 +2,27 @@
 //!
 //! ```no_run
 //! use postgres::{Client, NoTls};
-//! use connector_arrow::postgres::{PostgresConnection, ProtocolExtended};
+//! use connector_arrow::postgres::PostgresConnection;
 //! use connector_arrow::api::Connector;
 //!
 //! let client = Client::connect("postgres://localhost:5432/my_db", NoTls).unwrap();
 //!
-//! let mut conn = PostgresConnection::<ProtocolExtended>::new(client);
+//! let mut conn = PostgresConnection::new(client);
 //!
 //! let stmt = conn.query("SELECT * FROM my_table").unwrap();
 //! ````
 
 mod append;
 mod decimal;
-mod protocol_extended;
-mod protocol_simple;
+mod query;
 mod schema;
 mod types;
 
 use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use postgres::Client;
-use std::marker::PhantomData;
 use thiserror::Error;
 
-use crate::api::{Connector, Statement};
+use crate::api::Connector;
 use crate::errors::ConnectorError;
 
 /// Connection to PostgreSQL that implements [Connection], [crate::api::SchemaGet] and [crate::api::SchemaEdit].
@@ -32,34 +30,19 @@ use crate::errors::ConnectorError;
 /// Requires generic argument `Protocol`, which can be one of the following types:
 /// - [ProtocolExtended]
 /// - [ProtocolSimple]
-pub struct PostgresConnection<Protocol> {
+pub struct PostgresConnection {
     client: Client,
-    _protocol: PhantomData<Protocol>,
 }
 
-impl<Protocol> PostgresConnection<Protocol> {
+impl PostgresConnection {
     pub fn new(client: Client) -> Self {
-        PostgresConnection {
-            client,
-            _protocol: PhantomData,
-        }
+        PostgresConnection { client }
     }
 
     pub fn unwrap(self) -> Client {
         self.client
     }
 }
-
-/// Extended PostgreSQL wire protocol.
-/// Supports query parameters (but they are not yet implemented).
-/// Supports streaming, with batch size of 1024.
-pub struct ProtocolExtended;
-
-/// Simple PostgreSQL wire protocol.
-/// This protocol returns the values in rows as strings rather than in their binary encodings.
-/// Does not support query parameters.
-/// Does not support streaming.
-pub struct ProtocolSimple;
 
 // /// Protocol - Binary based bulk load
 // pub struct BinaryProtocol;
@@ -82,11 +65,8 @@ pub enum PostgresError {
     IO(#[from] std::io::Error),
 }
 
-impl<P> Connector for PostgresConnection<P>
-where
-    for<'conn> PostgresStatement<'conn, P>: Statement<'conn>,
-{
-    type Stmt<'conn> = PostgresStatement<'conn, P> where Self: 'conn;
+impl Connector for PostgresConnection {
+    type Stmt<'conn> = query::PostgresStatement<'conn> where Self: 'conn;
 
     type Append<'conn> = append::PostgresAppender<'conn> where Self: 'conn;
 
@@ -95,11 +75,10 @@ where
             .client
             .prepare(query)
             .map_err(PostgresError::Postgres)?;
-        Ok(PostgresStatement {
+        Ok(query::PostgresStatement {
             client: &mut self.client,
             query: query.to_string(),
             stmt,
-            _protocol: &PhantomData,
         })
     }
 
@@ -200,11 +179,4 @@ where
             .into(),
         )
     }
-}
-
-pub struct PostgresStatement<'conn, P> {
-    client: &'conn mut Client,
-    query: String,
-    stmt: postgres::Statement,
-    _protocol: &'conn PhantomData<P>,
 }

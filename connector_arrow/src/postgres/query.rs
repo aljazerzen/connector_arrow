@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use itertools::Itertools;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
-use postgres::{Row, RowIter};
+use postgres::{Client, Row, RowIter};
 
 use crate::api::{ArrowValue, ResultReader, Statement};
 use crate::types::{ArrowType, FixedSizeBinaryType};
@@ -12,9 +12,15 @@ use crate::util::transport;
 use crate::util::CellReader;
 use crate::{errors::ConnectorError, util::RowsReader};
 
-use super::{types, PostgresError, PostgresStatement, ProtocolExtended};
+use super::{types, PostgresError};
 
-impl<'conn> Statement<'conn> for PostgresStatement<'conn, ProtocolExtended> {
+pub struct PostgresStatement<'conn> {
+    pub(super) client: &'conn mut Client,
+    pub(super) query: String,
+    pub(super) stmt: postgres::Statement,
+}
+
+impl<'conn> Statement<'conn> for PostgresStatement<'conn> {
     type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;
 
     fn start<'p, I>(&mut self, params: I) -> Result<Self::Reader<'_>, ConnectorError>

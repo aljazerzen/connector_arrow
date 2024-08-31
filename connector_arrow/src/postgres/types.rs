@@ -5,7 +5,7 @@ use postgres::types::Type;
 
 use crate::{api::Connector, errors::ConnectorError};
 
-use super::{PostgresConnection, ProtocolExtended};
+use super::PostgresConnection;
 
 pub fn pg_stmt_to_arrow(
     stmt: &postgres::Statement,
@@ -21,7 +21,7 @@ pub fn pg_stmt_to_arrow(
 pub fn pg_field_to_arrow(name: String, db_ty: &Type, nullable: bool) -> Field {
     let mut metadata = HashMap::new();
 
-    let data_type = PostgresConnection::<ProtocolExtended>::type_db_into_arrow(db_ty.name());
+    let data_type = PostgresConnection::type_db_into_arrow(db_ty.name());
 
     // if we cannot map to an arrow type, map into a binary
     let data_type = data_type.unwrap_or_else(|| {
