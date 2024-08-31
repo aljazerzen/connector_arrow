@@ -6,13 +6,13 @@ use postgres::error::SqlState;
 use postgres::types::Type;
 
 use crate::api::{Connector, SchemaEdit, SchemaGet};
-use crate::postgres::{PostgresConnection, ProtocolExtended};
+use crate::postgres::PostgresConnection;
 use crate::util::escape::escaped_ident;
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
 use super::PostgresError;
 
-impl<P> SchemaGet for super::PostgresConnection<P> {
+impl SchemaGet for super::PostgresConnection {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query = "
             SELECT relname
@@ -61,17 +61,17 @@ impl<P> SchemaGet for super::PostgresConnection<P> {
     }
 }
 
-impl<P> SchemaEdit for super::PostgresConnection<P> {
+impl SchemaEdit for super::PostgresConnection {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()
             .iter()
             .map(|field| {
-                let ty =
-                    PostgresConnection::<ProtocolExtended>::type_arrow_into_db(field.data_type())
-                        .unwrap_or_else(|| {
-                            unimplemented!("cannot store type {} in PostgreSQL", field.data_type());
-                        });
+                let ty = PostgresConnection::type_arrow_into_db(field.data_type()).unwrap_or_else(
+                    || {
+                        unimplemented!("cannot store type {} in PostgreSQL", field.data_type());
+                    },
+                );
 
                 let is_nullable =
                     field.is_nullable() || matches!(field.data_type(), DataType::Null);

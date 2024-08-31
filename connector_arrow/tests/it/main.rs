@@ -8,11 +8,7 @@ mod test_duckdb;
 #[cfg(feature = "src_mysql")]
 mod test_mysql;
 #[cfg(feature = "src_postgres")]
-mod test_postgres_common;
-#[cfg(feature = "src_postgres")]
-mod test_postgres_extended;
-#[cfg(feature = "src_postgres")]
-mod test_postgres_simple;
+mod test_postgres;
 #[cfg(feature = "src_sqlite")]
 mod test_sqlite;
 #[cfg(feature = "src_tiberius")]
