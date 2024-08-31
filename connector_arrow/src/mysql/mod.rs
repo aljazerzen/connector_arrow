@@ -9,17 +9,17 @@ use mysql::prelude::*;
 use crate::api::Connector;
 use crate::ConnectorError;
 
-pub struct MySQLConnection<C: Queryable> {
-    conn: C,
+pub struct MySQLConnection<Q: Queryable> {
+    pub queryable: Q,
 }
 
 impl<C: Queryable> MySQLConnection<C> {
     pub fn new(conn: C) -> Self {
-        MySQLConnection { conn }
+        MySQLConnection { queryable: conn }
     }
 
     pub fn unwrap(self) -> C {
-        self.conn
+        self.queryable
     }
 }
 
@@ -29,15 +29,15 @@ impl<C: Queryable> Connector for MySQLConnection<C> {
     type Append<'conn> = append::MySQLAppender<'conn, C> where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        let stmt = self.conn.prep(query)?;
+        let stmt = self.queryable.prep(query)?;
         Ok(query::MySQLStatement {
-            conn: &mut self.conn,
+            queryable: &mut self.queryable,
             stmt,
         })
     }
 
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        append::MySQLAppender::new(&mut self.conn, table_name)
+        append::MySQLAppender::new(&mut self.queryable, table_name)
     }
 
     fn type_db_into_arrow(ty: &str) -> Option<DataType> {

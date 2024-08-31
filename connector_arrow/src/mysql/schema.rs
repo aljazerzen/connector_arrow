@@ -13,7 +13,7 @@ use crate::{
 
 impl<C: Queryable> SchemaGet for super::MySQLConnection<C> {
     fn table_list(&mut self) -> Result<Vec<String>, crate::ConnectorError> {
-        let mut results = self.conn.exec_iter("SHOW TABLES;", ())?;
+        let mut results = self.queryable.exec_iter("SHOW TABLES;", ())?;
         let result = results.iter().ok_or(crate::ConnectorError::NoResultSets)?;
 
         let table_names = result
@@ -29,7 +29,7 @@ impl<C: Queryable> SchemaGet for super::MySQLConnection<C> {
         name: &str,
     ) -> Result<arrow::datatypes::SchemaRef, crate::ConnectorError> {
         let mut results = self
-            .conn
+            .queryable
             .exec_iter(format!("DESCRIBE {};", escaped_ident_bt(name)), ())?;
         let result = results.iter().ok_or(crate::ConnectorError::NoResultSets)?;
 
@@ -76,7 +76,7 @@ impl<C: Queryable> SchemaEdit for super::MySQLConnection<C> {
 
         let ddl = format!("CREATE TABLE {} ({column_defs});", escaped_ident_bt(name));
 
-        let res = self.conn.query_drop(&ddl);
+        let res = self.queryable.query_drop(&ddl);
         match res {
             Ok(_) => Ok(()),
             Err(mysql::Error::MySqlError(e)) if e.code == 1050 => {
@@ -88,7 +88,7 @@ impl<C: Queryable> SchemaEdit for super::MySQLConnection<C> {
 
     fn table_drop(&mut self, name: &str) -> Result<(), TableDropError> {
         let res = self
-            .conn
+            .queryable
             .query_drop(format!("DROP TABLE {}", escaped_ident_bt(name)));
         match res {
             Ok(_) => Ok(()),

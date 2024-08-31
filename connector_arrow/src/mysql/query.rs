@@ -9,9 +9,9 @@ use crate::util::transport::ProduceTy;
 use crate::util::{self, transport::Produce};
 use crate::ConnectorError;
 
-pub struct MySQLStatement<'conn, C: Queryable> {
+pub struct MySQLStatement<'conn, Q: Queryable> {
     pub(super) stmt: mysql::Statement,
-    pub(super) conn: &'conn mut C,
+    pub(super) queryable: &'conn mut Q,
 }
 
 impl<'conn, C: Queryable> Statement<'conn> for MySQLStatement<'conn, C> {
@@ -25,7 +25,7 @@ impl<'conn, C: Queryable> Statement<'conn> for MySQLStatement<'conn, C> {
     {
         // TODO: params
 
-        let query_result = self.conn.exec_iter(&self.stmt, ())?;
+        let query_result = self.queryable.exec_iter(&self.stmt, ())?;
 
         // PacCell is needed so we can return query_result and result_set that mutably borrows query result.
         let pac = PacCell::try_new(query_result, |qr| -> Result<_, ConnectorError> {
