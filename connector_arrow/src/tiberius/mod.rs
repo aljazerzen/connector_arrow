@@ -13,13 +13,21 @@ use crate::api::Connector;
 use crate::ConnectorError;
 
 pub struct TiberiusConnection<S: AsyncRead + AsyncWrite + Unpin + Send> {
-    pub rt: Arc<Runtime>,
-    pub client: tiberius::Client<S>,
+    rt: Arc<Runtime>,
+    client: tiberius::Client<S>,
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusConnection<S> {
     pub fn new(rt: Arc<Runtime>, client: tiberius::Client<S>) -> Self {
         TiberiusConnection { rt, client }
+    }
+
+    pub fn unwrap(self) -> (Arc<Runtime>, tiberius::Client<S>) {
+        (self.rt, self.client)
+    }
+
+    pub fn inner_mut(&mut self) -> (&mut Arc<Runtime>, &mut tiberius::Client<S>) {
+        (&mut self.rt, &mut self.client)
     }
 }
 
