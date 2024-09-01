@@ -22,6 +22,14 @@ impl DuckDBConnection {
     pub fn new(inner: duckdb::Connection) -> Self {
         Self { inner }
     }
+
+    pub fn unwrap(self) -> duckdb::Connection {
+        self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut duckdb::Connection {
+        &mut self.inner
+    }
 }
 
 impl Connector for DuckDBConnection {

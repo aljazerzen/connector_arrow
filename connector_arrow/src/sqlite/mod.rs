@@ -22,6 +22,14 @@ impl SQLiteConnection {
     pub fn new(inner: rusqlite::Connection) -> Self {
         Self { inner }
     }
+
+    pub fn unwrap(self) -> rusqlite::Connection {
+        self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut rusqlite::Connection {
+        &mut self.inner
+    }
 }
 
 impl Connector for SQLiteConnection {

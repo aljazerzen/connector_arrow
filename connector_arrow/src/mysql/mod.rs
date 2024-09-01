@@ -10,23 +10,27 @@ use crate::api::Connector;
 use crate::ConnectorError;
 
 pub struct MySQLConnection<Q: Queryable> {
-    pub queryable: Q,
+    queryable: Q,
 }
 
-impl<C: Queryable> MySQLConnection<C> {
-    pub fn new(conn: C) -> Self {
+impl<Q: Queryable> MySQLConnection<Q> {
+    pub fn new(conn: Q) -> Self {
         MySQLConnection { queryable: conn }
     }
 
-    pub fn unwrap(self) -> C {
+    pub fn unwrap(self) -> Q {
         self.queryable
+    }
+
+    pub fn inner_mut(&mut self) -> &mut Q {
+        &mut self.queryable
     }
 }
 
-impl<C: Queryable> Connector for MySQLConnection<C> {
-    type Stmt<'conn> = query::MySQLStatement<'conn, C> where Self: 'conn;
+impl<Q: Queryable> Connector for MySQLConnection<Q> {
+    type Stmt<'conn> = query::MySQLStatement<'conn, Q> where Self: 'conn;
 
-    type Append<'conn> = append::MySQLAppender<'conn, C> where Self: 'conn;
+    type Append<'conn> = append::MySQLAppender<'conn, Q> where Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self.queryable.prep(query)?;

@@ -42,6 +42,10 @@ impl PostgresConnection {
     pub fn unwrap(self) -> Client {
         self.client
     }
+
+    pub fn inner_mut(&mut self) -> &mut Client {
+        &mut self.client
+    }
 }
 
 // /// Protocol - Binary based bulk load
