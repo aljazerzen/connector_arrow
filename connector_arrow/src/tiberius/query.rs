@@ -88,8 +88,7 @@ impl<'s> util::RowsReader<'s> for TiberiusStream<'s> {
         // are there more result sets?
         let row = match item? {
             tiberius::QueryItem::Row(row) => row,
-            tiberius::QueryItem::Metadata(metadata) => {
-                dbg!(metadata);
+            tiberius::QueryItem::Metadata(_) => {
                 // yes, this there are
                 return Err(ConnectorError::MultipleResultSets);
             }

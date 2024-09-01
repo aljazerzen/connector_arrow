@@ -20,7 +20,7 @@ pub fn next_batch_from_rows<'stmt, T: RowsReader<'stmt>>(
             for field in &schema.fields {
                 let cell_ref = cell_reader.next_cell();
 
-                transport::transport(dbg!(field), cell_ref.unwrap(), &mut writer)?;
+                transport::transport(field, cell_ref.unwrap(), &mut writer)?;
             }
         } else {
             break;

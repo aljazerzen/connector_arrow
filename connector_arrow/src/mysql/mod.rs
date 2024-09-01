@@ -45,8 +45,6 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
     }
 
     fn type_db_into_arrow(ty: &str) -> Option<DataType> {
-        dbg!(ty);
-
         let (ty, unsigned) = ty
             .strip_suffix(" unsigned")
             .map(|p| (p, true))
