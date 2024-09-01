@@ -77,7 +77,9 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
                 DataType::Binary
             }
 
-            ("tinytext" | "mediumtext" | "longtext" | "text" | "varchar", _) => DataType::Utf8,
+            ("tinytext" | "mediumtext" | "longtext" | "text" | "varchar" | "char", _) => {
+                DataType::Utf8
+            }
 
             _ => return None,
         })

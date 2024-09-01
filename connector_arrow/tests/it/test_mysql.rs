@@ -1,7 +1,7 @@
 use connector_arrow::mysql::MySQLConnection;
 use rstest::*;
 
-use crate::spec;
+use crate::{spec, util::QueryOfSingleLiteral};
 
 fn init() -> MySQLConnection<mysql::Conn> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -61,4 +61,22 @@ fn ident_escaping() {
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
     super::tests::roundtrip(&mut conn, table_name, spec, '`', true);
+}
+
+#[rstest]
+#[case::chars(literals_cases::strings())]
+fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
+    let mut conn = init();
+    crate::util::query_literals(&mut conn, queries)
+}
+
+/// These tests cases are used to test of querying of Postgres-native types
+/// that cannot be obtained by converting Arrow into PostgreSQL.
+#[allow(dead_code)]
+mod literals_cases {
+    use crate::util::QueryOfSingleLiteral;
+
+    pub fn strings() -> Vec<QueryOfSingleLiteral> {
+        vec![("char", "'hello'", "hello".to_string()).into()]
+    }
 }
