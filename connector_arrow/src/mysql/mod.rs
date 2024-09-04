@@ -56,8 +56,9 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
         } else {
             ty
         };
+        let ty = ty.to_lowercase();
 
-        Some(match (ty, unsigned) {
+        Some(match (ty.as_str(), unsigned) {
             ("null", _) => DataType::Null,
 
             ("tinyint" | "bool" | "boolean", false) => DataType::Int8,
@@ -80,6 +81,8 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
             ("tinytext" | "mediumtext" | "longtext" | "text" | "varchar" | "char", _) => {
                 DataType::Utf8
             }
+
+            ("decimal" | "numeric" | "newdecimal", _) => DataType::Utf8,
 
             _ => return None,
         })
@@ -109,6 +112,11 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
                 DataType::FixedSizeBinary(4) => "longblob",
                 DataType::FixedSizeBinary(_) => return None,
                 DataType::LargeBinary => return None,
+
+                DataType::Decimal128(p, s) | DataType::Decimal256(p, s) if *p <= 65 => {
+                    return Some(format!("decimal({p}, {s})"))
+                }
+                DataType::Decimal128(_, _) | DataType::Decimal256(_, _) => "text",
 
                 DataType::Utf8 => "longtext",
                 DataType::LargeUtf8 => return None,

@@ -50,7 +50,7 @@ fn ident_escaping() {
 #[case::int("roundtrip__int", spec::int())]
 #[case::uint("roundtrip__uint", spec::uint())]
 #[case::float("roundtrip__float", spec::float())]
-// #[case::decimal("roundtrip__decimal", spec::decimal())]
+#[case::decimal("roundtrip__decimal", spec::decimal())]
 // #[case::timestamp("roundtrip__timestamp", spec::timestamp())]
 // #[case::date("roundtrip__date", spec::date())]
 // #[case::time("roundtrip__time", spec::time())]
@@ -64,7 +64,8 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
 }
 
 #[rstest]
-#[case::chars(literals_cases::strings())]
+#[case::strings(literals_cases::strings())]
+#[case::decimals(literals_cases::decimals())]
 fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
     let mut conn = init();
     crate::util::query_literals(&mut conn, queries)
@@ -78,5 +79,12 @@ mod literals_cases {
 
     pub fn strings() -> Vec<QueryOfSingleLiteral> {
         vec![("char", "'hello'", "hello".to_string()).into()]
+    }
+
+    pub fn decimals() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            ("DECIMAL", "1000.33333", "1000".to_string()).into(),
+            ("DECIMAL(10, 2)", "1000.33333", "1000.33".to_string()).into(),
+        ]
     }
 }

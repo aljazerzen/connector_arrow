@@ -165,8 +165,36 @@ impl_consume_unsupported!(
         IntervalDayTimeType,
         IntervalMonthDayNanoType,
         IntervalYearMonthType,
-        Decimal128Type,
-        Decimal256Type,
         LargeUtf8Type,
     )
 );
+
+impl ConsumeTy<Decimal128Type> for Vec<Value> {
+    fn consume(&mut self, ty: &DataType, value: i128) {
+        let DataType::Decimal128(p, s) = ty else {
+            panic!()
+        };
+        self.push(Value::Bytes(
+            Decimal128Type::format_decimal(value, *p, *s).into_bytes(),
+        ));
+    }
+
+    fn consume_null(&mut self) {
+        self.push(Value::NULL);
+    }
+}
+
+impl ConsumeTy<Decimal256Type> for Vec<Value> {
+    fn consume(&mut self, ty: &DataType, value: i256) {
+        let DataType::Decimal256(p, s) = ty else {
+            panic!()
+        };
+        self.push(Value::Bytes(
+            Decimal256Type::format_decimal(value, *p, *s).into_bytes(),
+        ));
+    }
+
+    fn consume_null(&mut self) {
+        self.push(Value::NULL);
+    }
+}
