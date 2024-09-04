@@ -152,7 +152,7 @@ macro_rules! impl_consume_ty {
                         .append_value(value);
                 }
 
-                fn consume_null(&mut self) {
+                fn consume_null(&mut self, _ty: &DataType) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
@@ -204,11 +204,11 @@ impl_consume_ty! {
 }
 
 impl ConsumeTy<NullType> for ArrowRowWriter {
-    fn consume(&mut self, _ty: &DataType, _: ()) {
-        ConsumeTy::<NullType>::consume_null(self)
+    fn consume(&mut self, ty: &DataType, _: ()) {
+        ConsumeTy::<NullType>::consume_null(self, ty)
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.next_builder()
             .downcast_mut::<arrow::array::builder::NullBuilder>()
             .expect(concat!("bad cast to ", stringify!(NullBuilder)))
@@ -227,7 +227,7 @@ macro_rules! impl_consume_ref_ty {
                         .append_value(&value);
                 }
 
-                fn consume_null(&mut self) {
+                fn consume_null(&mut self, _ty: &DataType) {
                     self.next_builder()
                         .downcast_mut::<arrow::array::builder::$Builder>()
                         .expect(concat!("bad cast to ", stringify!($Builder)))
@@ -254,7 +254,7 @@ impl ConsumeTy<FixedSizeBinaryType> for ArrowRowWriter {
             .unwrap();
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.next_builder()
             .downcast_mut::<FixedSizeBinaryBuilder>()
             .expect(concat!("bad cast to ", stringify!($Builder)))

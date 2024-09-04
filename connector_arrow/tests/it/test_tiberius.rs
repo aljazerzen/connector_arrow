@@ -85,7 +85,7 @@ fn ident_escaping() {
 #[case::int("roundtrip::int", spec::int())]
 #[case::uint("roundtrip::uint", spec::uint())]
 #[case::float("roundtrip::float", spec::float())]
-// #[case::decimal("roundtrip::decimal", spec::decimal())]
+#[case::decimal("roundtrip::decimal", spec::decimal())]
 // #[case::timestamp("roundtrip::timestamp", spec::timestamp())]
 // #[case::date("roundtrip::date", spec::date())]
 // #[case::time("roundtrip::time", spec::time())]
@@ -103,7 +103,7 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
 #[case::bool(literals_cases::bool())]
 #[case::int(literals_cases::int())]
 #[case::float(literals_cases::float())]
-// #[case::decimal(literals_cases::decimal())]
+#[case::decimal(literals_cases::decimal())]
 // #[case::timestamp(literals_cases::timestamp())]
 // #[case::date(literals_cases::date())]
 // #[case::time(literals_cases::time())]
@@ -189,15 +189,16 @@ mod literals_cases {
     }
 
     pub fn decimal() -> Vec<QueryOfSingleLiteral> {
-        let precision_272 = "100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234.44100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234100234";
+        let precision_38 = "10023410023410023410023410023410023410";
         vec![
-            ("numeric", "100234.44", "100234.44".to_string()).into(),
-            ("numeric", "-100234", "-100234".to_string()).into(),
-            ("numeric", "0100234.4400", "100234.4400".to_string()).into(),
-            ("numeric", precision_272, precision_272.to_string()).into(),
-            ("numeric", "'Infinity'", "Infinity".to_string()).into(),
-            ("numeric", "'-Infinity'", "-Infinity".to_string()).into(),
-            ("numeric", "'NaN'", "NaN".to_string()).into(),
+            ("numeric(8, 2)", "100234.44", "100234.44".to_string()).into(),
+            ("numeric(6, 0)", "-100234", "-100234".to_string()).into(),
+            ("numeric(11, 4)", "0100234.4400", "100234.4400".to_string()).into(),
+            ("numeric(38, 0)", precision_38, precision_38.to_string()).into(),
+            ("numeric(11, 4)", "-100234.4400", "-100234.4400".to_string()).into(),
+            ("numeric(3, 2)", "-0.2", "-0.20".to_string()).into(),
+            ("numeric(3, 3)", "-0.2", "-0.200".to_string()).into(),
+            ("numeric(3, 2)", "0.2", "0.20".to_string()).into(),
         ]
     }
 

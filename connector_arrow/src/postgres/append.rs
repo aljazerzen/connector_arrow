@@ -151,7 +151,7 @@ macro_rules! impl_consume_ty {
                 $to_sql(($conversion)(value), self);
             }
 
-            fn consume_null(&mut self) {}
+            fn consume_null(&mut self, _ty: &DataType) {}
         }
     };
 }
@@ -167,7 +167,7 @@ macro_rules! impl_consume_ref_ty {
                 $to_sql(&value, self);
             }
 
-            fn consume_null(&mut self) {}
+            fn consume_null(&mut self, _ty: &DataType) {}
         }
     };
 }
@@ -175,7 +175,7 @@ macro_rules! impl_consume_ref_ty {
 impl ConsumeTy<NullType> for BytesMut {
     fn consume(&mut self, _ty: &DataType, _: ()) {}
 
-    fn consume_null(&mut self) {}
+    fn consume_null(&mut self, _ty: &DataType) {}
 }
 
 impl_consume_ty!(BooleanType, postgres_proto::bool_to_sql);
@@ -220,7 +220,7 @@ impl ConsumeTy<UInt64Type> for BytesMut {
         super::decimal::i128_to_sql(value as i128, 0, self)
     }
 
-    fn consume_null(&mut self) {}
+    fn consume_null(&mut self, _ty: &DataType) {}
 }
 
 impl ConsumeTy<Decimal128Type> for BytesMut {
@@ -232,7 +232,7 @@ impl ConsumeTy<Decimal128Type> for BytesMut {
         super::decimal::i128_to_sql(value, *scale, self)
     }
 
-    fn consume_null(&mut self) {}
+    fn consume_null(&mut self, _ty: &DataType) {}
 }
 
 impl ConsumeTy<Decimal256Type> for BytesMut {
@@ -244,7 +244,7 @@ impl ConsumeTy<Decimal256Type> for BytesMut {
         super::decimal::i256_to_sql(value, *scale, self)
     }
 
-    fn consume_null(&mut self) {}
+    fn consume_null(&mut self, _ty: &DataType) {}
 }
 
 impl_consume_unsupported!(

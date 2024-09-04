@@ -89,7 +89,7 @@ macro_rules! impl_consume_ty {
                 self.push(ColumnData::$variant(Some(($conversion)(value))))
             }
 
-            fn consume_null(&mut self) {
+            fn consume_null(&mut self, _ty: &DataType) {
                 self.push(ColumnData::$variant(None))
             }
         }
@@ -101,7 +101,7 @@ impl ConsumeTy<NullType> for TokenRow<'static> {
         self.push(ColumnData::U8(None))
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.push(ColumnData::U8(None))
     }
 }
@@ -124,8 +124,6 @@ impl_consume_ty!(LargeUtf8Type, String, Cow::from);
 impl_consume_unsupported!(
     TokenRow<'static>,
     (
-        Decimal128Type,
-        Decimal256Type,
         TimestampSecondType,
         TimestampMillisecondType,
         TimestampMicrosecondType,
@@ -151,4 +149,59 @@ impl_consume_unsupported!(
 
 fn u64_to_numeric(val: u64) -> Numeric {
     Numeric::new_with_scale(i128::from(val), 0)
+}
+
+impl ConsumeTy<Decimal128Type> for TokenRow<'static> {
+    fn consume(&mut self, ty: &DataType, value: i128) {
+        let DataType::Decimal128(p, s) = ty else {
+            panic!()
+        };
+        if super::can_decimal_fit_in_numeric(*p, *s) {
+            self.push(ColumnData::Numeric(Some(Numeric::new_with_scale(
+                value, *s as u8,
+            ))));
+        } else {
+            let string = Decimal128Type::format_decimal(value, *p, *s);
+            self.push(ColumnData::String(Some(string.into())));
+        }
+    }
+
+    fn consume_null(&mut self, ty: &DataType) {
+        let DataType::Decimal128(p, s) = ty else {
+            panic!()
+        };
+        if super::can_decimal_fit_in_numeric(*p, *s) {
+            self.push(ColumnData::Numeric(None));
+        } else {
+            self.push(ColumnData::String(None));
+        }
+    }
+}
+
+impl ConsumeTy<Decimal256Type> for TokenRow<'static> {
+    fn consume(&mut self, ty: &DataType, value: i256) {
+        let DataType::Decimal256(p, s) = ty else {
+            panic!()
+        };
+        if super::can_decimal_fit_in_numeric(*p, *s) {
+            self.push(ColumnData::Numeric(Some(Numeric::new_with_scale(
+                value.as_i128(),
+                *s as u8,
+            ))));
+        } else {
+            let string = Decimal256Type::format_decimal(value, *p, *s);
+            self.push(ColumnData::String(Some(string.into())));
+        }
+    }
+
+    fn consume_null(&mut self, ty: &DataType) {
+        let DataType::Decimal256(p, s) = ty else {
+            panic!()
+        };
+        if super::can_decimal_fit_in_numeric(*p, *s) {
+            self.push(ColumnData::Numeric(None));
+        } else {
+            self.push(ColumnData::String(None));
+        }
+    }
 }

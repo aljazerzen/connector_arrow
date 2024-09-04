@@ -1,8 +1,7 @@
 use arrow::{datatypes::*, record_batch::RecordBatch};
 use futures::{AsyncRead, AsyncWrite, StreamExt};
 use std::sync::Arc;
-use tiberius::numeric::Numeric;
-use tiberius::QueryStream;
+use tiberius::{ColumnData, QueryStream};
 use tokio::runtime::Runtime;
 
 use crate::api::{ResultReader, Statement};
@@ -154,8 +153,7 @@ impl_produce_ty!(Int64Type, i64);
 impl_produce_ty!(UInt8Type, u8);
 impl_produce_ty!(Float32Type, f32);
 impl_produce_ty!(Float64Type, f64);
-impl_produce_ty!(Decimal128Type, Numeric, numeric_to_i128);
-impl_produce_ty!(Utf8Type, &str, &str::to_owned);
+impl_produce_ty!(Utf8Type, StrOrNum, StrOrNum::into_inner);
 impl_produce_ty!(LargeUtf8Type, &str, &str::to_owned);
 
 impl_produce_unsupported!(
@@ -186,11 +184,40 @@ impl_produce_unsupported!(
         DurationNanosecondType,
         LargeBinaryType,
         FixedSizeBinaryType,
+        Decimal128Type,
         Decimal256Type,
         BinaryType,
     )
 );
 
-fn numeric_to_i128(val: Numeric) -> i128 {
-    val.value()
+struct StrOrNum(String);
+
+impl StrOrNum {
+    fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+impl<'a> tiberius::FromSql<'a> for StrOrNum {
+    fn from_sql(value: &'a ColumnData<'static>) -> tiberius::Result<Option<Self>> {
+        match value {
+            ColumnData::String(s) => Ok(s.as_ref().map(|x| StrOrNum(x.to_string()))),
+            ColumnData::Numeric(n) => Ok(n.as_ref().map(|x| {
+                if x.scale() > 0 {
+                    let sign = if x.value() < 0 { "-" } else { "" };
+                    StrOrNum(format!(
+                        "{sign}{}.{:0pad$}",
+                        x.int_part().abs(),
+                        x.dec_part().abs(),
+                        pad = x.scale() as usize
+                    ))
+                } else {
+                    StrOrNum(format!("{}", x.value()))
+                }
+            })),
+            _ => Err(tiberius::error::Error::Conversion(
+                format!("cannot convert `{:?}` into string", value).into(),
+            )),
+        }
+    }
 }

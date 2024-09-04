@@ -111,7 +111,7 @@ macro_rules! impl_consume_ty {
                 self.push(value);
             }
 
-            fn consume_null(&mut self) {
+            fn consume_null(&mut self, _ty: &DataType) {
                 self.push(Value::NULL);
             }
         }
@@ -140,7 +140,7 @@ impl ConsumeTy<NullType> for Vec<Value> {
         self.push(Value::NULL);
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.push(Value::NULL);
     }
 }
@@ -179,7 +179,7 @@ impl ConsumeTy<Decimal128Type> for Vec<Value> {
         ));
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.push(Value::NULL);
     }
 }
@@ -194,7 +194,7 @@ impl ConsumeTy<Decimal256Type> for Vec<Value> {
         ));
     }
 
-    fn consume_null(&mut self) {
+    fn consume_null(&mut self, _ty: &DataType) {
         self.push(Value::NULL);
     }
 }

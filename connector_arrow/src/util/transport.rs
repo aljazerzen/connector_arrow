@@ -9,7 +9,7 @@ macro_rules! impl_transport_match {
         let dt = $f.data_type();
         if !$f.is_nullable() {
             match dt {
-                Null => ConsumeTy::<NullType>::consume_null($c),
+                Null => ConsumeTy::<NullType>::consume_null($c, dt),
                 $(
                     $Pat => ConsumeTy::<$ArrTy>::consume($c, dt, ProduceTy::<$ArrTy>::produce($p)?),
                 )*
@@ -17,13 +17,13 @@ macro_rules! impl_transport_match {
             }
         } else {
             match dt {
-                Null => ConsumeTy::<NullType>::consume_null($c),
+                Null => ConsumeTy::<NullType>::consume_null($c, dt),
                 $(
                     $Pat => {
                         if let Some(v) = ProduceTy::<$ArrTy>::produce_opt($p)? {
                             ConsumeTy::<$ArrTy>::consume($c, dt, v)
                         } else {
-                            ConsumeTy::<$ArrTy>::consume_null($c)
+                            ConsumeTy::<$ArrTy>::consume_null($c, dt)
                         }
                     },
                 )*
@@ -183,7 +183,7 @@ pub trait Consume:
 pub trait ConsumeTy<T: ArrowType> {
     fn consume(&mut self, ty: &DataType, value: T::Native);
 
-    fn consume_null(&mut self);
+    fn consume_null(&mut self, ty: &DataType);
 }
 
 pub mod print {
@@ -201,7 +201,7 @@ pub mod print {
             println!("{}: {value:?}", std::any::type_name::<T>());
         }
 
-        fn consume_null(&mut self) {
+        fn consume_null(&mut self, _ty: &DataType) {
             println!("{}: null", std::any::type_name::<T>());
         }
     }
@@ -231,7 +231,7 @@ macro_rules! impl_consume_unsupported {
                 fn consume(&mut self, _ty: &arrow::datatypes::DataType, _val: <$t as $crate::types::ArrowType>::Native) {
                     unimplemented!("unsupported");
                 }
-                fn consume_null(&mut self) {
+                fn consume_null(&mut self, _ty: &DataType) {
                     unimplemented!("unsupported");
                 }
             }

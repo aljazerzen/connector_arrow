@@ -87,16 +87,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<
                 }
             }
 
-            "decimal" | "numeric" => {
-                let precision = args.get(0).cloned().unwrap_or(18) as u8;
-                let scale = args.get(1).cloned().unwrap_or(0) as i8;
-
-                if precision <= 128 {
-                    DataType::Decimal128(precision, scale)
-                } else {
-                    DataType::Decimal256(precision, scale)
-                }
-            }
+            "decimal" | "numeric" => DataType::Utf8,
 
             _ => return None,
         })
@@ -144,8 +135,13 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<
                 // DataType::Struct(_) => todo!(),
                 // DataType::Union(_, _) => todo!(),
                 // DataType::Dictionary(_, _) => todo!(),
-                // DataType::Decimal128(_, _) => todo!(),
-                // DataType::Decimal256(_, _) => todo!(),
+                DataType::Decimal128(p, s) | DataType::Decimal256(p, s)
+                    if can_decimal_fit_in_numeric(*p, *s) =>
+                {
+                    return Some(format!("numeric({p}, {s})"));
+                }
+                DataType::Decimal128(_, _) | DataType::Decimal256(_, _) => "nvarchar(max)",
+
                 // DataType::Map(_, _) => todo!(),
                 // DataType::RunEndEncoded(_, _) => todo!(),
                 _ => return None,
@@ -153,4 +149,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<
             .to_string(),
         )
     }
+}
+
+fn can_decimal_fit_in_numeric(precision: u8, scale: i8) -> bool {
+    // TODO: this should be p <= 38, not p < 38. This restriction is a bug in tiberius.
+
+    precision < 38 && scale >= 0 && precision >= scale as u8
 }

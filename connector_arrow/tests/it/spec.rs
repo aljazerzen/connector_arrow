@@ -260,7 +260,11 @@ fn domains_to_batch_spec(
                 continue;
             }
 
-            let mut field_name = data_type.to_string();
+            let mut field_name = data_type
+                .to_string()
+                .replace("(", "_")
+                .replace(")", "_")
+                .replace(", ", "_");
             if is_nullable {
                 field_name += "_null";
             }
