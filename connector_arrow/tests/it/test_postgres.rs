@@ -31,7 +31,7 @@ fn query_03() {
 
 #[test]
 fn schema_get() {
-    let table_name = "simple::schema_get";
+    let table_name = "schema_get";
 
     let mut conn = init();
     let column_spec = super::spec::basic_types();
@@ -40,7 +40,7 @@ fn schema_get() {
 
 #[test]
 fn schema_edit() {
-    let table_name = "simple::schema_edit";
+    let table_name = "schema_edit";
 
     let mut conn = init();
     let column_spec = super::spec::basic_types();
@@ -49,7 +49,7 @@ fn schema_edit() {
 
 #[test]
 fn ident_escaping() {
-    let table_name = "simple::ident_escaping";
+    let table_name = "ident_escaping";
 
     let mut conn = init();
     super::tests::ident_escaping(&mut conn, table_name);
@@ -71,8 +71,7 @@ fn ident_escaping() {
 #[case::binary("roundtrip::binary", spec::binary_large())]
 fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
     let mut conn = init();
-    let table_name = format!("extended::{table_name}");
-    super::tests::roundtrip(&mut conn, &table_name, spec, '"', false);
+    super::tests::roundtrip(&mut conn, table_name, spec, '"', false);
 }
 
 #[rstest]

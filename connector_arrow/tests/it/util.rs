@@ -92,10 +92,12 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
         let field = Field::new(&field_name, dt, true);
         expected_fields.push(field);
 
-        sql_selects.push(format!(
-            "CAST({} AS {}) as {field_name}",
-            query.value_sql, query.db_ty
-        ));
+        let val_sql = if query.inject_sql_cast {
+            format!("CAST({} AS {})", query.value_sql, query.db_ty)
+        } else {
+            query.value_sql
+        };
+        sql_selects.push(format!("{val_sql} as {field_name}",));
     }
 
     let schema = Arc::new(Schema::new(expected_fields));
@@ -140,10 +142,12 @@ pub fn query_literals_binary<C: Connector>(conn: &mut C, queries: Vec<QueryOfSin
         let field = Field::new(&field_name, dt, true);
         expected_fields.push(field);
 
-        sql_selects.push(format!(
-            "CAST({} AS {}) as {field_name}",
-            query.value_sql, query.db_ty
-        ));
+        let val_sql = if query.inject_sql_cast {
+            format!("CAST({} AS {})", query.value_sql, query.db_ty)
+        } else {
+            query.value_sql
+        };
+        sql_selects.push(format!("{val_sql} as {field_name}",));
     }
 
     let schema = Arc::new(Schema::new(expected_fields));
@@ -181,9 +185,10 @@ fn new_singleton_array(data_type: &DataType, value: Box<dyn ArrowValue>) -> Arra
 }
 
 pub struct QueryOfSingleLiteral {
-    db_ty: String,
-    value_sql: String,
-    value: Box<dyn ArrowValue>,
+    pub db_ty: String,
+    pub value_sql: String,
+    pub inject_sql_cast: bool,
+    pub value: Box<dyn ArrowValue>,
 }
 
 impl<S1: ToString, S2: ToString, V: ArrowValue> From<(S1, S2, V)> for QueryOfSingleLiteral {
@@ -191,6 +196,7 @@ impl<S1: ToString, S2: ToString, V: ArrowValue> From<(S1, S2, V)> for QueryOfSin
         QueryOfSingleLiteral {
             db_ty: value.0.to_string(),
             value_sql: value.1.to_string(),
+            inject_sql_cast: true,
             value: Box::new(value.2),
         }
     }
