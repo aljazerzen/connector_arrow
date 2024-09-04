@@ -7,7 +7,7 @@ license = "MIT"
 name = "connector_arrow"
 readme = "../README.md"
 repository = "https://github.com/aljazerzen/connector_arrow"
-version = "0.5.3"
+version = "0.5.4"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
