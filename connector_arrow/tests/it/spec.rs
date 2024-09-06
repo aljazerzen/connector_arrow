@@ -264,7 +264,10 @@ fn domains_to_batch_spec(
                 .to_string()
                 .replace("(", "_")
                 .replace(")", "_")
-                .replace(", ", "_");
+                .replace(", ", "_")
+                .replace("\"", "")
+                .replace(":", "")
+                .replace("+", "");
             if is_nullable {
                 field_name += "_null";
             }

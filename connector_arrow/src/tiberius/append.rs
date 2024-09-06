@@ -120,14 +120,14 @@ impl_consume_ty!(Float32Type, F32);
 impl_consume_ty!(Float64Type, F64);
 impl_consume_ty!(Utf8Type, String, Cow::from);
 impl_consume_ty!(LargeUtf8Type, String, Cow::from);
+impl_consume_ty!(TimestampSecondType, I64);
+impl_consume_ty!(TimestampMillisecondType, I64);
+impl_consume_ty!(TimestampMicrosecondType, I64);
+impl_consume_ty!(TimestampNanosecondType, I64);
 
 impl_consume_unsupported!(
     TokenRow<'static>,
     (
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampMicrosecondType,
-        TimestampNanosecondType,
         Date32Type,
         Date64Type,
         Time32SecondType,

@@ -111,7 +111,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<
                 DataType::Float64 => "float(53)", // 53 bits in mantissa
                 DataType::Float16 => "float(24)", // could be float(11), but there is no storage saved
 
-                // DataType::Timestamp(_, _) => todo!(),
+                DataType::Timestamp(_, _) => "bigint",
                 // DataType::Date32 => todo!(),
                 // DataType::Date64 => todo!(),
                 // DataType::Time32(_) => todo!(),

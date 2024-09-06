@@ -86,7 +86,7 @@ fn ident_escaping() {
 #[case::uint("roundtrip::uint", spec::uint())]
 #[case::float("roundtrip::float", spec::float())]
 #[case::decimal("roundtrip::decimal", spec::decimal())]
-// #[case::timestamp("roundtrip::timestamp", spec::timestamp())]
+#[case::timestamp("roundtrip::timestamp", spec::timestamp())]
 // #[case::date("roundtrip::date", spec::date())]
 // #[case::time("roundtrip::time", spec::time())]
 // #[case::duration("roundtrip::duration", spec::duration())]
