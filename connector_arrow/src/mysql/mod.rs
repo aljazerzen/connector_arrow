@@ -84,6 +84,17 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
 
             ("decimal" | "numeric" | "newdecimal", _) => DataType::Utf8,
 
+            // MySQL DATETIME has range 1000-01-01 00:00:00.000000 and
+            // 9999-12-31 23:59:59.999999 with microsecond precision.
+            // Arrow Date64 has only millisecond precision, so it cannot be used.
+            // MySQL DATETIME uses "current time" used by the server, which is unknown
+            // to connector_arrow. Because of that, it also cannot be converted to a timestamp,
+            // even a timestamp of unknown timezone.
+            // So we default to Utf8.
+            // TODO: if we send `SET timezone = 'UTC'` before executing queries, we could convert
+            // to timestamp in 'UTC' timezone.
+            ("datetime" | "timestamp", _) => DataType::Utf8,
+
             _ => return None,
         })
     }
@@ -117,6 +128,15 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
                     return Some(format!("decimal({p}, {s})"))
                 }
                 DataType::Decimal128(_, _) | DataType::Decimal256(_, _) => "text",
+
+                // MySQL TIMESTAMP cannot store timezone in schema, when inserting it will
+                // use server's "current time zone". Since we don't know what that is, we cannot
+                // convert timestamps to DATETIME.
+                // MySQL TIMESTAMP can store timestamps up to micro second precision.
+                //
+                // So we store the timestamp as a number of time units from unix epoch.
+                // Beware: this loses time unit and time zone information.
+                DataType::Timestamp(_, _) => "bigint",
 
                 DataType::Utf8 => "longtext",
                 DataType::LargeUtf8 => return None,

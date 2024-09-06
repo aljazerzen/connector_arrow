@@ -134,6 +134,10 @@ impl_consume_ty!(Utf8Type, Value::Bytes, String::into_bytes);
 impl_consume_ty!(BinaryType, Value::Bytes);
 impl_consume_ty!(LargeBinaryType, Value::Bytes);
 impl_consume_ty!(FixedSizeBinaryType, Value::Bytes);
+impl_consume_ty!(TimestampSecondType, Value::Int);
+impl_consume_ty!(TimestampMillisecondType, Value::Int);
+impl_consume_ty!(TimestampMicrosecondType, Value::Int);
+impl_consume_ty!(TimestampNanosecondType, Value::Int);
 
 impl ConsumeTy<NullType> for Vec<Value> {
     fn consume(&mut self, _ty: &DataType, _value: ()) {
@@ -148,10 +152,6 @@ impl ConsumeTy<NullType> for Vec<Value> {
 impl_consume_unsupported!(
     Vec<Value>,
     (
-        TimestampSecondType,
-        TimestampMillisecondType,
-        TimestampMicrosecondType,
-        TimestampNanosecondType,
         Date32Type,
         Date64Type,
         Time32SecondType,

@@ -140,7 +140,6 @@ impl_produce_ty!(
         UInt64Type,
         Float32Type,
         Float64Type,
-        Utf8Type,
         BinaryType,
     )
 );
@@ -174,3 +173,37 @@ impl_produce_unsupported!(
         Decimal256Type,
     )
 );
+
+impl<'r> ProduceTy<'r, Utf8Type> for MySQLCellRef<'r> {
+    fn produce(self) -> Result<String, ConnectorError> {
+        ProduceTy::<Utf8Type>::produce_opt(self).and_then(|x| {
+            x.ok_or_else(|| ConnectorError::DataSchemaMismatch("unexpected NULL".into()))
+        })
+    }
+    fn produce_opt(self) -> Result<Option<String>, ConnectorError> {
+        let res: mysql::Value = self.row.take(self.cell).unwrap();
+        match res {
+            mysql::Value::NULL => Ok(None),
+            mysql::Value::Bytes(_) => Ok(Some(
+                String::from_value_opt(res).map_err(|x| ConnectorError::MySQL(x.into()))?,
+            )),
+            mysql::Value::Int(_) => todo!(),
+            mysql::Value::UInt(_) => todo!(),
+            mysql::Value::Float(_) => todo!(),
+            mysql::Value::Double(_) => todo!(),
+            mysql::Value::Date(year, month, day, hour, minutes, seconds, micro_seconds) => {
+                // TODO: converting to timestamp
+                // let date_time = chrono::NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32).unwrap().and_hms_opt(hour as u32, minutes as u32, seconds as u32).unwrap();
+                // let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_naive_utc_and_offset(date_time, ???);
+                // let timestamp_sec = date_time.timestamp();
+                // let timestamp_micro = timestamp_sec * 1_000_000 + micro_seconds as i64;
+                // Ok(timestamp_micro)
+
+                Ok(Some(format!(
+                    "{year:04}-{month:02}-{day:02}T{hour:02}:{minutes:02}:{seconds:02}.{micro_seconds:06}"
+                )))
+            }
+            mysql::Value::Time(_, _, _, _, _, _) => todo!(),
+        }
+    }
+}

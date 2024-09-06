@@ -51,7 +51,7 @@ fn ident_escaping() {
 #[case::uint("roundtrip__uint", spec::uint())]
 #[case::float("roundtrip__float", spec::float())]
 #[case::decimal("roundtrip__decimal", spec::decimal())]
-// #[case::timestamp("roundtrip__timestamp", spec::timestamp())]
+#[case::timestamp("roundtrip__timestamp", spec::timestamp())]
 // #[case::date("roundtrip__date", spec::date())]
 // #[case::time("roundtrip__time", spec::time())]
 // #[case::duration("roundtrip__duration", spec::duration())]
@@ -66,6 +66,7 @@ fn roundtrip(#[case] table_name: &str, #[case] spec: spec::ArrowGenSpec) {
 #[rstest]
 #[case::strings(literals_cases::strings())]
 #[case::decimals(literals_cases::decimals())]
+#[case::timestamp(literals_cases::timestamp())]
 fn query_literals(#[case] queries: Vec<QueryOfSingleLiteral>) {
     let mut conn = init();
     crate::util::query_literals(&mut conn, queries)
@@ -85,6 +86,23 @@ mod literals_cases {
         vec![
             ("DECIMAL", "1000.33333", "1000".to_string()).into(),
             ("DECIMAL(10, 2)", "1000.33333", "1000.33".to_string()).into(),
+        ]
+    }
+
+    pub fn timestamp() -> Vec<QueryOfSingleLiteral> {
+        vec![
+            QueryOfSingleLiteral {
+                db_ty: "DATETIME".into(),
+                value_sql: "TIMESTAMP'2012^12^31 11*30*45'".into(),
+                inject_sql_cast: false,
+                value: Box::new("2012-12-31T11:30:45.000000".to_string()),
+            },
+            QueryOfSingleLiteral {
+                db_ty: "TIMESTAMP".into(),
+                value_sql: "FROM_UNIXTIME(1708701516)".into(),
+                inject_sql_cast: false,
+                value: Box::new("2024-02-23T15:18:36.000000".to_string()),
+            },
         ]
     }
 }
