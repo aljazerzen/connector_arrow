@@ -102,6 +102,16 @@ impl SchemaEdit for super::PostgresConnection {
 
         match res {
             Ok(_) => Ok(()),
+            Err(e)
+                if matches!(e.code(), Some(&SqlState::UNDEFINED_TABLE)) ||
+                    // GlareDB will return such errors
+                    e.as_db_error().map_or(false, |e| {
+                        e.message().starts_with("Error during planning: Table ")
+                            && e.message().ends_with(" does not exist")
+                    }) =>
+            {
+                Err(TableDropError::TableNonexistent)
+            }
             Err(e) if matches!(e.code(), Some(&SqlState::UNDEFINED_TABLE)) => {
                 Err(TableDropError::TableNonexistent)
             }
