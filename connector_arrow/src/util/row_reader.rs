@@ -1,5 +1,6 @@
-use arrow::array::{ArrayRef, AsArray};
+use arrow::array::{ArrayRef, AsArray, RecordBatch};
 use arrow::datatypes::*;
+use itertools::zip_eq;
 
 use crate::types::{ArrowType, FixedSizeBinaryType};
 use crate::ConnectorError;
@@ -11,6 +12,18 @@ pub struct ArrayCellRef<'a> {
     pub array: &'a ArrayRef,
     pub field: &'a Field,
     pub row_number: usize,
+}
+
+impl<'a> ArrayCellRef<'a> {
+    pub fn vec_from_batch(batch: &'a RecordBatch, row_number: usize) -> Vec<Self> {
+        zip_eq(batch.columns(), batch.schema_ref().fields())
+            .map(|(array, field)| ArrayCellRef {
+                array,
+                field,
+                row_number,
+            })
+            .collect()
+    }
 }
 
 impl<'r> Produce<'r> for &ArrayCellRef<'r> {}

@@ -14,6 +14,19 @@ fn query_01() {
     super::tests::query_01(&mut conn);
 }
 
+#[test]
+#[ignore]
+fn query_02() {
+    let mut conn = init();
+    super::tests::query_02(&mut conn);
+}
+
+#[test]
+fn query_03() {
+    let mut conn = init();
+    super::tests::query_03(&mut conn);
+}
+
 #[rstest]
 #[case::empty("roundtrip::empty", spec::empty())]
 #[case::null_bool("roundtrip::null_bool", spec::null_bool())]

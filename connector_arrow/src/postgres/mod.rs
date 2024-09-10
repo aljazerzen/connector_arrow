@@ -81,7 +81,6 @@ impl Connector for PostgresConnection {
             .map_err(PostgresError::Postgres)?;
         Ok(query::PostgresStatement {
             client: &mut self.client,
-            query: query.to_string(),
             stmt,
         })
     }

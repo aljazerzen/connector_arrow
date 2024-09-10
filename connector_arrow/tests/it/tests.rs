@@ -48,7 +48,7 @@ pub fn query_02<C: Connector>(conn: &mut C) {
 
 pub fn query_03<C: Connector>(conn: &mut C) {
     let query = "SELECT
-        CAST($1 as bool) as a_bool, CAST($2 as integer) as an_int, CAST($3 as real) as a_real, CAST($4 as text) as a_text
+        CAST($1 as boolean) as a_bool, CAST($2 as integer) as an_int, CAST($3 as real) as a_real, CAST($4 as text) as a_text
     ";
     let mut stmt = conn.query(query).unwrap();
 

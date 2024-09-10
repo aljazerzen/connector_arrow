@@ -53,6 +53,13 @@ fn query_02() {
 }
 
 #[test]
+#[ignore]
+fn query_03() {
+    let mut conn = init();
+    super::tests::query_03(&mut conn);
+}
+
+#[test]
 fn schema_get() {
     let table_name = "simple::schema_get";
 

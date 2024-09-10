@@ -8,11 +8,13 @@ pub use append::DuckDBAppender;
 
 use arrow::datatypes::{DataType, TimeUnit};
 use arrow::record_batch::RecordBatch;
+use itertools::Itertools;
 
 use std::sync::Arc;
 
-use crate::api::{ArrowValue, Connector, ResultReader, Statement};
+use crate::api::{Connector, ResultReader, Statement};
 use crate::errors::ConnectorError;
+use crate::util::{transport, ArrayCellRef};
 
 pub struct DuckDBConnection {
     inner: duckdb::Connection,
@@ -126,11 +128,20 @@ impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
     where
         Self: 'stmt;
 
-    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn ArrowValue>,
-    {
-        let arrow = self.stmt.query_arrow([])?;
+    fn start_batch<'p>(
+        &mut self,
+        args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError> {
+        // args
+        let arg_cells = ArrayCellRef::vec_from_batch(args.0, args.1);
+        let mut args: Vec<duckdb::types::Value> = Vec::with_capacity(arg_cells.len());
+        for cell in arg_cells {
+            transport::transport(cell.field, &cell, &mut args)?;
+        }
+        let args = args.iter().map(|x| x as &dyn duckdb::ToSql).collect_vec();
+
+        // query
+        let arrow = self.stmt.query_arrow(args.as_slice())?;
         Ok(DuckDBReader { arrow })
     }
 }

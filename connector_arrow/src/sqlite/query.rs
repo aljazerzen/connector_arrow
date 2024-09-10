@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use arrow::array::RecordBatch;
 use arrow::datatypes::*;
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 use rusqlite::types::{Type, Value};
 
-use crate::api::{ArrowValue, Connector, Statement};
+use crate::api::{Connector, Statement};
 use crate::types::FixedSizeBinaryType;
-use crate::util::transport::{Produce, ProduceTy};
-use crate::util::ArrowReader;
+use crate::util::transport::{self, Produce, ProduceTy};
 use crate::util::{collect_rows_to_arrow, CellReader, RowsReader};
+use crate::util::{ArrayCellRef, ArrowReader};
 use crate::ConnectorError;
 
 use super::SQLiteConnection;
@@ -20,14 +21,23 @@ pub struct SQLiteStatement<'conn> {
 impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
     type Reader<'task> = ArrowReader where Self: 'task;
 
-    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn ArrowValue>,
-    {
+    fn start_batch<'p>(
+        &mut self,
+        args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError> {
         let column_count = self.stmt.column_count();
 
+        // args
+        let arg_cells = ArrayCellRef::vec_from_batch(args.0, args.1);
+        let mut args: Vec<Value> = Vec::with_capacity(arg_cells.len());
+        for cell in arg_cells {
+            transport::transport(cell.field, &cell, &mut args)?;
+        }
+        let args = args.iter().map(|x| x as &dyn rusqlite::ToSql).collect_vec();
+
+        // query
         let rows: Vec<Vec<Value>> = {
-            let mut rows_iter = self.stmt.query([])?;
+            let mut rows_iter = self.stmt.query(args.as_slice())?;
 
             // read all of the rows into a buffer
             let mut rows = Vec::with_capacity(1024);

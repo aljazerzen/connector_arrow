@@ -1,10 +1,37 @@
+use arrow::array::RecordBatch;
 use arrow::datatypes::*;
+use itertools::{zip_eq, Itertools};
 use std::any::Any;
+use std::sync::Arc;
 
 use crate::api::ArrowValue;
 use crate::types::{FixedSizeBinaryType, NullType};
 use crate::util::transport::{Produce, ProduceTy};
+use crate::util::ArrowRowWriter;
 use crate::{impl_produce_unsupported, ConnectorError};
+
+pub(crate) fn vec_to_record_batch(
+    args: Vec<&dyn ArrowValue>,
+) -> Result<RecordBatch, ConnectorError> {
+    Ok(if args.is_empty() {
+        let opts = arrow::array::RecordBatchOptions::new().with_row_count(Some(1));
+        let schema = Arc::new(arrow::datatypes::Schema::new(vec![] as Vec<Field>));
+        RecordBatch::try_new_with_options(schema, vec![], &opts).unwrap()
+    } else {
+        let schema = Arc::new(arrow::datatypes::Schema::new(
+            args.iter()
+                .map(|a| Field::new("", a.get_data_type().clone(), true))
+                .collect_vec(),
+        ));
+        let mut arrow_writer = ArrowRowWriter::new(schema.clone(), 1);
+        arrow_writer.prepare_for_batch(1)?;
+        for (field, a) in zip_eq(schema.fields(), args) {
+            crate::util::transport::transport(field, a, &mut arrow_writer)?;
+        }
+
+        arrow_writer.finish().unwrap().into_iter().next().unwrap()
+    })
+}
 
 impl<'r> Produce<'r> for &'r dyn ArrowValue {}
 

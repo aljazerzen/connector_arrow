@@ -1,13 +1,15 @@
 use arrow::{datatypes::*, record_batch::RecordBatch};
 use futures::{AsyncRead, AsyncWrite, StreamExt};
+use itertools::Itertools;
 use std::sync::Arc;
-use tiberius::{ColumnData, QueryStream};
+use tiberius::{ColumnData, QueryStream, ToSql};
 use tokio::runtime::Runtime;
 
 use crate::api::{ResultReader, Statement};
 use crate::impl_produce_unsupported;
 use crate::types::{ArrowType, FixedSizeBinaryType, NullType};
-use crate::util::transport::ProduceTy;
+use crate::util::transport::{self, ProduceTy};
+use crate::util::ArrayCellRef;
 use crate::util::{self, transport::Produce};
 use crate::ConnectorError;
 
@@ -23,16 +25,24 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
     where
         Self: 'stmt;
 
-    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn crate::api::ArrowValue>,
-    {
-        // TODO: params
+    fn start_batch<'p>(
+        &mut self,
+        args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError> {
+        // args
+        let arg_cells = ArrayCellRef::vec_from_batch(args.0, args.1);
+        let mut args: Vec<ColumnData<'static>> = Vec::with_capacity(arg_cells.len());
+        for cell in arg_cells {
+            transport::transport(cell.field, &cell, &mut args)?;
+        }
+        let args = args.iter().map(Value).collect_vec();
+        let args = args.iter().map(|a| a as &dyn ToSql).collect_vec();
 
+        // query
         let mut stream = self
             .conn
             .rt
-            .block_on(self.conn.client.query(&self.query, &[]))?;
+            .block_on(self.conn.client.query(&self.query, args.as_slice()))?;
 
         // get columns
         let columns = self.conn.rt.block_on(stream.columns())?;
@@ -219,5 +229,13 @@ impl<'a> tiberius::FromSql<'a> for StrOrNum {
                 format!("cannot convert `{:?}` into string", value).into(),
             )),
         }
+    }
+}
+
+struct Value<'a>(&'a ColumnData<'a>);
+
+impl<'a> ToSql for Value<'a> {
+    fn to_sql(&self) -> ColumnData<'_> {
+        self.0.clone()
     }
 }

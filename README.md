@@ -35,7 +35,7 @@ without need for dynamic linking of C libraries.
 | feature | `src_sqlite` | `src_duckdb` | `src_postgres` | `src_mysql` | `src_tiberius` |
 | dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) | [mysql](https://crates.io/crates/mysql) | [tiberius](https://crates.io/crates/tiberius) |
 | query | x | x | x | x | x |
-| query params |  |  | x |  |  |
+| query params | x | x | x |  | x |
 | schema get | x | x | x | x | x |
 | schema edit | x | x | x | x | x |
 | append | x | x | x | x | x |

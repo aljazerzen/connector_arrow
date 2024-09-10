@@ -1,48 +1,39 @@
 use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
-use bytes::BytesMut;
-use itertools::Itertools;
+
 use postgres::fallible_iterator::FallibleIterator;
-use postgres::types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
+use postgres::types::{FromSql, Type};
 use postgres::{Client, Row, RowIter};
 
-use crate::api::{ArrowValue, ResultReader, Statement};
+use crate::api::{ResultReader, Statement};
 use crate::types::{ArrowType, FixedSizeBinaryType};
-use crate::util::transport;
 use crate::util::CellReader;
+use crate::util::{transport, ArrayCellRef};
 use crate::{errors::ConnectorError, util::RowsReader};
 
 use super::{types, PostgresError};
 
 pub struct PostgresStatement<'conn> {
     pub(super) client: &'conn mut Client,
-    pub(super) query: String,
     pub(super) stmt: postgres::Statement,
 }
 
 impl<'conn> Statement<'conn> for PostgresStatement<'conn> {
     type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;
 
-    fn start<'p, I>(&mut self, params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn ArrowValue>,
-    {
+    fn start_batch<'p>(
+        &mut self,
+        args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError> {
         let stmt = &self.stmt;
         let schema = types::pg_stmt_to_arrow(stmt)?;
 
-        // prepare params
-        let params = params
-            .into_iter()
-            .map(|p| {
-                let field = Field::new("", p.get_data_type().clone(), true);
-                ParamCell { field, value: p }
-            })
-            .collect_vec();
+        let arg_row = ArrayCellRef::vec_from_batch(args.0, args.1);
 
         // query
         let rows = self
             .client
-            .query_raw::<_, ParamCell, _>(&self.query, params)
+            .query_raw::<_, _, _>(stmt, &arg_row)
             .map_err(PostgresError::from)?;
 
         // create the row reader
@@ -334,35 +325,4 @@ impl Binary<'_> {
         // this is a clone, that is needed because Produce requires Vec<u8>
         Ok(self.0.to_vec())
     }
-}
-
-#[derive(Debug)]
-struct ParamCell<'a> {
-    field: Field,
-    value: &'a dyn ArrowValue,
-}
-
-// this is needed for params
-impl<'a> ToSql for ParamCell<'a> {
-    fn to_sql(
-        &self,
-        _ty: &postgres::types::Type,
-        out: &mut BytesMut,
-    ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>>
-    where
-        Self: Sized,
-    {
-        crate::util::transport::transport(&self.field, self.value, out)?;
-        Ok(IsNull::No)
-    }
-
-    fn accepts(_: &postgres::types::Type) -> bool
-    where
-        Self: Sized,
-    {
-        // we don't need type validation, arrays cannot contain wrong types
-        true
-    }
-
-    to_sql_checked!();
 }

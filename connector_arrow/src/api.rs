@@ -45,11 +45,24 @@ pub trait Statement<'conn> {
     where
         Self: 'stmt;
 
-    /// Start executing.
-    /// This will create a reader that can retrieve the result schema and data.
-    fn start<'p, I>(&mut self, params: I) -> Result<Self::Reader<'_>, ConnectorError>
+    /// Execute this statement once.
+    /// Returns a reader that can retrieve the result schema and data.
+    fn start<'p, I>(&mut self, args: I) -> Result<Self::Reader<'_>, ConnectorError>
     where
-        I: IntoIterator<Item = &'p dyn ArrowValue>;
+        I: IntoIterator<Item = &'p dyn ArrowValue>,
+    {
+        let args: Vec<_> = args.into_iter().collect();
+        let batch = crate::params::vec_to_record_batch(args)?;
+        self.start_batch((&batch, 0))
+    }
+
+    /// Execute this statement once.
+    /// Query arguments are read from record batch, from the specified row.
+    /// Returns a reader that can retrieve the result schema and data.
+    fn start_batch(
+        &mut self,
+        args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError>;
 }
 
 /// Reads result of the query, starting with the schema.

@@ -53,10 +53,12 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Append<'conn> for Tiberius
 
         for row_number in 0..batch.num_rows() {
             let mut tb_row = TokenRow::with_capacity(row_ref.len());
+            let mut buffer = Vec::with_capacity(1);
             for cell_ref in &mut row_ref {
                 cell_ref.row_number = row_number;
 
-                crate::util::transport::transport(cell_ref.field, &*cell_ref, &mut tb_row)?;
+                crate::util::transport::transport(cell_ref.field, &*cell_ref, &mut buffer)?;
+                tb_row.push(buffer.pop().unwrap());
             }
 
             let f = self.bulk_load.send(tb_row);
@@ -72,7 +74,7 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Append<'conn> for Tiberius
     }
 }
 
-impl Consume for TokenRow<'static> {}
+impl Consume for Vec<ColumnData<'static>> {}
 
 macro_rules! impl_consume_ty {
     ($ArrTy: ty, $variant: ident) => {
@@ -80,7 +82,7 @@ macro_rules! impl_consume_ty {
     };
 
     ($ArrTy: ty, $variant: ident, $conversion: expr) => {
-        impl ConsumeTy<$ArrTy> for TokenRow<'static> {
+        impl ConsumeTy<$ArrTy> for Vec<ColumnData<'static>> {
             fn consume(
                 &mut self,
                 _ty: &DataType,
@@ -96,7 +98,7 @@ macro_rules! impl_consume_ty {
     };
 }
 
-impl ConsumeTy<NullType> for TokenRow<'static> {
+impl ConsumeTy<NullType> for Vec<ColumnData<'static>> {
     fn consume(&mut self, _ty: &DataType, _: ()) {
         self.push(ColumnData::U8(None))
     }
@@ -126,7 +128,7 @@ impl_consume_ty!(TimestampMicrosecondType, I64);
 impl_consume_ty!(TimestampNanosecondType, I64);
 
 impl_consume_unsupported!(
-    TokenRow<'static>,
+    Vec<ColumnData<'static>>,
     (
         Date32Type,
         Date64Type,
@@ -151,7 +153,7 @@ fn u64_to_numeric(val: u64) -> Numeric {
     Numeric::new_with_scale(i128::from(val), 0)
 }
 
-impl ConsumeTy<Decimal128Type> for TokenRow<'static> {
+impl ConsumeTy<Decimal128Type> for Vec<ColumnData<'static>> {
     fn consume(&mut self, ty: &DataType, value: i128) {
         let DataType::Decimal128(p, s) = ty else {
             panic!()
@@ -178,7 +180,7 @@ impl ConsumeTy<Decimal128Type> for TokenRow<'static> {
     }
 }
 
-impl ConsumeTy<Decimal256Type> for TokenRow<'static> {
+impl ConsumeTy<Decimal256Type> for Vec<ColumnData<'static>> {
     fn consume(&mut self, ty: &DataType, value: i256) {
         let DataType::Decimal256(p, s) = ty else {
             panic!()

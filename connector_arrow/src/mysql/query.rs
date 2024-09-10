@@ -19,12 +19,10 @@ impl<'conn, C: Queryable> Statement<'conn> for MySQLStatement<'conn, C> {
     where
         Self: 'stmt;
 
-    fn start<'p, I>(&mut self, _params: I) -> Result<Self::Reader<'_>, ConnectorError>
-    where
-        I: IntoIterator<Item = &'p dyn crate::api::ArrowValue>,
-    {
-        // TODO: params
-
+    fn start_batch<'p>(
+        &mut self,
+        _args: (&RecordBatch, usize),
+    ) -> Result<Self::Reader<'_>, ConnectorError> {
         let query_result = self.queryable.exec_iter(&self.stmt, ())?;
 
         // PacCell is needed so we can return query_result and result_set that mutably borrows query result.
