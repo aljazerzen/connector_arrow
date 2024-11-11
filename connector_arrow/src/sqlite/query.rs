@@ -19,7 +19,10 @@ pub struct SQLiteStatement<'conn> {
 }
 
 impl<'conn> Statement<'conn> for SQLiteStatement<'conn> {
-    type Reader<'task> = ArrowReader where Self: 'task;
+    type Reader<'task>
+        = ArrowReader
+    where
+        Self: 'task;
 
     fn start_batch<'p>(
         &mut self,
@@ -112,8 +115,9 @@ pub struct SQLiteRowsReader {
     rows: std::vec::IntoIter<Vec<Value>>,
 }
 
-impl<'stmt> RowsReader<'stmt> for SQLiteRowsReader {
-    type CellReader<'rows> = SQLiteCellReader
+impl RowsReader<'_> for SQLiteRowsReader {
+    type CellReader<'rows>
+        = SQLiteCellReader
     where
         Self: 'rows;
 
@@ -128,8 +132,9 @@ pub struct SQLiteCellReader {
     row: std::vec::IntoIter<Value>,
 }
 
-impl<'rows> CellReader<'rows> for SQLiteCellReader {
-    type CellRef<'row> = Value
+impl CellReader<'_> for SQLiteCellReader {
+    type CellRef<'row>
+        = Value
     where
         Self: 'row;
 
@@ -138,9 +143,9 @@ impl<'rows> CellReader<'rows> for SQLiteCellReader {
     }
 }
 
-impl<'r> Produce<'r> for Value {}
+impl Produce<'_> for Value {}
 
-impl<'r> ProduceTy<'r, Int64Type> for Value {
+impl ProduceTy<'_, Int64Type> for Value {
     fn produce(self) -> Result<i64, ConnectorError> {
         unimplemented!()
     }
@@ -153,7 +158,7 @@ impl<'r> ProduceTy<'r, Int64Type> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, Float64Type> for Value {
+impl ProduceTy<'_, Float64Type> for Value {
     fn produce(self) -> Result<f64, ConnectorError> {
         unimplemented!()
     }
@@ -166,7 +171,7 @@ impl<'r> ProduceTy<'r, Float64Type> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, Utf8Type> for Value {
+impl ProduceTy<'_, Utf8Type> for Value {
     fn produce(self) -> Result<String, ConnectorError> {
         unimplemented!()
     }
@@ -179,7 +184,7 @@ impl<'r> ProduceTy<'r, Utf8Type> for Value {
     }
 }
 
-impl<'r> ProduceTy<'r, BinaryType> for Value {
+impl ProduceTy<'_, BinaryType> for Value {
     fn produce(self) -> Result<Vec<u8>, ConnectorError> {
         unimplemented!()
     }

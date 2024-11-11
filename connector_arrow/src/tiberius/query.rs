@@ -21,7 +21,8 @@ pub struct TiberiusStatement<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> {
 impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
     for TiberiusStatement<'conn, S>
 {
-    type Reader<'stmt> = TiberiusResultReader<'stmt>
+    type Reader<'stmt>
+        = TiberiusResultReader<'stmt>
     where
         Self: 'stmt;
 
@@ -75,7 +76,7 @@ impl<'stmt> ResultReader<'stmt> for TiberiusResultReader<'stmt> {
     }
 }
 
-impl<'stmt> Iterator for TiberiusResultReader<'stmt> {
+impl Iterator for TiberiusResultReader<'_> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -84,7 +85,8 @@ impl<'stmt> Iterator for TiberiusResultReader<'stmt> {
 }
 
 impl<'s> util::RowsReader<'s> for TiberiusStream<'s> {
-    type CellReader<'row> = TiberiusCellReader
+    type CellReader<'row>
+        = TiberiusCellReader
     where
         Self: 'row;
 
@@ -112,8 +114,9 @@ struct TiberiusCellReader {
     cell: usize,
 }
 
-impl<'a> util::CellReader<'a> for TiberiusCellReader {
-    type CellRef<'cell> = TiberiusCellRef<'cell>
+impl util::CellReader<'_> for TiberiusCellReader {
+    type CellRef<'cell>
+        = TiberiusCellRef<'cell>
     where
         Self: 'cell;
 
@@ -234,7 +237,7 @@ impl<'a> tiberius::FromSql<'a> for StrOrNum {
 
 struct Value<'a>(&'a ColumnData<'a>);
 
-impl<'a> ToSql for Value<'a> {
+impl ToSql for Value<'_> {
     fn to_sql(&self) -> ColumnData<'_> {
         self.0.clone()
     }

@@ -46,7 +46,7 @@ where
 
     // write into table
     {
-        let mut appender = conn.append(&table_name).unwrap();
+        let mut appender = conn.append(table_name).unwrap();
         for batch in batches {
             appender.append(batch.clone()).unwrap();
         }
@@ -113,10 +113,10 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
     let batch = batches.into_iter().exactly_one().unwrap();
 
     similar_asserts::assert_eq!(
-        arrow::util::pretty::pretty_format_batches(&vec![expected])
+        arrow::util::pretty::pretty_format_batches(&[expected])
             .unwrap()
             .to_string(),
-        arrow::util::pretty::pretty_format_batches(&vec![batch])
+        arrow::util::pretty::pretty_format_batches(&[batch])
             .unwrap()
             .to_string(),
     );
@@ -163,10 +163,10 @@ pub fn query_literals_binary<C: Connector>(conn: &mut C, queries: Vec<QueryOfSin
     let batch = batches.into_iter().exactly_one().unwrap();
 
     similar_asserts::assert_eq!(
-        arrow::util::pretty::pretty_format_batches(&vec![expected])
+        arrow::util::pretty::pretty_format_batches(&[expected])
             .unwrap()
             .to_string(),
-        arrow::util::pretty::pretty_format_batches(&vec![batch])
+        arrow::util::pretty::pretty_format_batches(&[batch])
             .unwrap()
             .to_string(),
     );

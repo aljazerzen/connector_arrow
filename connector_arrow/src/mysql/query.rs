@@ -15,7 +15,8 @@ pub struct MySQLStatement<'conn, Q: Queryable> {
 }
 
 impl<'conn, C: Queryable> Statement<'conn> for MySQLStatement<'conn, C> {
-    type Reader<'stmt> = MySQLQueryResult<'stmt>
+    type Reader<'stmt>
+        = MySQLQueryResult<'stmt>
     where
         Self: 'stmt;
 
@@ -48,7 +49,7 @@ impl<'stmt> ResultReader<'stmt> for MySQLQueryResult<'stmt> {
     }
 }
 
-impl<'stmt> Iterator for MySQLQueryResult<'stmt> {
+impl Iterator for MySQLQueryResult<'_> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -65,7 +66,8 @@ struct MySQLResultReader<'stmt> {
 }
 
 impl<'s> util::RowsReader<'s> for MySQLResultReader<'s> {
-    type CellReader<'row> = MySQLCellReader
+    type CellReader<'row>
+        = MySQLCellReader
     where
         Self: 'row;
 
@@ -80,8 +82,9 @@ struct MySQLCellReader {
     cell: usize,
 }
 
-impl<'a> util::CellReader<'a> for MySQLCellReader {
-    type CellRef<'cell> = MySQLCellRef<'cell>
+impl util::CellReader<'_> for MySQLCellReader {
+    type CellRef<'cell>
+        = MySQLCellRef<'cell>
     where
         Self: 'cell;
 

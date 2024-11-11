@@ -35,11 +35,15 @@ impl DuckDBConnection {
 }
 
 impl Connector for DuckDBConnection {
-    type Stmt<'conn> = DuckDBStatement<'conn>
+    type Stmt<'conn>
+        = DuckDBStatement<'conn>
     where
         Self: 'conn;
 
-    type Append<'conn> = DuckDBAppender<'conn> where Self: 'conn;
+    type Append<'conn>
+        = DuckDBAppender<'conn>
+    where
+        Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self.inner.prepare(query)?;
@@ -124,7 +128,8 @@ pub struct DuckDBStatement<'conn> {
 }
 
 impl<'conn> Statement<'conn> for DuckDBStatement<'conn> {
-    type Reader<'stmt> = DuckDBReader<'stmt>
+    type Reader<'stmt>
+        = DuckDBReader<'stmt>
     where
         Self: 'stmt;
 
@@ -157,7 +162,7 @@ impl<'stmt> ResultReader<'stmt> for DuckDBReader<'stmt> {
     }
 }
 
-impl<'stmt> Iterator for DuckDBReader<'stmt> {
+impl Iterator for DuckDBReader<'_> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {

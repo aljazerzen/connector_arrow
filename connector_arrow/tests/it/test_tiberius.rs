@@ -344,10 +344,10 @@ mod literals_cases {
                 "cidr",
                 "'192.168/25'",
                 vec![
-                    02, // family: IPv4
+                    2, // family: IPv4
                     25, // netmask
-                    01, // is cidr
-                    04, // length
+                    1, // is cidr
+                    4, // length
                     192, 168, 0, 0,
                 ],
             )
@@ -356,9 +356,9 @@ mod literals_cases {
                 "cidr",
                 "'2001:4f8:3:ba:2e0:81ff:fe22:d1f1/128'",
                 vec![
-                    03,  // family: IPv6
+                    3,  // family: IPv6
                     128, // netmask
-                    01,  // is cidr
+                    1,  // is cidr
                     16,  // length
                     0x20, 0x01, 0x04, 0xf8, 0x00, 0x03, 0x00, 0xba, 0x02, 0xe0, 0x81, 0xff, 0xfe,
                     0x22, 0xd1, 0xf1,
@@ -369,10 +369,10 @@ mod literals_cases {
                 "inet",
                 "'192.168.0.1/24'",
                 vec![
-                    02, // family: IPv4
+                    2, // family: IPv4
                     24, // netmask
-                    00, // is cidr
-                    04, // length
+                    0, // is cidr
+                    4, // length
                     192, 168, 0, 1,
                 ],
             )

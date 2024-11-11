@@ -107,7 +107,7 @@ impl<'conn> Append<'conn> for PostgresAppender<'conn> {
     }
 }
 
-impl<'a> ToSql for ArrayCellRef<'a> {
+impl ToSql for ArrayCellRef<'_> {
     fn to_sql(
         &self,
         _ty: &postgres::types::Type,
