@@ -28,9 +28,15 @@ impl<Q: Queryable> MySQLConnection<Q> {
 }
 
 impl<Q: Queryable> Connector for MySQLConnection<Q> {
-    type Stmt<'conn> = query::MySQLStatement<'conn, Q> where Self: 'conn;
+    type Stmt<'conn>
+        = query::MySQLStatement<'conn, Q>
+    where
+        Self: 'conn;
 
-    type Append<'conn> = append::MySQLAppender<'conn, Q> where Self: 'conn;
+    type Append<'conn>
+        = append::MySQLAppender<'conn, Q>
+    where
+        Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self.queryable.prep(query)?;

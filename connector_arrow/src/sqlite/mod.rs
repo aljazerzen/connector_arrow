@@ -33,9 +33,15 @@ impl SQLiteConnection {
 }
 
 impl Connector for SQLiteConnection {
-    type Stmt<'conn> = SQLiteStatement<'conn> where Self: 'conn;
+    type Stmt<'conn>
+        = SQLiteStatement<'conn>
+    where
+        Self: 'conn;
 
-    type Append<'conn> = SQLiteAppender<'conn> where Self: 'conn;
+    type Append<'conn>
+        = SQLiteAppender<'conn>
+    where
+        Self: 'conn;
 
     fn query(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
         let stmt = self.inner.prepare(query)?;

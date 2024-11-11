@@ -31,7 +31,7 @@ impl Iterator for ArrowReader {
     }
 }
 
-impl<'stmt> ResultReader<'stmt> for ArrowReader {
+impl ResultReader<'_> for ArrowReader {
     fn get_schema(&mut self) -> Result<Arc<arrow::datatypes::Schema>, ConnectorError> {
         Ok(self.schema.clone())
     }

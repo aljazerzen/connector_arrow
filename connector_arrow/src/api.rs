@@ -116,7 +116,7 @@ pub(crate) mod sealed {
 pub mod unimplemented {
     pub struct Appender;
 
-    impl<'conn> super::Append<'conn> for Appender {
+    impl super::Append<'_> for Appender {
         fn append(
             &mut self,
             _: arrow::record_batch::RecordBatch,

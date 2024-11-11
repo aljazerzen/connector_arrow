@@ -16,7 +16,7 @@ use crate::{generator::generate_batch, spec::ArrowGenSpec};
 
 pub fn query_01<C: Connector>(conn: &mut C) {
     let query = "SELECT 1 as a, NULL as b";
-    let results = connector_arrow::query(conn, &query).unwrap();
+    let results = connector_arrow::query(conn, query).unwrap();
 
     similar_asserts::assert_eq!(
         pretty_format_batches(&results).unwrap().to_string(),
@@ -34,7 +34,7 @@ pub fn query_02<C: Connector>(conn: &mut C) {
         CAST(3.14 as NUMERIC(2, 0)) as b,
         CAST(0 as NUMERIC(3, 2)) as c
     ";
-    let results = connector_arrow::query(conn, &query).unwrap();
+    let results = connector_arrow::query(conn, query).unwrap();
 
     similar_asserts::assert_eq!(
         "+-------------------------------------------------------------------------------------------------------+---+------+\n\
@@ -109,7 +109,7 @@ where
     let (schema, batches) = generate_batch(spec, &mut rng);
 
     load_into_table(conn, schema.clone(), &batches, table_name).unwrap();
-    let schema = coerce::coerce_schema(schema, &coerce_type::<C>, Some(false));
+    let schema = coerce::coerce_schema(schema, coerce_type::<C>, Some(false));
 
     let schema_introspection = conn.table_get(table_name).unwrap();
     let schema_introspection = coerce::coerce_schema(schema_introspection, |_| None, Some(false));

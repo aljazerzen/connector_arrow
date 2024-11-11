@@ -32,9 +32,15 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusConnection<S> {
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<S> {
-    type Stmt<'conn> = query::TiberiusStatement<'conn, S> where Self: 'conn;
+    type Stmt<'conn>
+        = query::TiberiusStatement<'conn, S>
+    where
+        Self: 'conn;
 
-    type Append<'conn> = append::TiberiusAppender<'conn, S> where Self: 'conn;
+    type Append<'conn>
+        = append::TiberiusAppender<'conn, S>
+    where
+        Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         Ok(query::TiberiusStatement {

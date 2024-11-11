@@ -26,7 +26,7 @@ pub struct EscapedIdent<'a> {
     quote: char,
 }
 
-impl<'a> fmt::Display for EscapedIdent<'a> {
+impl fmt::Display for EscapedIdent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if VALID_IDENT.is_match(self.ident) {
             f.write_str(self.ident)

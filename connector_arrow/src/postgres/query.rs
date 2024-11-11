@@ -19,7 +19,10 @@ pub struct PostgresStatement<'conn> {
 }
 
 impl<'conn> Statement<'conn> for PostgresStatement<'conn> {
-    type Reader<'stmt> = PostgresBatchStream<'stmt> where Self: 'stmt;
+    type Reader<'stmt>
+        = PostgresBatchStream<'stmt>
+    where
+        Self: 'stmt;
 
     fn start_batch<'p>(
         &mut self,
@@ -53,7 +56,7 @@ impl<'a> ResultReader<'a> for PostgresBatchStream<'a> {
     }
 }
 
-impl<'a> Iterator for PostgresBatchStream<'a> {
+impl Iterator for PostgresBatchStream<'_> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -72,7 +75,10 @@ impl<'a> PostgresRowStream<'a> {
 }
 
 impl<'stmt> RowsReader<'stmt> for PostgresRowStream<'stmt> {
-    type CellReader<'row> = PostgresCellReader where Self: 'row;
+    type CellReader<'row>
+        = PostgresCellReader
+    where
+        Self: 'row;
 
     fn next_row(&mut self) -> Result<Option<Self::CellReader<'_>>, ConnectorError> {
         let row = self.iter.next().map_err(PostgresError::from)?;
@@ -86,8 +92,11 @@ struct PostgresCellReader {
     next_col: usize,
 }
 
-impl<'row> CellReader<'row> for PostgresCellReader {
-    type CellRef<'cell> = CellRef<'cell> where Self: 'cell;
+impl CellReader<'_> for PostgresCellReader {
+    type CellRef<'cell>
+        = CellRef<'cell>
+    where
+        Self: 'cell;
 
     fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
         if self.next_col >= self.row.columns().len() {

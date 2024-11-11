@@ -70,9 +70,15 @@ pub enum PostgresError {
 }
 
 impl Connector for PostgresConnection {
-    type Stmt<'conn> = query::PostgresStatement<'conn> where Self: 'conn;
+    type Stmt<'conn>
+        = query::PostgresStatement<'conn>
+    where
+        Self: 'conn;
 
-    type Append<'conn> = append::PostgresAppender<'conn> where Self: 'conn;
+    type Append<'conn>
+        = append::PostgresAppender<'conn>
+    where
+        Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
         let stmt = self

@@ -79,13 +79,13 @@ When designing the mapping, we:
 
 For example, most databases don't support sorting `UInt8`. To get around that, we could:
 
-1.  store it into `Int8` by bounding the value to range `0..127`, which would lose information.
-2.  store it into `Int8` by subtracting 128 (i.e. just reinterpreting the bytes as `Int8`). This
-    coercion would be efficient, as the new type would not be any larger than the original, but it
-    would be confusing as value 0 would be converted to -128 and value 255 to 127.
-3.  store it into `Int16`. This uses more space, but it does not lose information or change the
-    meaning of the stored value. So `connector_arrow` coerces `UInt8 => Int16`, `UInt16 => Int32`,
-    `UInt32 => Int64` and `UInt64 => Decimal128(20, 0)`.
+1. store it into `Int8` by bounding the value to range `0..127`, which would lose information.
+2. store it into `Int8` by subtracting 128 (i.e. just reinterpreting the bytes as `Int8`). This
+   coercion would be efficient, as the new type would not be any larger than the original, but it
+   would be confusing as value 0 would be converted to -128 and value 255 to 127.
+3. store it into `Int16`. This uses more space, but it does not lose information or change the
+   meaning of the stored value. So `connector_arrow` coerces `UInt8 => Int16`, `UInt16 => Int32`,
+   `UInt32 => Int64` and `UInt64 => Decimal128(20, 0)`.
 
 ## Dynamic vs static types
 
@@ -106,19 +106,18 @@ affinity](https://www.sqlite.org/datatype3.html#type_affinity) of the column.
 
 This problem can be solved in the following ways:
 
-1.  **Convert to some other type.** For PostgreSQL `NUMERIC`, that would mean conversion to a
-    decimal textual representation, encoded as `Utf8`. This is generally slow and inconvenient to
-    work with.
-2.  **Buffer and infer.** If we are able receive and buffer all of the result data, we could infer
-    the type information from the data. This is obviously not possible if we want to support
-    streaming results, as it would defeat all of the benefits of streaming. It might happen that
-    values don't have uniform types. In that case, we can reject the result entirely and inform the
-    user to cast the data into a uniform type before returning the results. We can also try to cast
-    the values to some uniform type, but is generally slow, error prone and that might not be
-    possible.
-3.  **Infer from the first batch.** If we don't want to rule out streaming, we can opt for buffering
-    only the first batch of data and inferring the types from that. If any of the subsequent batches
-    turns out to have different types, we again have the options: reject or cast.
+1. **Convert to some other type.** For PostgreSQL `NUMERIC`, that would mean conversion to a decimal
+   textual representation, encoded as `Utf8`. This is generally slow and inconvenient to work with.
+2. **Buffer and infer.** If we are able receive and buffer all of the result data, we could infer
+   the type information from the data. This is obviously not possible if we want to support
+   streaming results, as it would defeat all of the benefits of streaming. It might happen that
+   values don't have uniform types. In that case, we can reject the result entirely and inform the
+   user to cast the data into a uniform type before returning the results. We can also try to cast
+   the values to some uniform type, but is generally slow, error prone and that might not be
+   possible.
+3. **Infer from the first batch.** If we don't want to rule out streaming, we can opt for buffering
+   only the first batch of data and inferring the types from that. If any of the subsequent batches
+   turns out to have different types, we again have the options: reject or cast.
 
 At the moment, `connector_arrow` does not have a common way of solving this problem. Connector for
 SQLite uses option 2 and other connectors don't support types with dynamic types parameters.
