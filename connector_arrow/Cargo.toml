@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 name = "connector_arrow"
 
 [dependencies]
-itertools = "0.13"
+itertools = "0.14"
 log = "0.4"
 thiserror = "2"
 chrono = "0.4"
