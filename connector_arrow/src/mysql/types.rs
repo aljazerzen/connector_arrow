@@ -98,5 +98,7 @@ fn get_name_of_column_type(col_ty: &ColumnType, unsigned: bool, binary: bool) ->
 
         (MYSQL_TYPE_GEOMETRY, _, _) => "geometry",
         (MYSQL_TYPE_UNKNOWN, _, _) => "unknown",
+
+        (MYSQL_TYPE_VECTOR, _, _) => "vector",
     }
 }
