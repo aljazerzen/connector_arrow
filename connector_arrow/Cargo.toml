@@ -58,7 +58,7 @@ default-features = false
 optional = true
 
 [dependencies.duckdb]
-version = "1.1.0"
+version = "~1.1.0"
 default-features = false
 optional = true
 
