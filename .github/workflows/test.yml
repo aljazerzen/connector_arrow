@@ -11,8 +11,7 @@ jobs:
     steps:
       # checkout and env setup
       - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
+      - uses: nixbuild/nix-quick-install-action@v30
       - name: Build the nix shell
         run: nix develop --command just --version
       - uses: Swatinem/rust-cache@v2
