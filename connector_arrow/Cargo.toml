@@ -53,7 +53,7 @@ version = "0.2" # this dep is bound to postgres's transitive dep
 optional = true
 
 [dependencies.rusqlite]
-version = "0.34.0"
+version = "0.35.0"
 default-features = false
 optional = true
 
