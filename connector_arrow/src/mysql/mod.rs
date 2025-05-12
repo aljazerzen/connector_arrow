@@ -3,6 +3,8 @@ mod query;
 mod schema;
 mod types;
 
+pub use mysql;
+
 use arrow::datatypes::*;
 use mysql::prelude::*;
 

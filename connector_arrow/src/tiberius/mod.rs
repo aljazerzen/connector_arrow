@@ -3,6 +3,8 @@ mod query;
 mod schema;
 mod types;
 
+pub use tiberius;
+
 use arrow::datatypes::*;
 use futures::{AsyncRead, AsyncWrite};
 use itertools::Itertools;

@@ -3,6 +3,8 @@
 mod append;
 mod schema;
 
+pub use duckdb;
+
 #[doc(hidden)]
 pub use append::DuckDBAppender;
 

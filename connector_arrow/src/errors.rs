@@ -39,7 +39,7 @@ pub enum ConnectorError {
     #[error(transparent)]
     Arrow(#[from] arrow::error::ArrowError),
 
-    #[cfg(feature = "src_sqlite")]
+    #[cfg(feature = "src_rusqlite")]
     #[error(transparent)]
     SQLite(#[from] rusqlite::Error),
 

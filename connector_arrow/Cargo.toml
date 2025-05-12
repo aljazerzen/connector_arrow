@@ -86,7 +86,7 @@ url = "2.5.0"
 
 
 [features]
-all = ["src_sqlite", "src_duckdb", "src_postgres", "src_mysql", "src_tiberius"]
+all = ["src_rusqlite", "src_duckdb", "src_postgres", "src_mysql", "src_tiberius"]
 src_postgres = [
     "postgres",
     "postgres-protocol",
@@ -96,7 +96,7 @@ src_postgres = [
     "bytes",
     "byteorder",
 ]
-src_sqlite = ["rusqlite"]
+src_rusqlite = ["rusqlite"]
 src_duckdb = ["duckdb", "fallible-streaming-iterator"]
 src_mysql = ["mysql", "pac_cell"]
 src_tiberius = ["tiberius", "tokio", "tokio-util", "futures"]

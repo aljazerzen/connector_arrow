@@ -21,7 +21,7 @@
 //! let conn = rusqlite::Connection::open_in_memory()?;
 //!
 //! // wrap into connector_arrow connection
-//! let mut conn = connector_arrow::sqlite::SQLiteConnection::new(conn);
+//! let mut conn = connector_arrow::rusqlite::SQLiteConnection::new(conn);
 //!
 //! let mut stmt = conn.query("SELECT 1 as a")?;
 //!
@@ -66,8 +66,8 @@ pub mod duckdb;
 pub mod mysql;
 #[cfg(feature = "src_postgres")]
 pub mod postgres;
-#[cfg(feature = "src_sqlite")]
-pub mod sqlite;
+#[cfg(feature = "src_rusqlite")]
+pub mod rusqlite;
 #[cfg(feature = "src_tiberius")]
 pub mod tiberius;
 

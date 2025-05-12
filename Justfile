@@ -22,7 +22,7 @@ test-fast *ARGS:
 # test that all features work by themselves
 test-feature-gate:
     cargo check --features src_postgres
-    cargo check --features src_sqlite
+    cargo check --features src_rusqlite
     cargo check --features src_duckdb
     cargo check --features src_mysql
     cargo clippy -- -D warnings

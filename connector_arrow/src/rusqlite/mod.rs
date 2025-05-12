@@ -5,6 +5,8 @@ mod query;
 mod schema;
 mod types;
 
+pub use rusqlite;
+
 #[doc(hidden)]
 pub use append::SQLiteAppender;
 #[doc(hidden)]

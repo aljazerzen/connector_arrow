@@ -18,6 +18,8 @@ mod query;
 mod schema;
 mod types;
 
+pub use postgres;
+
 use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use postgres::Client;
 use thiserror::Error;

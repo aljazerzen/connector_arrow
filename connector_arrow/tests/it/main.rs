@@ -9,7 +9,7 @@ mod test_duckdb;
 mod test_mysql;
 #[cfg(feature = "src_postgres")]
 mod test_postgres;
-#[cfg(feature = "src_sqlite")]
+#[cfg(feature = "src_rusqlite")]
 mod test_sqlite;
 #[cfg(feature = "src_tiberius")]
 mod test_tiberius;
