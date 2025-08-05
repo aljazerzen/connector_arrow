@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/25.05";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
       url = "github:nix-community/fenix";
@@ -33,7 +33,7 @@
           cargo-insta
           cargo-audit
           pkg-config
-          docker-compose 
+          docker-compose
           (dontCheckPython python311Packages.yamlfix)
           comrak
           fd
