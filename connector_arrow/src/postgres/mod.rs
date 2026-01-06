@@ -170,6 +170,7 @@ impl Connector for PostgresConnection {
 
                 DataType::Binary | DataType::LargeBinary | DataType::FixedSizeBinary(_) => "bytea",
 
+                DataType::Decimal32(..) | DataType::Decimal64(..) => return None,
                 DataType::Decimal128(precision, scale) | DataType::Decimal256(precision, scale) => {
                     return Some(format!("decimal({precision}, {scale})"))
                 }

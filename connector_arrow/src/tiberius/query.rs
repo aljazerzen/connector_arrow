@@ -229,7 +229,7 @@ impl<'a> tiberius::FromSql<'a> for StrOrNum {
                 }
             })),
             _ => Err(tiberius::error::Error::Conversion(
-                format!("cannot convert `{:?}` into string", value).into(),
+                format!("cannot convert `{value:?}` into string").into(),
             )),
         }
     }

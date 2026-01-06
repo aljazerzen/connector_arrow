@@ -375,6 +375,8 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
         DataType::Struct(_) => todo!(),
         DataType::Union(_, _) => todo!(),
         DataType::Dictionary(_, _) => todo!(),
+        DataType::Decimal32(_, _) => todo!(),
+        DataType::Decimal64(_, _) => todo!(),
         DataType::Decimal128(precision, _) => {
             let max = if *precision == 38 {
                 999_99999_99999_99999_99999_99999_99999_99999i128
