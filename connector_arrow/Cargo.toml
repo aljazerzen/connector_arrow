@@ -64,7 +64,7 @@ default-features = false
 optional = true
 
 [dependencies.mysql]
-version = "26.0.0"
+version = "27.0.0"
 default-features = false
 optional = true
 features = ["minimal"]
