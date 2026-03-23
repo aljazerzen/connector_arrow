@@ -59,7 +59,7 @@ optional = true
 
 [dependencies.duckdb]
 # pinned to minor version because duckdb sometimes updates arrow in minor versions
-version = "~1.4.1"
+version = "~1.10501.0"
 default-features = false
 optional = true
 
