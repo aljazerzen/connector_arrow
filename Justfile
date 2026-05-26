@@ -15,7 +15,7 @@ test:
 # run tests, importants things first, for development
 test-fast *ARGS:
     just fmt
-    INSTA_FORCE_PASS=1 cargo nextest run --features=all --no-fail-fast {{ARGS}}
+    INSTA_FORCE_PASS=1 cargo nextest run --features=all --no-fail-fast {{ ARGS }}
     cargo insta review
     cargo clippy --features=all
 
@@ -30,15 +30,7 @@ test-feature-gate:
 
 # format source files
 fmt:
-    comrak --extension table,tasklist \
-        --width 100 \
-        --to commonmark \
-        README.md --output README.md
-    cargo fmt
-    yamlfix $(fd --hidden '.yml')
+    treefmt
 
-# validate that source files are formatted
 fmt-check:
-    cargo fmt --check
-    yamlfix --check $(fd --hidden '.yml')
-
+    treefmt --fail-on-change

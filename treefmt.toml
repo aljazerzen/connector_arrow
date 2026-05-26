@@ -1,0 +1,26 @@
+[formatter.rust]
+command = "rustfmt"
+options = []
+includes = ["*.rs"]
+
+[formatter.toml]
+command = "taplo"
+options = ["fmt"]
+includes = ["*.toml"]
+
+[formatter.yaml]
+command = "yamlfmt"
+options = []
+includes = ["*.yaml", "*.yml"]
+
+[formatter.just]
+command = "just"
+options = ["--fmt", "--justfile"]
+includes = ["justfile", "Justfile", "**/justfile", "**/Justfile"]
+no-positional-arg-support = true
+
+[formatter.markdown]
+command = "comrak"
+options = ["--extension=table,tasklist", "--width=100", "--inplace"]
+includes = ["*.md"]
+no-positional-arg-support = true

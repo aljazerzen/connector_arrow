@@ -1,4 +1,3 @@
----
 name: Publish
 on:
   push:
@@ -12,7 +11,6 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - name: Build the nix shell
         run: nix develop --command cargo --version
-
       # publish
       - run: nix develop --command cargo publish --package connector_arrow --verbose
         env:
