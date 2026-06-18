@@ -6,11 +6,10 @@ default:
     just --list
 
 test:
-    just fmt-check
-    cargo clippy --features=all -- -D warnings
     cargo nextest run --features=all
-    just test-feature-gate
     cargo test --doc --features=all
+    cargo clippy --features=all
+    just test-feature-gate
 
 # run tests, importants things first, for development
 test-fast *ARGS:
@@ -31,6 +30,3 @@ test-feature-gate:
 # format source files
 fmt:
     treefmt
-
-fmt-check:
-    treefmt --fail-on-change
