@@ -10,10 +10,10 @@
 
   outputs =
     {
-      self,
       nixpkgs,
       flake-utils,
       fenix,
+      ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -56,8 +56,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = essentials ++ dbs;
 
-          # linking duckdb needs this
-          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+          # runtime shared libs: libstdc++ (duckdb) + libsqlite3
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.stdenv.cc.cc.lib ] ++ dbs);
         };
       }
     );

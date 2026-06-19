@@ -45,7 +45,7 @@ impl Connector for SQLiteConnection {
     where
         Self: 'conn;
 
-    fn query(&mut self, query: &str) -> Result<SQLiteStatement, ConnectorError> {
+    fn query(&mut self, query: &str) -> Result<SQLiteStatement<'_>, ConnectorError> {
         let stmt = self.inner.prepare(query)?;
         Ok(SQLiteStatement { stmt })
     }

@@ -74,6 +74,7 @@ pub fn query_table<C: Connector>(
     Ok((schema, batches))
 }
 
+#[allow(dead_code)]
 pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLiteral>) {
     let mut sql_selects = Vec::new();
     let mut expected_fields = Vec::new();
@@ -122,6 +123,7 @@ pub fn query_literals<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLite
     );
 }
 
+#[allow(dead_code)]
 pub fn query_literals_binary<C: Connector>(conn: &mut C, queries: Vec<QueryOfSingleLiteral>) {
     let mut sql_selects = Vec::new();
     let mut expected_fields = Vec::new();
@@ -172,6 +174,7 @@ pub fn query_literals_binary<C: Connector>(conn: &mut C, queries: Vec<QueryOfSin
     );
 }
 
+#[allow(dead_code)]
 fn new_singleton_array(data_type: &DataType, value: Box<dyn ArrowValue>) -> ArrayRef {
     let schema = Arc::new(Schema::new(vec![Field::new("", data_type.clone(), true)]));
 
@@ -184,6 +187,7 @@ fn new_singleton_array(data_type: &DataType, value: Box<dyn ArrowValue>) -> Arra
     batch.column(0).clone()
 }
 
+#[allow(dead_code)]
 pub struct QueryOfSingleLiteral {
     pub db_ty: String,
     pub value_sql: String,
