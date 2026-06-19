@@ -2,6 +2,7 @@ use arrow::array::*;
 use arrow::datatypes::*;
 use half::f16;
 use rand::Rng;
+use rand::RngExt;
 use std::ops::Neg;
 use std::sync::Arc;
 
@@ -78,7 +79,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 false,
                 true,
                 false,
-                rng.gen_bool(0.5)
+                rng.random_bool(0.5)
             ]
         }
         DataType::Int8 => {
@@ -88,7 +89,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i8::MIN,
                 i8::MAX,
                 0,
-                rng.gen_range(i8::MIN..=i8::MAX)
+                rng.random_range(i8::MIN..=i8::MAX)
             ]
         }
         DataType::Int16 => {
@@ -98,7 +99,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i16::MIN,
                 i16::MAX,
                 0,
-                rng.gen_range(i16::MIN..=i16::MAX)
+                rng.random_range(i16::MIN..=i16::MAX)
             ]
         }
         DataType::Int32 => {
@@ -108,7 +109,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i32::MIN,
                 i32::MAX,
                 0,
-                rng.gen_range(i32::MIN..=i32::MAX)
+                rng.random_range(i32::MIN..=i32::MAX)
             ]
         }
         DataType::Int64 => {
@@ -118,7 +119,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 0,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::UInt8 => {
@@ -128,7 +129,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 u8::MIN,
                 u8::MAX,
                 0,
-                rng.gen_range(u8::MIN..=u8::MAX)
+                rng.random_range(u8::MIN..=u8::MAX)
             ]
         }
         DataType::UInt16 => {
@@ -138,7 +139,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 u16::MIN,
                 u16::MAX,
                 0,
-                rng.gen_range(u16::MIN..=u16::MAX)
+                rng.random_range(u16::MIN..=u16::MAX)
             ]
         }
         DataType::UInt32 => {
@@ -148,7 +149,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 u32::MIN,
                 u32::MAX,
                 0,
-                rng.gen_range(u32::MIN..=u32::MAX)
+                rng.random_range(u32::MIN..=u32::MAX)
             ]
         }
         DataType::UInt64 => {
@@ -158,7 +159,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 u64::MIN,
                 u64::MAX,
                 0,
-                rng.gen_range(u64::MIN..=u64::MAX)
+                rng.random_range(u64::MIN..=u64::MAX)
             ]
         }
         DataType::Float16 => {
@@ -168,7 +169,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 f16::MIN,
                 f16::MAX,
                 f16::ZERO,
-                f16::from_bits(rng.gen_range(u16::MIN..=u16::MAX))
+                f16::from_bits(rng.random_range(u16::MIN..=u16::MAX))
             ]
         }
         DataType::Float32 => {
@@ -178,7 +179,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 f32::MIN,
                 f32::MAX,
                 f32::ZERO,
-                rng.gen::<f32>() // TODO: this is standard instead of uniform
+                rng.random::<f32>() // TODO: this is standard instead of uniform
             ]
         }
         DataType::Float64 => {
@@ -188,7 +189,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 f64::MIN,
                 f64::MAX,
                 f64::ZERO,
-                rng.gen::<f64>() // TODO: this is standard instead of uniform
+                rng.random::<f64>() // TODO: this is standard instead of uniform
             ]
         }
         DataType::Timestamp(TimeUnit::Nanosecond, _) => {
@@ -199,7 +200,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 i64::ZERO,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::Timestamp(TimeUnit::Microsecond, _) => {
@@ -210,7 +211,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 i64::ZERO,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::Timestamp(TimeUnit::Millisecond, _) => {
@@ -221,7 +222,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 i64::ZERO,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::Timestamp(TimeUnit::Second, _) => {
@@ -231,7 +232,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 i64::ZERO,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::Date32 => {
@@ -241,7 +242,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i32::MIN,
                 i32::MAX,
                 0,
-                rng.gen_range(i32::MIN..=i32::MAX)
+                rng.random_range(i32::MIN..=i32::MAX)
             ]
         }
         DataType::Date64 => {
@@ -251,7 +252,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 0,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ]
         }
         DataType::Time32(_) => {
@@ -261,7 +262,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i32::MIN,
                 i32::MAX,
                 0,
-                rng.gen_range(i32::MIN..=i32::MAX)
+                rng.random_range(i32::MIN..=i32::MAX)
             ];
             arrow::compute::cast(&array, data_type).unwrap()
         }
@@ -272,7 +273,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 0,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ];
             arrow::compute::cast(&array, data_type).unwrap()
         }
@@ -283,7 +284,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 0,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ];
             arrow::compute::cast(&array, data_type).unwrap()
         }
@@ -294,7 +295,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i32::MIN,
                 i32::MAX,
                 0,
-                rng.gen_range(i32::MIN..=i32::MAX)
+                rng.random_range(i32::MIN..=i32::MAX)
             ]
         }
         DataType::Interval(IntervalUnit::MonthDayNano) => {
@@ -304,7 +305,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i128::MIN,
                 i128::MAX,
                 0,
-                rng.gen_range(i128::MIN..=i128::MAX)
+                rng.random_range(i128::MIN..=i128::MAX)
             ];
             arrow::compute::cast(&array, data_type).unwrap()
         }
@@ -315,7 +316,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 i64::MIN,
                 i64::MAX,
                 0,
-                rng.gen_range(i64::MIN..=i64::MAX)
+                rng.random_range(i64::MIN..=i64::MAX)
             ];
             arrow::compute::cast(&array, data_type).unwrap()
         }
@@ -390,7 +391,7 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 min,
                 max,
                 0,
-                rng.gen_range(min..=max)
+                rng.random_range(min..=max)
             ]
         }
         DataType::Decimal256(precision, _) => {
@@ -421,8 +422,8 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
                 max,
                 i256::ZERO,
                 i256::from_parts(
-                    rng.gen_range(min_low..=max_low),
-                    rng.gen_range(min_high..=max_high)
+                    rng.random_range(min_low..=max_low),
+                    rng.random_range(min_high..=max_high)
                 )
             ]
         }
@@ -438,24 +439,24 @@ fn generate_array<R: Rng>(data_type: &DataType, values: &[ValuesSpec], rng: &mut
 fn gen_binary_of_size<R: Rng>(size: usize, rng: &mut R) -> Vec<u8> {
     let mut buf = Vec::<u8>::with_capacity(size);
     for _ in 0..size {
-        buf.push(rng.gen());
+        buf.push(rng.random());
     }
     buf
 }
 
 fn gen_binary<R: Rng>(size_range: std::ops::Range<usize>, rng: &mut R) -> Vec<u8> {
-    let size: usize = rng.gen_range(size_range);
+    let size: usize = rng.random_range(size_range);
     gen_binary_of_size(size, rng)
 }
 
 fn gen_string_of_size<R: Rng>(size: usize, rng: &mut R) -> String {
-    rng.sample_iter(&rand::distributions::Alphanumeric)
+    rng.sample_iter(&rand::distr::Alphanumeric)
         .take(size)
         .map(char::from)
         .collect()
 }
 
 fn gen_string<R: Rng>(size_range: std::ops::Range<usize>, rng: &mut R) -> String {
-    let size: usize = rng.gen_range(size_range);
+    let size: usize = rng.random_range(size_range);
     gen_string_of_size(size, rng)
 }
