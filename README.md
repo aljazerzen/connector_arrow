@@ -32,8 +32,8 @@ without need for dynamic linking of C libraries.
 
 | RDBMS | SQLite | DuckDB | PostgreSQL | MySQL | Microsoft SQL Server |
 | --- | --- | --- | --- | --- | --- |
-| feature | `src_rusqlite` | `src_duckdb` | `src_postgres` | `src_mysql` | `src_tiberius` |
-| dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) | [mysql](https://crates.io/crates/mysql) | [tiberius](https://crates.io/crates/tiberius) |
+| feature | `src_rusqlite` | `src_duckdb` | `src_postgres` | `src_mysql` | `src_mssql` |
+| dependency | [rusqlite](https://crates.io/crates/rusqlite) | [duckdb](https://crates.io/crates/duckdb) | [postgres](https://crates.io/crates/postgres) | [mysql](https://crates.io/crates/mysql) | [mssql](https://crates.io/crates/mssql) (fork of [tiberius](https://crates.io/crates/tiberius)) |
 | query | x | x | x | x | x |
 | query params | x | x | x |  | x |
 | schema get | x | x | x | x | x |

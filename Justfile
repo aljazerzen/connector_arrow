@@ -1,6 +1,6 @@
 export POSTGRES_URL := "postgres://user:pass@localhost:5432/db"
 export MYSQL_URL := "mysql://root:pass@localhost:3306/db"
-export TIBERIUS_URL := "tds://sa:passwordA1@localhost:1433"
+export MSSQL_URL := "tds://sa:passwordA1@localhost:1433"
 
 default:
     just --list

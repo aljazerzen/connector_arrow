@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use arrow::datatypes::*;
-use tiberius::{Column, ColumnType};
+use mssql::{Column, ColumnType};
 use tokio::net::TcpStream;
 use tokio_util::compat::Compat;
 
@@ -25,7 +25,7 @@ pub fn get_result_schema(columns: Option<&[Column]>) -> Result<SchemaRef, Connec
 pub fn create_field(name: &str, db_ty: &str, nullable: bool) -> Field {
     let mut metadata = HashMap::new();
 
-    let data_type = super::TiberiusConnection::<Compat<TcpStream>>::type_db_into_arrow(db_ty);
+    let data_type = super::MssqlConnection::<Compat<TcpStream>>::type_db_into_arrow(db_ty);
 
     // if we cannot map to an arrow type, map into a binary
     let data_type = data_type.unwrap_or_else(|| {

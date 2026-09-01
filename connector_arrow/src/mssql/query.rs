@@ -2,7 +2,7 @@ use arrow::{datatypes::*, record_batch::RecordBatch};
 use futures::{AsyncRead, AsyncWrite, StreamExt};
 use itertools::Itertools;
 use std::sync::Arc;
-use tiberius::{ColumnData, QueryStream, ToSql};
+use mssql::{ColumnData, QueryStream, ToSql};
 use tokio::runtime::Runtime;
 
 use crate::api::{ResultReader, Statement};
@@ -13,16 +13,16 @@ use crate::util::ArrayCellRef;
 use crate::util::{self, transport::Produce};
 use crate::ConnectorError;
 
-pub struct TiberiusStatement<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> {
-    pub(super) conn: &'conn mut super::TiberiusConnection<S>,
+pub struct MssqlStatement<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> {
+    pub(super) conn: &'conn mut super::MssqlConnection<S>,
     pub(super) query: String,
 }
 
 impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
-    for TiberiusStatement<'conn, S>
+    for MssqlStatement<'conn, S>
 {
     type Reader<'stmt>
-        = TiberiusResultReader<'stmt>
+        = MssqlResultReader<'stmt>
     where
         Self: 'stmt;
 
@@ -50,9 +50,9 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
         let schema = super::types::get_result_schema(columns)?;
         self.conn.rt.block_on(stream.next());
 
-        Ok(TiberiusResultReader {
+        Ok(MssqlResultReader {
             schema,
-            stream: TiberiusStream {
+            stream: MssqlStream {
                 rt: self.conn.rt.clone(),
                 stream,
             },
@@ -60,23 +60,23 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Statement<'conn>
     }
 }
 
-pub struct TiberiusResultReader<'stmt> {
+pub struct MssqlResultReader<'stmt> {
     schema: SchemaRef,
-    stream: TiberiusStream<'stmt>,
+    stream: MssqlStream<'stmt>,
 }
 
-struct TiberiusStream<'stmt> {
+struct MssqlStream<'stmt> {
     rt: Arc<Runtime>,
     stream: QueryStream<'stmt>,
 }
 
-impl<'stmt> ResultReader<'stmt> for TiberiusResultReader<'stmt> {
+impl<'stmt> ResultReader<'stmt> for MssqlResultReader<'stmt> {
     fn get_schema(&mut self) -> Result<arrow::datatypes::SchemaRef, ConnectorError> {
         Ok(self.schema.clone())
     }
 }
 
-impl Iterator for TiberiusResultReader<'_> {
+impl Iterator for MssqlResultReader<'_> {
     type Item = Result<RecordBatch, ConnectorError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -84,9 +84,9 @@ impl Iterator for TiberiusResultReader<'_> {
     }
 }
 
-impl<'s> util::RowsReader<'s> for TiberiusStream<'s> {
+impl<'s> util::RowsReader<'s> for MssqlStream<'s> {
     type CellReader<'row>
-        = TiberiusCellReader
+        = MssqlCellReader
     where
         Self: 'row;
 
@@ -98,30 +98,30 @@ impl<'s> util::RowsReader<'s> for TiberiusStream<'s> {
 
         // are there more result sets?
         let row = match item? {
-            tiberius::QueryItem::Row(row) => row,
-            tiberius::QueryItem::Metadata(_) => {
+            mssql::QueryItem::Row(row) => row,
+            mssql::QueryItem::Metadata(_) => {
                 // yes, this there are
                 return Err(ConnectorError::MultipleResultSets);
             }
         };
 
-        Ok(Some(TiberiusCellReader { row, cell: 0 }))
+        Ok(Some(MssqlCellReader { row, cell: 0 }))
     }
 }
 
-struct TiberiusCellReader {
-    row: tiberius::Row,
+struct MssqlCellReader {
+    row: mssql::Row,
     cell: usize,
 }
 
-impl util::CellReader<'_> for TiberiusCellReader {
+impl util::CellReader<'_> for MssqlCellReader {
     type CellRef<'cell>
-        = TiberiusCellRef<'cell>
+        = MssqlCellRef<'cell>
     where
         Self: 'cell;
 
     fn next_cell(&mut self) -> Option<Self::CellRef<'_>> {
-        let r = TiberiusCellRef {
+        let r = MssqlCellRef {
             row: &mut self.row,
             cell: self.cell,
         };
@@ -131,12 +131,12 @@ impl util::CellReader<'_> for TiberiusCellReader {
 }
 
 #[derive(Debug)]
-struct TiberiusCellRef<'a> {
-    row: &'a mut tiberius::Row,
+struct MssqlCellRef<'a> {
+    row: &'a mut mssql::Row,
     cell: usize,
 }
 
-impl<'r> Produce<'r> for TiberiusCellRef<'r> {}
+impl<'r> Produce<'r> for MssqlCellRef<'r> {}
 
 macro_rules! impl_produce_ty {
     ($ArrTy: ty, $DbTy: ty) => {
@@ -144,7 +144,7 @@ macro_rules! impl_produce_ty {
     };
 
     ($ArrTy: ty, $DbTy: ty, $conversion: expr) => {
-        impl<'r> ProduceTy<'r, $ArrTy> for TiberiusCellRef<'r> {
+        impl<'r> ProduceTy<'r, $ArrTy> for MssqlCellRef<'r> {
             fn produce(self) -> Result<<$ArrTy as ArrowType>::Native, ConnectorError> {
                 Ok(self
                     .row
@@ -170,7 +170,7 @@ impl_produce_ty!(Utf8Type, StrOrNum, StrOrNum::into_inner);
 impl_produce_ty!(LargeUtf8Type, &str, &str::to_owned);
 
 impl_produce_unsupported!(
-    TiberiusCellRef<'r>,
+    MssqlCellRef<'r>,
     (
         NullType,
         Int8Type,
@@ -211,8 +211,8 @@ impl StrOrNum {
     }
 }
 
-impl<'a> tiberius::FromSql<'a> for StrOrNum {
-    fn from_sql(value: &'a ColumnData<'static>) -> tiberius::Result<Option<Self>> {
+impl<'a> mssql::FromSql<'a> for StrOrNum {
+    fn from_sql(value: &'a ColumnData<'static>) -> mssql::Result<Option<Self>> {
         match value {
             ColumnData::String(s) => Ok(s.as_ref().map(|x| StrOrNum(x.to_string()))),
             ColumnData::Numeric(n) => Ok(n.as_ref().map(|x| {
@@ -228,7 +228,7 @@ impl<'a> tiberius::FromSql<'a> for StrOrNum {
                     StrOrNum(format!("{}", x.value()))
                 }
             })),
-            _ => Err(tiberius::error::Error::Conversion(
+            _ => Err(mssql::error::Error::Conversion(
                 format!("cannot convert `{value:?}` into string").into(),
             )),
         }

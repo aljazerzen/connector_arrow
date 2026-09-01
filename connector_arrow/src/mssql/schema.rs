@@ -9,7 +9,7 @@ use crate::api::{Connector, SchemaEdit, SchemaGet};
 use crate::util::escape::escaped_ident;
 use crate::{ConnectorError, TableCreateError, TableDropError};
 
-impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaGet for super::TiberiusConnection<S> {
+impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaGet for super::MssqlConnection<S> {
     fn table_list(&mut self) -> Result<Vec<String>, ConnectorError> {
         let query = "
             SELECT TABLE_NAME
@@ -47,7 +47,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaGet for super::TiberiusConn
                 TABLE_NAME = @P1
             ORDER BY ORDINAL_POSITION;
         ";
-        let params: [&dyn tiberius::ToSql; 1] = [&table_name.to_string()];
+        let params: [&dyn mssql::ToSql; 1] = [&table_name.to_string()];
         let res = self.client.query(query, &params);
         let res = self.rt.block_on(res)?;
 
@@ -76,7 +76,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaGet for super::TiberiusConn
     }
 }
 
-impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaEdit for super::TiberiusConnection<S> {
+impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaEdit for super::MssqlConnection<S> {
     fn table_create(&mut self, name: &str, schema: SchemaRef) -> Result<(), TableCreateError> {
         let column_defs = schema
             .fields()
@@ -102,7 +102,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaEdit for super::TiberiusCon
 
         match res {
             Ok(_) => Ok(()),
-            Err(tiberius::error::Error::Server(e)) if e.code() == 2714 => {
+            Err(mssql::error::Error::Server(e)) if e.code() == 2714 => {
                 Err(TableCreateError::TableExists)
             }
             Err(e) => Err(TableCreateError::Connector(e.into())),
@@ -116,7 +116,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> SchemaEdit for super::TiberiusCon
 
         match res {
             Ok(_) => Ok(()),
-            Err(tiberius::error::Error::Server(e)) if e.code() == 3701 => {
+            Err(mssql::error::Error::Server(e)) if e.code() == 3701 => {
                 Err(TableDropError::TableNonexistent)
             }
             Err(e) => Err(TableDropError::Connector(e.into())),
