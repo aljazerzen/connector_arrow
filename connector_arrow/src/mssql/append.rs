@@ -5,8 +5,8 @@ use arrow::datatypes::*;
 use arrow::record_batch::RecordBatch;
 use futures::{AsyncRead, AsyncWrite};
 use itertools::{zip_eq, Itertools};
-use tiberius::numeric::Numeric;
-use tiberius::{BulkLoadRequest, Client, ColumnData, TokenRow};
+use mssql::numeric::Numeric;
+use mssql::{BulkLoadRequest, Client, ColumnData, TokenRow};
 use tokio::runtime::Runtime;
 
 use crate::api::Append;
@@ -16,12 +16,12 @@ use crate::util::transport::{Consume, ConsumeTy};
 use crate::util::ArrayCellRef;
 use crate::{impl_consume_unsupported, ConnectorError};
 
-pub struct TiberiusAppender<'c, S: AsyncRead + AsyncWrite + Unpin + Send> {
+pub struct MssqlAppender<'c, S: AsyncRead + AsyncWrite + Unpin + Send> {
     rt: Arc<Runtime>,
     bulk_load: BulkLoadRequest<'c, S>,
 }
 
-impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusAppender<'conn, S> {
+impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> MssqlAppender<'conn, S> {
     pub fn new(
         rt: Arc<Runtime>,
         client: &'conn mut Client<S>,
@@ -29,7 +29,7 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusAppender<'conn, S>
     ) -> Result<Self, ConnectorError> {
         let table_name = escaped_ident(table_name).to_string();
 
-        // Tiberius requires table_name to be 'conn, but does not really use it as such.
+        // mssql (inherited from tiberius) requires table_name to be 'conn, but does not really use it as such.
         // We convert our '_ into 'conn here.
         let table_name: &'conn str = unsafe { std::mem::transmute::<_, _>(table_name.as_str()) };
 
@@ -40,7 +40,7 @@ impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusAppender<'conn, S>
     }
 }
 
-impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Append<'conn> for TiberiusAppender<'conn, S> {
+impl<'conn, S: AsyncRead + AsyncWrite + Unpin + Send> Append<'conn> for MssqlAppender<'conn, S> {
     fn append(&mut self, batch: RecordBatch) -> Result<(), ConnectorError> {
         let schema = batch.schema();
         let mut row_ref = zip_eq(batch.columns(), schema.fields())

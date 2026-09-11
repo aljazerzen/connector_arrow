@@ -11,5 +11,5 @@ mod test_mysql;
 mod test_postgres;
 #[cfg(feature = "src_rusqlite")]
 mod test_sqlite;
-#[cfg(feature = "src_tiberius")]
-mod test_tiberius;
+#[cfg(feature = "src_mssql")]
+mod test_mssql;

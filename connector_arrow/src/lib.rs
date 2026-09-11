@@ -68,8 +68,8 @@ pub mod mysql;
 pub mod postgres;
 #[cfg(feature = "src_rusqlite")]
 pub mod rusqlite;
-#[cfg(feature = "src_tiberius")]
-pub mod tiberius;
+#[cfg(feature = "src_mssql")]
+pub mod mssql;
 
 pub use arrow;
 pub use errors::*;

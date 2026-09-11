@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use connector_arrow::tiberius::TiberiusConnection;
+use connector_arrow::mssql::MssqlConnection;
 use rstest::rstest;
-use tiberius::{AuthMethod, Client, Config};
+use mssql::{AuthMethod, Client, Config};
 use tokio::{net::TcpStream, runtime};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use crate::{spec, util::QueryOfSingleLiteral};
 
-fn init() -> TiberiusConnection<Compat<TcpStream>> {
+fn init() -> MssqlConnection<Compat<TcpStream>> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     let rt = Arc::new(
@@ -18,7 +18,7 @@ fn init() -> TiberiusConnection<Compat<TcpStream>> {
             .unwrap(),
     );
 
-    let url = std::env::var("TIBERIUS_URL").unwrap();
+    let url = std::env::var("MSSQL_URL").unwrap();
     let url = url::Url::parse(&url).unwrap();
 
     let mut config = Config::new();
@@ -36,7 +36,7 @@ fn init() -> TiberiusConnection<Compat<TcpStream>> {
     let client = Client::connect(config, tcp.compat_write());
     let client = rt.block_on(client).unwrap();
 
-    TiberiusConnection::new(rt, client)
+    MssqlConnection::new(rt, client)
 }
 
 #[test]

@@ -69,8 +69,10 @@ default-features = false
 optional = true
 features = ["minimal"]
 
-[dependencies.tiberius]
-version = "0.12.2"
+[dependencies.mssql]
+# https://crates.io/crates/mssql - a maintained fork of tiberius with the same
+# Client/ColumnData/ToSql/etc. API this module already used from `tiberius`.
+version = "1.0.1"
 default-features = false
 optional = true
 
@@ -91,7 +93,7 @@ all = [
   "src_duckdb",
   "src_postgres",
   "src_mysql",
-  "src_tiberius",
+  "src_mssql",
 ]
 src_postgres = [
   "postgres",
@@ -105,7 +107,7 @@ src_postgres = [
 src_rusqlite = ["rusqlite"]
 src_duckdb = ["duckdb", "fallible-streaming-iterator"]
 src_mysql = ["mysql", "pac_cell"]
-src_tiberius = ["tiberius", "tokio", "tokio-util", "futures"]
+src_mssql = ["mssql", "tokio", "tokio-util", "futures"]
 
 [package.metadata.docs.rs]
 features = ["all"]

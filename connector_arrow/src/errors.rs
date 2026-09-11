@@ -55,9 +55,9 @@ pub enum ConnectorError {
     #[error(transparent)]
     MySQL(#[from] mysql::Error),
 
-    #[cfg(feature = "src_tiberius")]
+    #[cfg(feature = "src_mssql")]
     #[error(transparent)]
-    Tiberius(#[from] tiberius::error::Error),
+    Mssql(#[from] mssql::error::Error),
 }
 
 #[derive(Error, Debug)]

@@ -3,7 +3,7 @@ mod query;
 mod schema;
 mod types;
 
-pub use tiberius;
+pub use mssql;
 
 use arrow::datatypes::*;
 use futures::{AsyncRead, AsyncWrite};
@@ -14,45 +14,45 @@ use tokio::runtime::Runtime;
 use crate::api::Connector;
 use crate::ConnectorError;
 
-pub struct TiberiusConnection<S: AsyncRead + AsyncWrite + Unpin + Send> {
+pub struct MssqlConnection<S: AsyncRead + AsyncWrite + Unpin + Send> {
     rt: Arc<Runtime>,
-    client: tiberius::Client<S>,
+    client: mssql::Client<S>,
 }
 
-impl<S: AsyncRead + AsyncWrite + Unpin + Send> TiberiusConnection<S> {
-    pub fn new(rt: Arc<Runtime>, client: tiberius::Client<S>) -> Self {
-        TiberiusConnection { rt, client }
+impl<S: AsyncRead + AsyncWrite + Unpin + Send> MssqlConnection<S> {
+    pub fn new(rt: Arc<Runtime>, client: mssql::Client<S>) -> Self {
+        MssqlConnection { rt, client }
     }
 
-    pub fn unwrap(self) -> (Arc<Runtime>, tiberius::Client<S>) {
+    pub fn unwrap(self) -> (Arc<Runtime>, mssql::Client<S>) {
         (self.rt, self.client)
     }
 
-    pub fn inner_mut(&mut self) -> (&mut Arc<Runtime>, &mut tiberius::Client<S>) {
+    pub fn inner_mut(&mut self) -> (&mut Arc<Runtime>, &mut mssql::Client<S>) {
         (&mut self.rt, &mut self.client)
     }
 }
 
-impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<S> {
+impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for MssqlConnection<S> {
     type Stmt<'conn>
-        = query::TiberiusStatement<'conn, S>
+        = query::MssqlStatement<'conn, S>
     where
         Self: 'conn;
 
     type Append<'conn>
-        = append::TiberiusAppender<'conn, S>
+        = append::MssqlAppender<'conn, S>
     where
         Self: 'conn;
 
     fn query<'a>(&'a mut self, query: &str) -> Result<Self::Stmt<'a>, ConnectorError> {
-        Ok(query::TiberiusStatement {
+        Ok(query::MssqlStatement {
             conn: self,
             query: query.to_string(),
         })
     }
 
     fn append<'a>(&'a mut self, table_name: &str) -> Result<Self::Append<'a>, ConnectorError> {
-        append::TiberiusAppender::new(self.rt.clone(), &mut self.client, table_name)
+        append::MssqlAppender::new(self.rt.clone(), &mut self.client, table_name)
     }
 
     #[allow(clippy::get_first)]
@@ -160,7 +160,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connector for TiberiusConnection<
 }
 
 fn can_decimal_fit_in_numeric(precision: u8, scale: i8) -> bool {
-    // TODO: this should be p <= 38, not p < 38. This restriction is a bug in tiberius.
+    // TODO: this should be p <= 38, not p < 38. This restriction is a bug inherited from tiberius;
+    // unclear whether the mssql fork has fixed it independently.
 
     precision < 38 && scale >= 0 && precision >= scale as u8
 }
