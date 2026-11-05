@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
     ports: ['5432:5432']
     environment:
       POSTGRES_DB: db
@@ -12,16 +12,21 @@ services:
       timeout: 5s
       retries: 5
   mysql:
-    image: mariadb:10
+    image: docker.io/library/mariadb:10
     ports: ['3306:3306']
     environment:
       MYSQL_DATABASE: db
       MYSQL_ROOT_PASSWORD: pass
     command: --secure-file-priv=""
+    healthcheck:
+      test: [CMD-SHELL, mysqladmin ping -h localhost -uroot -ppass]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   mssql:
-    image: mcr.microsoft.com/mssql/server
+    image: mcr.microsoft.com/mssql/server:2022-latest
     ports: ['1433:1433']
-    platform: linux/amd64 # https://github.com/microsoft/mssql-docker/issues/668#issuecomment-1436802153
+    platform: linux/amd64
     environment:
       ACCEPT_EULA: Y
       MSSQL_PID: Developer

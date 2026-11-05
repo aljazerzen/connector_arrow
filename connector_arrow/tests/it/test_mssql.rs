@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use connector_arrow::mssql::MssqlConnection;
-use rstest::rstest;
 use mssql::{AuthMethod, Client, Config};
+use rstest::rstest;
 use tokio::{net::TcpStream, runtime};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 

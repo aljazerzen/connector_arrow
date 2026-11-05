@@ -7,6 +7,9 @@ start:
 stop:
     docker compose down
 
+podman-compose *ARGS:
+    podman-compose {{ ARGS }}
+
 # dbs not included in ci
 seed-more:
     mysql --protocol tcp -h$MYSQL_HOST -P$MYSQL_PORT -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DB < mysql.sql

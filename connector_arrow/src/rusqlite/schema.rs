@@ -79,7 +79,7 @@ pub(crate) fn table_create(
     let res = conn.inner.execute(&ddl, ());
     match res {
         Ok(_) => Ok(()),
-        Err(e) if e.to_string().ends_with("already exists") => Err(TableCreateError::TableExists),
+        Err(e) if e.to_string().contains("already exists") => Err(TableCreateError::TableExists),
         Err(e) => Err(TableCreateError::Connector(ConnectorError::SQLite(e))),
     }
 }

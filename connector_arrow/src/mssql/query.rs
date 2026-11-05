@@ -1,8 +1,8 @@
 use arrow::{datatypes::*, record_batch::RecordBatch};
 use futures::{AsyncRead, AsyncWrite, StreamExt};
 use itertools::Itertools;
-use std::sync::Arc;
 use mssql::{ColumnData, QueryStream, ToSql};
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::api::{ResultReader, Statement};

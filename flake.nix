@@ -39,6 +39,8 @@
           cargo-audit
           pkg-config
           docker-compose
+          podman
+          podman-compose
 
           taplo
           treefmt
