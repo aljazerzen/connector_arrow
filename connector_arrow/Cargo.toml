@@ -88,13 +88,7 @@ url = "2.5.0"
 
 
 [features]
-all = [
-  "src_rusqlite",
-  "src_duckdb",
-  "src_postgres",
-  "src_mysql",
-  "src_mssql",
-]
+all = ["src_rusqlite", "src_duckdb", "src_postgres", "src_mysql", "src_mssql"]
 src_postgres = [
   "postgres",
   "postgres-protocol",

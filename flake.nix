@@ -38,7 +38,7 @@
           cargo-insta
           cargo-audit
           pkg-config
-          docker-compose
+          podman
 
           taplo
           treefmt

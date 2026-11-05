@@ -83,9 +83,10 @@ impl<Q: Queryable> Connector for MySQLConnection<Q> {
             ("real" | "float" | "float4", _) => DataType::Float32,
             ("double" | "float8", _) => DataType::Float64,
 
-            ("bit" | "tinyblob" | "mediumblob" | "longblob" | "blob" | "binary" | "varbinary", _) => {
-                DataType::Binary
-            }
+            (
+                "bit" | "tinyblob" | "mediumblob" | "longblob" | "blob" | "binary" | "varbinary",
+                _,
+            ) => DataType::Binary,
 
             ("tinytext" | "mediumtext" | "longtext" | "text" | "varchar" | "char", _) => {
                 DataType::Utf8

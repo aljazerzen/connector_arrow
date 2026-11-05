@@ -2,10 +2,13 @@ _default:
     just list
 
 start:
-    docker compose up --detach --wait
+    podman run --detach --replace --name connector-arrow-postgres --publish 5432:5432 --env POSTGRES_DB=db --env POSTGRES_USER=user --env POSTGRES_PASSWORD=pass --health-cmd 'pg_isready -U user -d db' --health-interval 5s --health-timeout 5s --health-retries 5 postgres:16-alpine
+    podman run --detach --replace --name connector-arrow-mysql --publish 3306:3306 --env MYSQL_DATABASE=db --env MYSQL_ROOT_PASSWORD=pass mariadb:10 --secure-file-priv=""
+    podman run --detach --replace --name connector-arrow-mssql --platform linux/amd64 --publish 1433:1433 --env ACCEPT_EULA=Y --env MSSQL_PID=Developer --env MSSQL_SA_PASSWORD=passwordA1 --env LC_ALL=en_US.UTF-8 --env MSSQL_COLLATION=Latin1_General_100_CS_AI_SC_UTF8 mcr.microsoft.com/mssql/server
+    until podman healthcheck run connector-arrow-postgres; do sleep 1; done
 
 stop:
-    docker compose down
+    podman rm --force connector-arrow-postgres connector-arrow-mysql connector-arrow-mssql || true
 
 # dbs not included in ci
 seed-more:
