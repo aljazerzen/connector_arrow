@@ -72,7 +72,7 @@ features = ["minimal"]
 [dependencies.mssql]
 # https://crates.io/crates/mssql - a maintained fork of tiberius with the same
 # Client/ColumnData/ToSql/etc. API this module already used from `tiberius`.
-version = "1.0.1"
+version = "2.1.0"
 default-features = false
 optional = true
 
